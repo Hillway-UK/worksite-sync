@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PhotoModal } from '@/components/PhotoModal';
+import { XeroSettingsModal } from '@/components/XeroSettingsModal';
 import { toast } from '@/hooks/use-toast';
 import { FileText, Download, ChevronDown, Camera } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, getWeek, getYear } from 'date-fns';
 import moment from 'moment';
 
 interface WeeklyData {
@@ -20,10 +21,31 @@ interface WeeklyData {
   worker_name: string;
   total_hours: number;
   hourly_rate: number;
-  jobs: { job_name: string; hours: number }[];
+  jobs: { job_id: string; job_name: string; job_address: string; hours: number }[];
   additional_costs: number;
   total_amount: number;
   profile_photo?: string;
+}
+
+interface XeroSettings {
+  prefix: string;
+  startingNumber: number;
+  accountCode: string;
+  taxType: string;
+  paymentTerms: number;
+}
+
+interface JobSiteData {
+  job_id: string;
+  job_name: string;
+  job_address: string;
+  workers: Array<{
+    worker_id: string;
+    worker_name: string;
+    total_hours: number;
+    hourly_rate: number;
+    additional_costs: number;
+  }>;
 }
 
 interface DetailedEntry {
@@ -46,6 +68,13 @@ export default function AdminReports() {
   const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 6 }), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
+  const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
+    prefix: 'INV',
+    startingNumber: 1001,
+    accountCode: '4000',
+    taxType: '20% VAT',
+    paymentTerms: 30,
+  });
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
     photoUrl: string;
@@ -224,6 +253,226 @@ export default function AdminReports() {
     return grouped;
   };
 
+  // Utility functions for Xero export
+  const extractCity = (address: string): string => {
+    if (!address) return '';
+    const parts = address.split(',').map(part => part.trim());
+    if (parts.length < 2) return '';
+    // Get the second to last part (city is usually before postcode)
+    return parts[parts.length - 2] || '';
+  };
+
+  const extractPostcode = (address: string): string => {
+    if (!address) return '';
+    const parts = address.split(' ');
+    // Get the last 1-2 parts as postcode (UK format)
+    if (parts.length >= 2) {
+      const lastTwo = parts.slice(-2).join(' ');
+      // Check if it looks like a UK postcode
+      if (/^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$/i.test(lastTwo)) {
+        return lastTwo.toUpperCase();
+      }
+    }
+    return parts[parts.length - 1] || '';
+  };
+
+  const getNextInvoiceNumber = (): string => {
+    const lastNumber = parseInt(localStorage.getItem('xero_last_invoice_number') || xeroSettings.startingNumber.toString());
+    const nextNumber = lastNumber + 1;
+    localStorage.setItem('xero_last_invoice_number', nextNumber.toString());
+    
+    const year = getYear(new Date());
+    return `${xeroSettings.prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
+  };
+
+  const fetchJobSiteData = async (): Promise<JobSiteData[]> => {
+    const weekStart = new Date(selectedWeek);
+    const weekEnd = addDays(weekStart, 6);
+
+    // Fetch clock entries with job and worker details
+    const { data: entries, error } = await supabase
+      .from('clock_entries')
+      .select(`
+        *,
+        workers(id, name, hourly_rate),
+        jobs(id, name, address)
+      `)
+      .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
+      .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
+      .not('clock_out', 'is', null);
+
+    if (error) throw error;
+
+    // Fetch additional costs for the period
+    const { data: additionalCosts } = await supabase
+      .from('additional_costs')
+      .select('*')
+      .gte('date', format(weekStart, 'yyyy-MM-dd'))
+      .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+
+    // Group by job site
+    const jobSiteMap: Record<string, JobSiteData> = {};
+
+    entries?.forEach(entry => {
+      const jobId = entry.jobs?.id;
+      const jobName = entry.jobs?.name || 'Unknown Job';
+      const jobAddress = entry.jobs?.address || '';
+
+      if (!jobSiteMap[jobId]) {
+        jobSiteMap[jobId] = {
+          job_id: jobId,
+          job_name: jobName,
+          job_address: jobAddress,
+          workers: []
+        };
+      }
+
+      // Find or create worker entry for this job site
+      let workerEntry = jobSiteMap[jobId].workers.find(w => w.worker_id === entry.worker_id);
+      if (!workerEntry) {
+        workerEntry = {
+          worker_id: entry.worker_id,
+          worker_name: entry.workers?.name || 'Unknown',
+          total_hours: 0,
+          hourly_rate: entry.workers?.hourly_rate || 0,
+          additional_costs: 0
+        };
+        jobSiteMap[jobId].workers.push(workerEntry);
+      }
+
+      workerEntry.total_hours += entry.total_hours || 0;
+    });
+
+    // Add additional costs to worker entries
+    additionalCosts?.forEach(cost => {
+      Object.values(jobSiteMap).forEach(jobSite => {
+        const workerEntry = jobSite.workers.find(w => w.worker_id === cost.worker_id);
+        if (workerEntry) {
+          workerEntry.additional_costs += Number(cost.amount);
+        }
+      });
+    });
+
+    return Object.values(jobSiteMap).filter(jobSite => jobSite.workers.length > 0);
+  };
+
+  const generateXeroCSV = async () => {
+    try {
+      setLoading(true);
+      const jobSiteData = await fetchJobSiteData();
+      
+      if (jobSiteData.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No timesheet data found for the selected week",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const weekStart = new Date(selectedWeek);
+      const weekEnd = addDays(weekStart, 6);
+      const invoiceDate = format(new Date(), 'dd/MM/yyyy');
+      const dueDate = format(addDays(new Date(), xeroSettings.paymentTerms), 'dd/MM/yyyy');
+      const weekNumber = getWeek(weekStart);
+      const year = getYear(weekStart);
+
+      // Xero CSV headers with asterisks for required fields
+      const csvHeaders = [
+        '*ContactName',
+        'EmailAddress',
+        'POAddressLine1',
+        'POCity',
+        'POPostalCode',
+        '*InvoiceNumber',
+        '*InvoiceDate',
+        '*DueDate',
+        'Description',
+        '*Quantity',
+        '*UnitAmount',
+        '*AccountCode',
+        '*TaxType',
+        'Currency'
+      ];
+
+      const csvRows: string[][] = [];
+
+      jobSiteData.forEach(jobSite => {
+        const invoiceNumber = getNextInvoiceNumber();
+        const city = extractCity(jobSite.job_address);
+        const postcode = extractPostcode(jobSite.job_address);
+
+        jobSite.workers.forEach(worker => {
+          if (worker.total_hours > 0) {
+            // Add worker hours line
+            csvRows.push([
+              jobSite.job_name,
+              '',
+              jobSite.job_address,
+              city,
+              postcode,
+              invoiceNumber,
+              invoiceDate,
+              dueDate,
+              `Construction Labour - ${worker.worker_name} - Week ${weekNumber} ${year}`,
+              worker.total_hours.toFixed(2),
+              worker.hourly_rate.toFixed(2),
+              xeroSettings.accountCode,
+              xeroSettings.taxType,
+              'GBP'
+            ]);
+          }
+
+          // Add additional costs line if any
+          if (worker.additional_costs > 0) {
+            csvRows.push([
+              jobSite.job_name,
+              '',
+              jobSite.job_address,
+              city,
+              postcode,
+              invoiceNumber,
+              invoiceDate,
+              dueDate,
+              `Additional Costs - ${worker.worker_name}`,
+              '1',
+              worker.additional_costs.toFixed(2),
+              xeroSettings.accountCode,
+              xeroSettings.taxType,
+              'GBP'
+            ]);
+          }
+        });
+      });
+
+      const csvContent = [csvHeaders, ...csvRows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Xero_Export_${format(weekStart, 'dd-MM-yyyy')}_to_${format(weekEnd, 'dd-MM-yyyy')}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "Xero invoice file exported successfully",
+      });
+    } catch (error) {
+      console.error('Error generating Xero export:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate Xero export",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateCSV = () => {
     const weekStart = new Date(selectedWeek);
     const weekEnd = addDays(weekStart, 6);
@@ -324,7 +573,20 @@ export default function AdminReports() {
           <TabsContent value="summary">
             <Card>
               <CardHeader>
-                <CardTitle>Weekly Summary</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Weekly Summary</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <XeroSettingsModal onSettingsChange={setXeroSettings} />
+                    <Button 
+                      onClick={generateXeroCSV} 
+                      disabled={weeklyData.length === 0 || loading}
+                      variant="outline"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export to Xero
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
