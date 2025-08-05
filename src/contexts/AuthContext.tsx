@@ -47,6 +47,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: managerError 
       });
       
+      if (managerError) {
+        console.error('Manager query error:', managerError);
+        // Don't return here, continue to worker check
+      }
+      
       if (managerData) {
         console.log('✓ User is a MANAGER');
         setUserRole('manager');
@@ -66,6 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: workerData, 
         error: workerError 
       });
+      
+      if (workerError) {
+        console.error('Worker query error:', workerError);
+      }
       
       if (workerData) {
         console.log('✓ User is a WORKER');
@@ -87,32 +96,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkSession = async () => {
       console.log('Checking session...');
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user || null);
-      
-      if (session?.user) {
-        console.log('Session found for:', session.user.email);
-        await checkUserRole(session.user.email!);
-      } else {
-        console.log('No session found');
-        setUserRole(null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Initial session check result:', !!session);
+        setSession(session);
+        setUser(session?.user || null);
+        
+        if (session?.user) {
+          console.log('Session found for:', session.user.email);
+          await checkUserRole(session.user.email!);
+        } else {
+          console.log('No session found');
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
     checkSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, !!session);
       setSession(session);
       setUser(session?.user || null);
       
       if (session?.user) {
         console.log('New session for:', session.user.email);
+        // Don't set loading here to avoid infinite loops
         await checkUserRole(session.user.email!);
       } else {
+        console.log('Session ended, clearing role');
         setUserRole(null);
       }
     });
