@@ -29,83 +29,97 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const checkUserRole = async (userEmail: string) => {
-    console.log('Checking role for email:', userEmail);
-    
     try {
-      // Check if user is a manager
+      console.log('=== CHECKING USER ROLE ===');
+      console.log('Email to check:', userEmail);
+      
+      // Check if user is a manager first
+      console.log('Checking managers table...');
       const { data: managerData, error: managerError } = await supabase
         .from('managers')
         .select('*')
         .eq('email', userEmail)
-        .single();
-        
-      console.log('Manager check result:', { managerData, managerError });
+        .maybeSingle();
       
-      if (managerData && !managerError) {
-        console.log('User is a manager');
+      console.log('Manager query result:', { 
+        found: !!managerData, 
+        data: managerData, 
+        error: managerError 
+      });
+      
+      if (managerData) {
+        console.log('✓ User is a MANAGER');
         setUserRole('manager');
         return 'manager';
       }
       
       // Check if user is a worker
+      console.log('Checking workers table...');
       const { data: workerData, error: workerError } = await supabase
         .from('workers')
         .select('*')
         .eq('email', userEmail)
-        .single();
+        .maybeSingle();
         
-      console.log('Worker check result:', { workerData, workerError });
+      console.log('Worker query result:', { 
+        found: !!workerData, 
+        data: workerData, 
+        error: workerError 
+      });
       
-      if (workerData && !workerError) {
-        console.log('User is a worker');
+      if (workerData) {
+        console.log('✓ User is a WORKER');
         setUserRole('worker');
         return 'worker';
-      } else {
-        console.log('User not found in either table');
-        setUserRole(null);
-        return null;
       }
+      
+      console.log('✗ User not found in either table');
+      setUserRole(null);
+      return null;
+      
     } catch (error) {
-      console.error('Error checking user role:', error);
+      console.error('Error in checkUserRole:', error);
       setUserRole(null);
       return null;
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user?.email) {
-          setTimeout(() => {
-            checkUserRole(session.user.email!);
-          }, 0);
-        } else {
-          setUserRole(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      console.log('Checking session...');
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(session?.user || null);
       
-      if (session?.user?.email) {
-        checkUserRole(session.user.email).then(() => {
-          setLoading(false);
-        });
+      if (session?.user) {
+        console.log('Session found for:', session.user.email);
+        await checkUserRole(session.user.email!);
       } else {
-        setLoading(false);
+        console.log('No session found');
+        setUserRole(null);
+      }
+      
+      setLoading(false);
+    };
+
+    checkSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+      setSession(session);
+      setUser(session?.user || null);
+      
+      if (session?.user) {
+        console.log('New session for:', session.user.email);
+        await checkUserRole(session.user.email!);
+      } else {
+        setUserRole(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

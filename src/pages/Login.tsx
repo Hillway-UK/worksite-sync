@@ -43,47 +43,24 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    console.log('Attempting login with email:', email);
-
-    try {
-      const { error } = await signIn(email, password);
-      
-      if (error) {
-        console.error('Login error:', error);
-        setError(error);
-        toast({
-          title: "Login failed",
-          description: error,
-          variant: "destructive",
-        });
-      } else {
-        console.log('Login successful, user role:', userRole);
-        console.log('Current user email:', user?.email);
-        
-        // Add a small delay to ensure userRole is set
-        setTimeout(() => {
-          console.log('After delay - userRole:', userRole);
-          if (userRole === 'manager') {
-            console.log('Navigating to /admin');
-            navigate('/admin');
-          } else if (userRole === 'worker') {
-            console.log('Navigating to /dashboard');
-            navigate('/dashboard');
-          } else {
-            console.log('No role found, staying on login');
-            setError('User role not found. Please contact administrator.');
-          }
-        }, 1000);
-      }
-    } catch (err) {
-      console.error('Unexpected login error:', err);
-      setError('An unexpected error occurred');
+    
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Email:', email);
+    
+    const { error } = await signIn(email, password);
+    
+    if (error) {
+      console.error('Login failed:', error);
+      setError(error);
+      setIsLoading(false);
       toast({
         title: "Login failed",
-        description: "An unexpected error occurred",
+        description: error,
         variant: "destructive",
       });
-    } finally {
+    } else {
+      console.log('Login successful, waiting for role...');
+      // The useEffect will handle navigation once userRole is set
       setIsLoading(false);
     }
   };
