@@ -207,6 +207,7 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
             </Label>
             <MapComponent
               center={selectedLocation || [51.5074, -0.1278]}
+              zoom={13}
               onLocationSelect={handleLocationSelect}
               selectedLocation={selectedLocation}
               radius={radius}

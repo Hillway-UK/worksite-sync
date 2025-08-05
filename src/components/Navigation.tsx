@@ -112,6 +112,17 @@ export const Navigation: React.FC = () => {
                 Dashboard
               </Link>
               <Link
+                to="/admin/profile"
+                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
+                  isActive('/admin/profile')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Link>
+              <Link
                 to="/admin/workers"
                 className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
                   isActive('/admin/workers')
@@ -193,6 +204,18 @@ export const Navigation: React.FC = () => {
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Dashboard
+              </Link>
+              <Link
+                to="/admin/profile"
+                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] ${
+                  isActive('/admin/profile')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </Link>
               <Link
                 to="/admin/workers"

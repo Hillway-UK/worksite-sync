@@ -15,6 +15,7 @@ import AdminWorkers from "./pages/AdminWorkers";
 import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
 import AdminAmendments from "./pages/AdminAmendments";
+import AdminProfile from "./pages/AdminProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -97,6 +98,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="manager">
                   <AdminAmendments />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/profile" 
+              element={
+                <ProtectedRoute requireRole="manager">
+                  <AdminProfile />
                 </ProtectedRoute>
               } 
             />
