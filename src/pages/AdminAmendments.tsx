@@ -28,6 +28,7 @@ export default function AdminAmendments() {
   const [selectedAmendment, setSelectedAmendment] = useState<Amendment | null>(null);
   const [managerNotes, setManagerNotes] = useState('');
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchAmendments();
