@@ -29,33 +29,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const checkUserRole = async (userEmail: string) => {
+    console.log('Checking role for email:', userEmail);
+    
     try {
       // Check if user is a manager
-      const { data: manager } = await supabase
+      const { data: managerData, error: managerError } = await supabase
         .from('managers')
         .select('*')
         .eq('email', userEmail)
         .single();
-
-      if (manager) {
+        
+      console.log('Manager check result:', { managerData, managerError });
+      
+      if (managerData && !managerError) {
+        console.log('User is a manager');
         setUserRole('manager');
         return 'manager';
       }
-
+      
       // Check if user is a worker
-      const { data: worker } = await supabase
+      const { data: workerData, error: workerError } = await supabase
         .from('workers')
         .select('*')
         .eq('email', userEmail)
         .single();
-
-      if (worker) {
+        
+      console.log('Worker check result:', { workerData, workerError });
+      
+      if (workerData && !workerError) {
+        console.log('User is a worker');
         setUserRole('worker');
         return 'worker';
+      } else {
+        console.log('User not found in either table');
+        setUserRole(null);
+        return null;
       }
-
-      setUserRole(null);
-      return null;
     } catch (error) {
       console.error('Error checking user role:', error);
       setUserRole(null);

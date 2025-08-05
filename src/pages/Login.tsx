@@ -21,12 +21,21 @@ export default function Login() {
   const from = location.state?.from?.pathname || '/';
 
   useEffect(() => {
+    console.log('Login page - userRole changed to:', userRole);
+    console.log('Login page - user:', user);
+    console.log('Login page - loading:', loading);
+    
     if (!loading && user && userRole) {
+      console.log('Navigation conditions met - userRole:', userRole);
       if (userRole === 'manager') {
+        console.log('Navigating to /admin');
         navigate('/admin', { replace: true });
       } else if (userRole === 'worker') {
+        console.log('Navigating to /dashboard');
         navigate('/dashboard', { replace: true });
       }
+    } else {
+      console.log('Navigation conditions not met:', { loading, user: !!user, userRole });
     }
   }, [user, userRole, loading, navigate]);
 
@@ -34,19 +43,40 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+    console.log('Attempting login with email:', email);
 
     try {
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('Login error:', error);
         setError(error);
         toast({
           title: "Login failed",
           description: error,
           variant: "destructive",
         });
+      } else {
+        console.log('Login successful, user role:', userRole);
+        console.log('Current user email:', user?.email);
+        
+        // Add a small delay to ensure userRole is set
+        setTimeout(() => {
+          console.log('After delay - userRole:', userRole);
+          if (userRole === 'manager') {
+            console.log('Navigating to /admin');
+            navigate('/admin');
+          } else if (userRole === 'worker') {
+            console.log('Navigating to /dashboard');
+            navigate('/dashboard');
+          } else {
+            console.log('No role found, staying on login');
+            setError('User role not found. Please contact administrator.');
+          }
+        }, 1000);
       }
     } catch (err) {
+      console.error('Unexpected login error:', err);
       setError('An unexpected error occurred');
       toast({
         title: "Login failed",
