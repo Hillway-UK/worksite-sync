@@ -47,20 +47,6 @@ export type Database = {
             foreignKeyName: "additional_costs_worker_id_fkey"
             columns: ["worker_id"]
             isOneToOne: false
-            referencedRelation: "current_status"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "additional_costs_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
-            referencedRelation: "weekly_summary"
-            referencedColumns: ["worker_id"]
-          },
-          {
-            foreignKeyName: "additional_costs_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
             referencedRelation: "workers"
             referencedColumns: ["id"]
           },
@@ -68,6 +54,8 @@ export type Database = {
       }
       clock_entries: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           clock_in: string
           clock_in_lat: number | null
           clock_in_lng: number | null
@@ -79,10 +67,13 @@ export type Database = {
           created_at: string | null
           id: string
           job_id: string
+          needs_approval: boolean | null
           total_hours: number | null
           worker_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           clock_in: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -94,10 +85,13 @@ export type Database = {
           created_at?: string | null
           id?: string
           job_id: string
+          needs_approval?: boolean | null
           total_hours?: number | null
           worker_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           clock_in?: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -109,30 +103,24 @@ export type Database = {
           created_at?: string | null
           id?: string
           job_id?: string
+          needs_approval?: boolean | null
           total_hours?: number | null
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "clock_entries_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clock_entries_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clock_entries_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
-            referencedRelation: "current_status"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clock_entries_worker_id_fkey"
-            columns: ["worker_id"]
-            isOneToOne: false
-            referencedRelation: "weekly_summary"
-            referencedColumns: ["worker_id"]
           },
           {
             foreignKeyName: "clock_entries_worker_id_fkey"
@@ -206,10 +194,78 @@ export type Database = {
         }
         Relationships: []
       }
+      time_amendments: {
+        Row: {
+          clock_entry_id: string
+          created_at: string | null
+          id: string
+          manager_id: string | null
+          manager_notes: string | null
+          processed_at: string | null
+          reason: string
+          requested_clock_in: string | null
+          requested_clock_out: string | null
+          status: string | null
+          worker_id: string
+        }
+        Insert: {
+          clock_entry_id: string
+          created_at?: string | null
+          id?: string
+          manager_id?: string | null
+          manager_notes?: string | null
+          processed_at?: string | null
+          reason: string
+          requested_clock_in?: string | null
+          requested_clock_out?: string | null
+          status?: string | null
+          worker_id: string
+        }
+        Update: {
+          clock_entry_id?: string
+          created_at?: string | null
+          id?: string
+          manager_id?: string | null
+          manager_notes?: string | null
+          processed_at?: string | null
+          reason?: string
+          requested_clock_in?: string | null
+          requested_clock_out?: string | null
+          status?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_amendments_clock_entry_id_fkey"
+            columns: ["clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_amendments_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_amendments_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workers: {
         Row: {
+          address: string | null
           created_at: string | null
+          date_started: string | null
           email: string
+          emergency_contact: string | null
+          emergency_phone: string | null
           hourly_rate: number
           id: string
           is_active: boolean | null
@@ -218,8 +274,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string | null
+          date_started?: string | null
           email: string
+          emergency_contact?: string | null
+          emergency_phone?: string | null
           hourly_rate?: number
           id?: string
           is_active?: boolean | null
@@ -228,8 +288,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string | null
+          date_started?: string | null
           email?: string
+          emergency_contact?: string | null
+          emergency_phone?: string | null
           hourly_rate?: number
           id?: string
           is_active?: boolean | null
@@ -241,32 +305,7 @@ export type Database = {
       }
     }
     Views: {
-      current_status: {
-        Row: {
-          clock_in: string | null
-          clock_in_photo: string | null
-          email: string | null
-          id: string | null
-          job_code: string | null
-          job_name: string | null
-          name: string | null
-          status: string | null
-        }
-        Relationships: []
-      }
-      weekly_summary: {
-        Row: {
-          days_worked: number | null
-          hourly_rate: number | null
-          jobs_worked: number | null
-          total_hours: number | null
-          total_pay: number | null
-          week_start: string | null
-          worker_id: string | null
-          worker_name: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never
