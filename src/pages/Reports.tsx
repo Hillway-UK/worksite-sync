@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Download, Calendar } from 'lucide-react';
+import { PhotoModal } from '@/components/PhotoModal';
+import { FileText, Download, Calendar, Camera } from 'lucide-react';
 import moment from 'moment';
 
 interface ClockEntry {
@@ -14,6 +15,8 @@ interface ClockEntry {
   clock_in: string;
   clock_out?: string;
   total_hours?: number;
+  clock_in_photo?: string;
+  clock_out_photo?: string;
   job?: {
     name: string;
     code: string;
@@ -26,6 +29,19 @@ export default function Reports() {
   const [filteredEntries, setFilteredEntries] = useState<ClockEntry[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState('this-month');
   const [loading, setLoading] = useState(true);
+  const [photoModal, setPhotoModal] = useState<{
+    isOpen: boolean;
+    photoUrl: string;
+    workerName: string;
+    timestamp: string;
+    jobName?: string;
+  }>({
+    isOpen: false,
+    photoUrl: '',
+    workerName: '',
+    timestamp: '',
+    jobName: '',
+  });
 
   useEffect(() => {
     fetchClockEntries();
@@ -109,14 +125,16 @@ export default function Reports() {
   };
 
   const generateCSV = () => {
-    const headers = ['Date', 'Job Code', 'Job Name', 'Clock In', 'Clock Out', 'Total Hours'];
+    const headers = ['Date', 'Job Code', 'Job Name', 'Clock In Time', 'Clock Out Time', 'Total Hours', 'Has Clock In Photo', 'Has Clock Out Photo'];
     const rows = filteredEntries.map(entry => [
       moment(entry.clock_in).format('YYYY-MM-DD'),
       entry.job?.code || '',
       entry.job?.name || '',
       moment(entry.clock_in).format('HH:mm'),
       entry.clock_out ? moment(entry.clock_out).format('HH:mm') : '',
-      entry.total_hours?.toFixed(2) || ''
+      entry.total_hours?.toFixed(2) || '',
+      entry.clock_in_photo ? 'Yes' : 'No',
+      entry.clock_out_photo ? 'Yes' : 'No'
     ]);
 
     const csvContent = [headers, ...rows]
@@ -237,6 +255,7 @@ export default function Reports() {
                     <TableHead>Job</TableHead>
                     <TableHead>Clock In</TableHead>
                     <TableHead>Clock Out</TableHead>
+                    <TableHead>Photos</TableHead>
                     <TableHead className="text-right">Hours</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -258,6 +277,42 @@ export default function Reports() {
                       <TableCell>
                         {entry.clock_out ? moment(entry.clock_out).format('h:mm A') : '-'}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {entry.clock_in_photo && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPhotoModal({
+                                isOpen: true,
+                                photoUrl: entry.clock_in_photo!,
+                                workerName: user?.email || 'Worker',
+                                timestamp: moment(entry.clock_in).format('DD/MM/YYYY HH:mm'),
+                                jobName: entry.job?.name,
+                              })}
+                            >
+                              <Camera className="h-4 w-4" />
+                              In
+                            </Button>
+                          )}
+                          {entry.clock_out_photo && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPhotoModal({
+                                isOpen: true,
+                                photoUrl: entry.clock_out_photo!,
+                                workerName: user?.email || 'Worker',
+                                timestamp: moment(entry.clock_out).format('DD/MM/YYYY HH:mm'),
+                                jobName: entry.job?.name,
+                              })}
+                            >
+                              <Camera className="h-4 w-4" />
+                              Out
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         {entry.total_hours?.toFixed(2) || '-'}
                       </TableCell>
@@ -272,6 +327,15 @@ export default function Reports() {
             )}
           </CardContent>
         </Card>
+
+        <PhotoModal
+          isOpen={photoModal.isOpen}
+          onClose={() => setPhotoModal(prev => ({ ...prev, isOpen: false }))}
+          photoUrl={photoModal.photoUrl}
+          workerName={photoModal.workerName}
+          timestamp={photoModal.timestamp}
+          jobName={photoModal.jobName}
+        />
       </div>
     </Layout>
   );

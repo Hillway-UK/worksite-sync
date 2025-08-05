@@ -6,9 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WorkerDialog } from '@/components/WorkerDialog';
+import { PhotoModal } from '@/components/PhotoModal';
 import { toast } from '@/hooks/use-toast';
-import { Users, Search, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Users, Search, ToggleLeft, ToggleRight, Camera } from 'lucide-react';
 
 interface Worker {
   id: string;
@@ -18,6 +20,7 @@ interface Worker {
   hourly_rate: number;
   is_active: boolean;
   created_at: string;
+  profile_photo?: string;
 }
 
 export default function AdminWorkers() {
@@ -25,6 +28,17 @@ export default function AdminWorkers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [weeklyHours, setWeeklyHours] = useState<Record<string, number>>({});
+  const [photoModal, setPhotoModal] = useState<{
+    isOpen: boolean;
+    photoUrl: string;
+    workerName: string;
+    timestamp: string;
+  }>({
+    isOpen: false,
+    photoUrl: '',
+    workerName: '',
+    timestamp: '',
+  });
 
   useEffect(() => {
     fetchWorkers();
@@ -32,13 +46,33 @@ export default function AdminWorkers() {
 
   const fetchWorkers = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch workers with their first clock-in photos
+      const { data: workersData, error: workersError } = await supabase
         .from('workers')
         .select('*')
         .order('name');
 
-      if (error) throw error;
-      setWorkers(data || []);
+      if (workersError) throw workersError;
+
+      // Get first photo for each worker
+      const workersWithPhotos = await Promise.all(
+        (workersData || []).map(async (worker) => {
+          const { data: photoData } = await supabase
+            .from('clock_entries')
+            .select('clock_in_photo, clock_in')
+            .eq('worker_id', worker.id)
+            .not('clock_in_photo', 'is', null)
+            .order('clock_in', { ascending: true })
+            .limit(1);
+
+          return {
+            ...worker,
+            profile_photo: photoData?.[0]?.clock_in_photo || null,
+          };
+        })
+      );
+
+      setWorkers(workersWithPhotos);
 
       // Fetch weekly hours for each worker
       const hours: Record<string, number> = {};
@@ -46,7 +80,7 @@ export default function AdminWorkers() {
       weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
       const weekStartStr = weekStart.toISOString().split('T')[0];
 
-      for (const worker of data || []) {
+      for (const worker of workersWithPhotos || []) {
         try {
           const { data: hoursData, error: hoursError } = await supabase
             .rpc('get_worker_weekly_hours', {
@@ -152,7 +186,7 @@ export default function AdminWorkers() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Worker</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Hourly Rate</TableHead>
@@ -171,7 +205,46 @@ export default function AdminWorkers() {
                   ) : (
                     filteredWorkers.map((worker) => (
                       <TableRow key={worker.id}>
-                        <TableCell className="font-medium">{worker.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              {worker.profile_photo ? (
+                                <>
+                                  <AvatarImage 
+                                    src={worker.profile_photo} 
+                                    alt={worker.name}
+                                  />
+                                  <AvatarFallback>
+                                    {worker.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </>
+                              ) : (
+                                <AvatarFallback>
+                                  {worker.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{worker.name}</div>
+                              {worker.profile_photo && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto p-0 text-xs text-muted-foreground"
+                                  onClick={() => setPhotoModal({
+                                    isOpen: true,
+                                    photoUrl: worker.profile_photo!,
+                                    workerName: worker.name,
+                                    timestamp: 'Profile Photo',
+                                  })}
+                                >
+                                  <Camera className="h-3 w-3 mr-1" />
+                                  View Photo
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
                         <TableCell>{worker.email}</TableCell>
                         <TableCell>{worker.phone || '-'}</TableCell>
                         <TableCell>£{worker.hourly_rate.toFixed(2)}</TableCell>
@@ -210,6 +283,14 @@ export default function AdminWorkers() {
             </div>
           </CardContent>
         </Card>
+
+        <PhotoModal
+          isOpen={photoModal.isOpen}
+          onClose={() => setPhotoModal(prev => ({ ...prev, isOpen: false }))}
+          photoUrl={photoModal.photoUrl}
+          workerName={photoModal.workerName}
+          timestamp={photoModal.timestamp}
+        />
       </div>
     </Layout>
   );
