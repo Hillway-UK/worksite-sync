@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Briefcase, FileText, LogOut, Menu } from 'lucide-react';
+import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 
 export const Navigation: React.FC = () => {
@@ -29,14 +29,48 @@ export const Navigation: React.FC = () => {
             </div>
             <div className="flex items-center space-x-4">
               <Link
-                to="/clock"
+                to="/dashboard"
                 className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
-                  isActive('/clock')
+                  isActive('/dashboard')
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
               >
-                Clock In/Out
+                <Calendar className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+              <Link
+                to="/profile"
+                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
+                  isActive('/profile')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Link>
+              <Link
+                to="/amendments"
+                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
+                  isActive('/amendments')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Amendments
+              </Link>
+              <Link
+                to="/reports"
+                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
+                  isActive('/reports')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Reports
               </Link>
               <Button
                 onClick={handleSignOut}
@@ -74,6 +108,7 @@ export const Navigation: React.FC = () => {
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
               >
+                <BarChart3 className="h-4 w-4 mr-2" />
                 Dashboard
               </Link>
               <Link
@@ -99,6 +134,17 @@ export const Navigation: React.FC = () => {
                 Jobs
               </Link>
               <Link
+                to="/admin/amendments"
+                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
+                  isActive('/admin/amendments')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Amendments
+              </Link>
+              <Link
                 to="/admin/reports"
                 className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
                   isActive('/admin/reports')
@@ -107,7 +153,7 @@ export const Navigation: React.FC = () => {
                 }`}
               >
                 <FileText className="h-4 w-4 mr-2" />
-                Reports
+                Weekly Reports
               </Link>
               <Button
                 onClick={handleSignOut}
@@ -138,13 +184,14 @@ export const Navigation: React.FC = () => {
             <div className="md:hidden py-4 space-y-2">
               <Link
                 to="/admin"
-                className={`block px-4 py-3 rounded-md text-sm font-medium min-h-[44px] ${
+                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] ${
                   isActive('/admin')
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <BarChart3 className="h-4 w-4 mr-2" />
                 Dashboard
               </Link>
               <Link
@@ -172,6 +219,18 @@ export const Navigation: React.FC = () => {
                 Jobs
               </Link>
               <Link
+                to="/admin/amendments"
+                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] ${
+                  isActive('/admin/amendments')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Amendments
+              </Link>
+              <Link
                 to="/admin/reports"
                 className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] ${
                   isActive('/admin/reports')
@@ -181,7 +240,7 @@ export const Navigation: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <FileText className="h-4 w-4 mr-2" />
-                Reports
+                Weekly Reports
               </Link>
               <Button
                 onClick={() => {
