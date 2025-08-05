@@ -6,11 +6,15 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
-import Clock from "./pages/Clock";
+import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
+import Amendments from "./pages/Amendments";
+import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
 import AdminWorkers from "./pages/AdminWorkers";
 import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
+import AdminAmendments from "./pages/AdminAmendments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,10 +29,34 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route 
-              path="/clock" 
+              path="/dashboard" 
               element={
                 <ProtectedRoute requireRole="worker">
-                  <Clock />
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute requireRole="worker">
+                  <Profile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/amendments" 
+              element={
+                <ProtectedRoute requireRole="worker">
+                  <Amendments />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/reports" 
+              element={
+                <ProtectedRoute requireRole="worker">
+                  <Reports />
                 </ProtectedRoute>
               } 
             />
@@ -61,6 +89,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="manager">
                   <AdminReports />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/amendments" 
+              element={
+                <ProtectedRoute requireRole="manager">
+                  <AdminAmendments />
                 </ProtectedRoute>
               } 
             />

@@ -25,7 +25,7 @@ export default function Login() {
       if (userRole === 'manager') {
         navigate('/admin', { replace: true });
       } else if (userRole === 'worker') {
-        navigate('/clock', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [user, userRole, loading, navigate]);
