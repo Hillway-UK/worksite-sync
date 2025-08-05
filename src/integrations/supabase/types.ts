@@ -308,7 +308,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_clocked_in_workers: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          worker_id: string
+          worker_name: string
+          job_name: string
+          clock_in: string
+        }[]
+      }
+      get_recent_activity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          worker_name: string
+          job_name: string
+          clock_in: string
+          clock_out: string
+          total_hours: number
+        }[]
+      }
+      get_total_hours_today: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_worker_weekly_hours: {
+        Args: { worker_uuid: string; week_start: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
