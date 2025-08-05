@@ -24,7 +24,7 @@ export function XeroSettingsModal({ onSettingsChange }: XeroSettingsModalProps) 
   const [settings, setSettings] = useState<XeroSettings>({
     prefix: 'INV',
     startingNumber: 1001,
-    accountCode: '4000',
+    accountCode: '5000',
     taxType: '20% VAT',
     paymentTerms: 30,
   });
@@ -34,7 +34,7 @@ export function XeroSettingsModal({ onSettingsChange }: XeroSettingsModalProps) 
     const savedSettings = {
       prefix: localStorage.getItem('xero_settings_prefix') || 'INV',
       startingNumber: parseInt(localStorage.getItem('xero_settings_starting_number') || '1001'),
-      accountCode: localStorage.getItem('xero_settings_account_code') || '4000',
+      accountCode: localStorage.getItem('xero_settings_account_code') || '5000',
       taxType: localStorage.getItem('xero_settings_tax_type') || '20% VAT',
       paymentTerms: parseInt(localStorage.getItem('xero_settings_payment_terms') || '30'),
     };
@@ -66,10 +66,13 @@ export function XeroSettingsModal({ onSettingsChange }: XeroSettingsModalProps) 
           <Settings className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Xero Export Settings</DialogTitle>
-        </DialogHeader>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Xero Export Settings</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              These are supplier bills from contractors, not sales invoices
+            </p>
+          </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="prefix" className="text-right">
@@ -105,7 +108,7 @@ export function XeroSettingsModal({ onSettingsChange }: XeroSettingsModalProps) 
               value={settings.accountCode}
               onChange={(e) => setSettings({ ...settings, accountCode: e.target.value })}
               className="col-span-3"
-              placeholder="4000"
+              placeholder="5000"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">

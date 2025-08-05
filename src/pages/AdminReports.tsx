@@ -71,7 +71,7 @@ export default function AdminReports() {
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
     prefix: 'INV',
     startingNumber: 1001,
-    accountCode: '4000',
+    accountCode: '5000',
     taxType: '20% VAT',
     paymentTerms: 30,
   });
@@ -254,223 +254,289 @@ export default function AdminReports() {
   };
 
   // Utility functions for Xero export
-  const extractCity = (address: string): string => {
-    if (!address) return '';
-    const parts = address.split(',').map(part => part.trim());
-    if (parts.length < 2) return '';
-    // Get the second to last part (city is usually before postcode)
-    return parts[parts.length - 2] || '';
-  };
-
-  const extractPostcode = (address: string): string => {
-    if (!address) return '';
-    const parts = address.split(' ');
-    // Get the last 1-2 parts as postcode (UK format)
-    if (parts.length >= 2) {
-      const lastTwo = parts.slice(-2).join(' ');
-      // Check if it looks like a UK postcode
-      if (/^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$/i.test(lastTwo)) {
-        return lastTwo.toUpperCase();
-      }
+  const parseWorkerAddress = (address: string | null) => {
+    if (!address) {
+      return {
+        addressLine1: '',
+        city: '',
+        region: '',
+        postcode: ''
+      };
     }
-    return parts[parts.length - 1] || '';
-  };
 
-  const getNextInvoiceNumber = (): string => {
-    const lastNumber = parseInt(localStorage.getItem('xero_last_invoice_number') || xeroSettings.startingNumber.toString());
-    const nextNumber = lastNumber + 1;
-    localStorage.setItem('xero_last_invoice_number', nextNumber.toString());
+    const parts = address.split(',').map(part => part.trim());
     
-    const year = getYear(new Date());
-    return `${xeroSettings.prefix}-${year}-${nextNumber.toString().padStart(4, '0')}`;
+    // Extract postcode (last part matching UK pattern)
+    const postcodeRegex = /^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\s?[0-9][A-Z]{2}$/i;
+    const lastPart = parts[parts.length - 1] || '';
+    const postcode = postcodeRegex.test(lastPart) ? lastPart : '';
+    
+    // Extract city (second to last part, or second part if no valid postcode)
+    let city = '';
+    if (postcode && parts.length >= 2) {
+      city = parts[parts.length - 2] || '';
+    } else if (parts.length >= 2) {
+      city = parts[1] || '';
+    }
+    
+    // Extract address line 1 (first part)
+    const addressLine1 = parts[0] || '';
+    
+    // Region could be third part if available
+    let region = '';
+    if (parts.length >= 3 && postcode) {
+      region = parts[parts.length - 3] || '';
+    }
+    
+    return {
+      addressLine1,
+      city,
+      region,
+      postcode
+    };
   };
 
-  const fetchJobSiteData = async (): Promise<JobSiteData[]> => {
+  const getNextInvoiceNumber = (): number => {
+    const lastNumber = parseInt(localStorage.getItem('xero_last_invoice_number') || xeroSettings.startingNumber.toString());
+    return lastNumber + 1;
+  };
+
+  const fetchWorkerData = async () => {
     const weekStart = new Date(selectedWeek);
     const weekEnd = addDays(weekStart, 6);
 
-    // Fetch clock entries with job and worker details
-    const { data: entries, error } = await supabase
-      .from('clock_entries')
-      .select(`
-        *,
-        workers(id, name, hourly_rate),
-        jobs(id, name, address)
-      `)
-      .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-      .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
-      .not('clock_out', 'is', null);
+    try {
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('clock_entries')
+        .select(`
+          *,
+          workers (id, name, hourly_rate, email, address),
+          jobs (id, name, address)
+        `)
+        .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
+        .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
+        .not('total_hours', 'is', null);
 
-    if (error) throw error;
+      if (entriesError) throw entriesError;
 
-    // Fetch additional costs for the period
-    const { data: additionalCosts } = await supabase
-      .from('additional_costs')
-      .select('*')
-      .gte('date', format(weekStart, 'yyyy-MM-dd'))
-      .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+      const { data: costsData, error: costsError } = await supabase
+        .from('additional_costs')
+        .select(`
+          *,
+          workers (id, name, email, address)
+        `)
+        .gte('date', format(weekStart, 'yyyy-MM-dd'))
+        .lte('date', format(weekEnd, 'yyyy-MM-dd'));
 
-    // Group by job site
-    const jobSiteMap: Record<string, JobSiteData> = {};
+      if (costsError) throw costsError;
 
-    entries?.forEach(entry => {
-      const jobId = entry.jobs?.id;
-      const jobName = entry.jobs?.name || 'Unknown Job';
-      const jobAddress = entry.jobs?.address || '';
+      // Group by worker, then by job
+      const workerMap = new Map<string, {
+        workerId: string;
+        workerName: string;
+        workerEmail: string;
+        workerAddress: string;
+        jobs: Map<string, {
+          jobId: string;
+          jobName: string;
+          totalHours: number;
+          hourlyRate: number;
+        }>;
+        additionalCosts: Array<{
+          amount: number;
+          description: string;
+          jobName?: string;
+        }>;
+      }>();
 
-      if (!jobSiteMap[jobId]) {
-        jobSiteMap[jobId] = {
-          job_id: jobId,
-          job_name: jobName,
-          job_address: jobAddress,
-          workers: []
-        };
-      }
+      // Process time entries
+      entriesData?.forEach((entry: any) => {
+        const workerId = entry.workers.id;
+        const jobId = entry.jobs.id;
+        
+        if (!workerMap.has(workerId)) {
+          workerMap.set(workerId, {
+            workerId,
+            workerName: entry.workers.name,
+            workerEmail: entry.workers.email || '',
+            workerAddress: entry.workers.address || '',
+            jobs: new Map(),
+            additionalCosts: []
+          });
+        }
+        
+        const worker = workerMap.get(workerId)!;
+        
+        if (!worker.jobs.has(jobId)) {
+          worker.jobs.set(jobId, {
+            jobId,
+            jobName: entry.jobs.name,
+            totalHours: 0,
+            hourlyRate: entry.workers.hourly_rate
+          });
+        }
+        
+        const job = worker.jobs.get(jobId)!;
+        job.totalHours += parseFloat(entry.total_hours) || 0;
+      });
 
-      // Find or create worker entry for this job site
-      let workerEntry = jobSiteMap[jobId].workers.find(w => w.worker_id === entry.worker_id);
-      if (!workerEntry) {
-        workerEntry = {
-          worker_id: entry.worker_id,
-          worker_name: entry.workers?.name || 'Unknown',
-          total_hours: 0,
-          hourly_rate: entry.workers?.hourly_rate || 0,
-          additional_costs: 0
-        };
-        jobSiteMap[jobId].workers.push(workerEntry);
-      }
-
-      workerEntry.total_hours += entry.total_hours || 0;
-    });
-
-    // Add additional costs to worker entries
-    additionalCosts?.forEach(cost => {
-      Object.values(jobSiteMap).forEach(jobSite => {
-        const workerEntry = jobSite.workers.find(w => w.worker_id === cost.worker_id);
-        if (workerEntry) {
-          workerEntry.additional_costs += Number(cost.amount);
+      // Process additional costs
+      costsData?.forEach((cost: any) => {
+        const workerId = cost.workers.id;
+        
+        if (workerMap.has(workerId)) {
+          const worker = workerMap.get(workerId)!;
+          worker.additionalCosts.push({
+            amount: parseFloat(cost.amount) || 0,
+            description: cost.description || 'Additional Cost'
+          });
         }
       });
-    });
 
-    return Object.values(jobSiteMap).filter(jobSite => jobSite.workers.length > 0);
+      return Array.from(workerMap.values());
+    } catch (error) {
+      console.error('Error fetching worker data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch data for Xero export",
+        variant: "destructive",
+      });
+      return [];
+    }
   };
 
   const generateXeroCSV = async () => {
-    try {
-      setLoading(true);
-      const jobSiteData = await fetchJobSiteData();
-      
-      if (jobSiteData.length === 0) {
-        toast({
-          title: "No Data",
-          description: "No timesheet data found for the selected week",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const weekStart = new Date(selectedWeek);
-      const weekEnd = addDays(weekStart, 6);
-      const invoiceDate = format(new Date(), 'dd/MM/yyyy');
-      const dueDate = format(addDays(new Date(), xeroSettings.paymentTerms), 'dd/MM/yyyy');
-      const weekNumber = getWeek(weekStart);
-      const year = getYear(weekStart);
-
-      // Xero CSV headers with asterisks for required fields
-      const csvHeaders = [
-        '*ContactName',
-        'EmailAddress',
-        'POAddressLine1',
-        'POCity',
-        'POPostalCode',
-        '*InvoiceNumber',
-        '*InvoiceDate',
-        '*DueDate',
-        'Description',
-        '*Quantity',
-        '*UnitAmount',
-        '*AccountCode',
-        '*TaxType',
-        'Currency'
-      ];
-
-      const csvRows: string[][] = [];
-
-      jobSiteData.forEach(jobSite => {
-        const invoiceNumber = getNextInvoiceNumber();
-        const city = extractCity(jobSite.job_address);
-        const postcode = extractPostcode(jobSite.job_address);
-
-        jobSite.workers.forEach(worker => {
-          if (worker.total_hours > 0) {
-            // Add worker hours line
-            csvRows.push([
-              jobSite.job_name,
-              '',
-              jobSite.job_address,
-              city,
-              postcode,
-              invoiceNumber,
-              invoiceDate,
-              dueDate,
-              `Construction Labour - ${worker.worker_name} - Week ${weekNumber} ${year}`,
-              worker.total_hours.toFixed(2),
-              worker.hourly_rate.toFixed(2),
-              xeroSettings.accountCode,
-              xeroSettings.taxType,
-              'GBP'
-            ]);
-          }
-
-          // Add additional costs line if any
-          if (worker.additional_costs > 0) {
-            csvRows.push([
-              jobSite.job_name,
-              '',
-              jobSite.job_address,
-              city,
-              postcode,
-              invoiceNumber,
-              invoiceDate,
-              dueDate,
-              `Additional Costs - ${worker.worker_name}`,
-              '1',
-              worker.additional_costs.toFixed(2),
-              xeroSettings.accountCode,
-              xeroSettings.taxType,
-              'GBP'
-            ]);
-          }
-        });
-      });
-
-      const csvContent = [csvHeaders, ...csvRows]
-        .map(row => row.map(field => `"${field}"`).join(','))
-        .join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Xero_Export_${format(weekStart, 'dd-MM-yyyy')}_to_${format(weekEnd, 'dd-MM-yyyy')}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-
+    const startDate = new Date(selectedWeek);
+    const endDate = new Date(selectedWeek);
+    endDate.setDate(endDate.getDate() + 6); // End of week
+    
+    const workerData = await fetchWorkerData();
+    
+    if (workerData.length === 0) {
       toast({
-        title: "Success",
-        description: "Xero invoice file exported successfully",
-      });
-    } catch (error) {
-      console.error('Error generating Xero export:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate Xero export",
+        title: "No Data",
+        description: "No timesheet data found for the selected week",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const headers = [
+      '*ContactName', 'EmailAddress', 'POAddressLine1', 'POAddressLine2', 'POAddressLine3', 'POAddressLine4',
+      'POCity', 'PORegion', 'POPostalCode', 'POCountry', '*InvoiceNumber', '*InvoiceDate', '*DueDate',
+      'Total', 'InventoryItemCode', 'Description', '*Quantity', '*UnitAmount', '*AccountCode', '*TaxType',
+      'TaxAmount', 'TrackingName1', 'TrackingOption1', 'TrackingName2', 'TrackingOption2', 'Currency'
+    ];
+
+    const today = new Date();
+    const invoiceDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + xeroSettings.paymentTerms);
+    const dueDateStr = `${dueDate.getDate().toString().padStart(2, '0')}/${(dueDate.getMonth() + 1).toString().padStart(2, '0')}/${dueDate.getFullYear()}`;
+
+    const weekNumber = getWeek(startDate);
+    const year = getYear(startDate);
+
+    let csvContent = headers.join(',') + '\n';
+    let currentInvoiceNumber = getNextInvoiceNumber();
+
+    workerData.forEach((worker) => {
+      const addressInfo = parseWorkerAddress(worker.workerAddress);
+      const invoiceNum = `${xeroSettings.prefix}-${year}-${currentInvoiceNumber.toString().padStart(4, '0')}`;
+
+      // Add line items for each job the worker worked on
+      worker.jobs.forEach((job) => {
+        if (job.totalHours > 0) {
+          const row = [
+            `"${worker.workerName}"`,
+            `"${worker.workerEmail}"`,
+            `"${addressInfo.addressLine1}"`,
+            '""', // POAddressLine2
+            '""', // POAddressLine3
+            '""', // POAddressLine4
+            `"${addressInfo.city}"`,
+            `"${addressInfo.region}"`,
+            `"${addressInfo.postcode}"`,
+            '"United Kingdom"',
+            `"${invoiceNum}"`,
+            `"${invoiceDate}"`,
+            `"${dueDateStr}"`,
+            '""', // Total (Xero calculates)
+            '""', // InventoryItemCode
+            `"Construction Work - ${job.jobName} - Week ${weekNumber} ${year}"`,
+            job.totalHours.toFixed(2),
+            job.hourlyRate.toFixed(2),
+            `"${xeroSettings.accountCode}"`,
+            `"${xeroSettings.taxType}"`,
+            '""', // TaxAmount (Xero calculates)
+            '"Project"',
+            `"${job.jobName}"`,
+            '""', // TrackingName2
+            '""', // TrackingOption2
+            '"GBP"'
+          ];
+          csvContent += row.join(',') + '\n';
+        }
+      });
+
+      // Add additional costs as separate line items
+      worker.additionalCosts.forEach((cost) => {
+        const row = [
+          `"${worker.workerName}"`,
+          `"${worker.workerEmail}"`,
+          `"${addressInfo.addressLine1}"`,
+          '""', // POAddressLine2
+          '""', // POAddressLine3
+          '""', // POAddressLine4
+          `"${addressInfo.city}"`,
+          `"${addressInfo.region}"`,
+          `"${addressInfo.postcode}"`,
+          '"United Kingdom"',
+          `"${invoiceNum}"`,
+          `"${invoiceDate}"`,
+          `"${dueDateStr}"`,
+          '""', // Total (Xero calculates)
+          '""', // InventoryItemCode
+          `"Additional Costs - ${cost.description}"`,
+          '1',
+          cost.amount.toFixed(2),
+          `"${xeroSettings.accountCode}"`,
+          `"${xeroSettings.taxType}"`,
+          '""', // TaxAmount (Xero calculates)
+          '"Project"',
+          '"General"', // Default project for additional costs
+          '""', // TrackingName2
+          '""', // TrackingOption2
+          '"GBP"'
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+
+      currentInvoiceNumber++;
+    });
+
+    // Update the last used invoice number
+    localStorage.setItem('xero_last_invoice_number', currentInvoiceNumber.toString());
+
+    // Download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const filename = `Xero_Export_${startDateStr}_to_${endDateStr}.csv`;
+    
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Successful",
+      description: `Xero invoice file "${filename}" exported successfully`,
+    });
   };
 
   const generateCSV = () => {
