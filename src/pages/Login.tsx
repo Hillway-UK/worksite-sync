@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+const COMPANY_LOGO_URL = '/lovable-uploads/81534cbc-ebc0-4c27-9d16-6c2069e07bf2.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -78,7 +79,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Clock className="h-12 w-12 text-primary" />
+            <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-12 w-auto" loading="eager" />
           </div>
           <CardTitle className="text-2xl font-bold">Time Keeper</CardTitle>
           <CardDescription>

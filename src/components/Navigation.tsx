@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
+const COMPANY_LOGO_URL = '/lovable-uploads/81534cbc-ebc0-4c27-9d16-6c2069e07bf2.png';
 
 export const Navigation: React.FC = () => {
   const { userRole, signOut } = useAuth();
@@ -24,7 +25,7 @@ export const Navigation: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Clock className="h-6 w-6 text-primary mr-2" />
+              <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-8 w-auto mr-2" loading="eager" />
               <span className="font-bold text-lg">Time Keeper</span>
             </div>
             <div className="flex items-center space-x-4">
@@ -94,7 +95,7 @@ export const Navigation: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Briefcase className="h-6 w-6 text-primary mr-2" />
+              <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-8 w-auto mr-2" loading="eager" />
               <span className="font-bold text-lg">Time Keeper Admin</span>
             </div>
 
