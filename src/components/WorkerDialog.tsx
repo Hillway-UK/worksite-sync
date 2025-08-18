@@ -107,9 +107,12 @@ export function WorkerDialog({ worker, onSave, trigger }: WorkerDialogProps) {
 
         toast({
           title: "Success",
-          description: `Worker created successfully. Temporary password: ${tempPassword}`,
-          duration: 10000,
+          description: "Worker created successfully. Login credentials have been generated and should be shared securely with the worker.",
+          duration: 8000,
         });
+
+        // Log password securely for admin to copy (removed from UI for security)
+        console.log(`Temporary password for ${data.email}: ${tempPassword}`);
       }
 
       setOpen(false);
