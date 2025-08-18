@@ -5,23 +5,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Calendar, Clock, MapPin, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { PioneerLogo } from '@/components/PioneerLogo';
 import { format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ClockEntry {
   id: string;
   clock_in: string;
   clock_out?: string;
   total_hours?: number;
-  manual_entry?: boolean;
-  auto_clocked_out?: boolean;
-  notes?: string;
   job?: {
     name: string;
     code: string;
@@ -33,81 +26,35 @@ interface ClockEntry {
   }[];
 }
 
-interface Job {
-  id: string;
-  name: string;
-  code: string;
-  address: string;
-}
-
 export default function Timesheets() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<ClockEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalHours, setTotalHours] = useState(0);
-  const [worker, setWorker] = useState<any>(null);
-  
-  // Manual entry state
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const [manualEntry, setManualEntry] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    job_id: '',
-    clock_in_time: '09:00',
-    clock_out_time: '17:00',
-    notes: ''
-  });
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [submittingManual, setSubmittingManual] = useState(false);
 
   useEffect(() => {
-    fetchWorker();
-    fetchJobs();
+    fetchTimesheets();
   }, [user]);
 
-  const fetchWorker = async () => {
+  const fetchTimesheets = async () => {
     if (!user?.email) {
       navigate('/login');
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      const { data: worker } = await supabase
         .from('workers')
-        .select('*')
+        .select('id')
         .eq('email', user.email)
         .single();
 
-      if (error) throw error;
-      setWorker(data);
-      
-      if (data) {
-        fetchTimesheets(data.id);
+      if (!worker) {
+        toast.error('Worker profile not found');
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching worker:', error);
-      toast.error('Worker profile not found');
-    }
-  };
 
-  const fetchJobs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      
-      if (error) throw error;
-      setJobs(data || []);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-    }
-  };
-
-  const fetchTimesheets = async (workerId: string) => {
-    try {
-      setLoading(true);
       const { data: clockEntries, error } = await supabase
         .from('clock_entries')
         .select(`
@@ -115,7 +62,7 @@ export default function Timesheets() {
           jobs:job_id(name, code, address),
           time_amendments(status, reason)
         `)
-        .eq('worker_id', workerId)
+        .eq('worker_id', worker.id)
         .order('clock_in', { ascending: false })
         .limit(50);
 
@@ -134,81 +81,6 @@ export default function Timesheets() {
       toast.error('Failed to load timesheets');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const submitManualEntry = async () => {
-    if (!manualEntry.job_id) {
-      toast.error('Please select a job site');
-      return;
-    }
-
-    if (!worker?.id) {
-      toast.error('Worker profile not found');
-      return;
-    }
-
-    setSubmittingManual(true);
-    try {
-      // Combine date and time for timestamps
-      const clockInDateTime = new Date(`${manualEntry.date}T${manualEntry.clock_in_time}:00`);
-      const clockOutDateTime = new Date(`${manualEntry.date}T${manualEntry.clock_out_time}:00`);
-
-      // Validate times
-      if (clockOutDateTime <= clockInDateTime) {
-        toast.error('Clock out time must be after clock in time');
-        return;
-      }
-
-      // Check for existing entries on this date
-      const { data: existingEntries, error: checkError } = await supabase
-        .from('clock_entries')
-        .select('*')
-        .eq('worker_id', worker.id)
-        .gte('clock_in', `${manualEntry.date}T00:00:00`)
-        .lte('clock_in', `${manualEntry.date}T23:59:59`);
-
-      if (checkError) throw checkError;
-
-      if (existingEntries && existingEntries.length > 0) {
-        toast.error('You already have an entry for this date');
-        return;
-      }
-
-      // Calculate total hours
-      const timeDiff = clockOutDateTime.getTime() - clockInDateTime.getTime();
-      const hours = timeDiff / (1000 * 60 * 60);
-
-      // Create the manual entry
-      const { error } = await supabase
-        .from('clock_entries')
-        .insert({
-          worker_id: worker.id,
-          job_id: manualEntry.job_id,
-          clock_in: clockInDateTime.toISOString(),
-          clock_out: clockOutDateTime.toISOString(),
-          total_hours: hours,
-          manual_entry: true,
-          notes: manualEntry.notes || `Manual entry added on ${format(new Date(), 'dd/MM/yyyy')}`
-        });
-
-      if (error) throw error;
-
-      toast.success('Manual entry added successfully');
-      setShowManualEntry(false);
-      setManualEntry({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        job_id: '',
-        clock_in_time: '09:00',
-        clock_out_time: '17:00',
-        notes: ''
-      });
-      fetchTimesheets(worker.id); // Refresh the timesheet
-    } catch (error: any) {
-      console.error('Error adding manual entry:', error);
-      toast.error(error.message || 'Failed to add manual entry');
-    } finally {
-      setSubmittingManual(false);
     }
   };
 
@@ -249,18 +121,6 @@ export default function Timesheets() {
       </header>
 
       <div className="max-w-4xl mx-auto p-4">
-        {/* Header with Manual Entry Button */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Recent Entries</h2>
-          <Button
-            onClick={() => setShowManualEntry(true)}
-            className="bg-primary hover:bg-primary/90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Manual Entry
-          </Button>
-        </div>
-
         {/* Summary Card */}
         <Card className="mb-6 shadow-xl">
           <CardHeader>
@@ -307,16 +167,6 @@ export default function Timesheets() {
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-semibold text-lg">{entry.job?.name || 'Unknown Job'}</h3>
                         {getStatusBadge(entry)}
-                        {entry.manual_entry && (
-                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                            Manual Entry
-                          </Badge>
-                        )}
-                        {entry.auto_clocked_out && (
-                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                            Auto Clock-Out
-                          </Badge>
-                        )}
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -354,13 +204,6 @@ export default function Timesheets() {
                         )}
                       </div>
                       
-                      {entry.notes && (
-                        <div className="mt-3 p-2 bg-gray-50 rounded border border-gray-200">
-                          <p className="text-sm font-medium text-gray-800">Notes</p>
-                          <p className="text-sm text-gray-700">{entry.notes}</p>
-                        </div>
-                      )}
-                      
                       {entry.time_amendments?.length > 0 && (
                         <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
                           <p className="text-sm font-medium text-yellow-800">Amendment Request</p>
@@ -376,98 +219,6 @@ export default function Timesheets() {
             ))
           )}
         </div>
-
-        {/* Manual Entry Dialog */}
-        <Dialog open={showManualEntry} onOpenChange={setShowManualEntry}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold">Add Manual Time Entry</DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4 mt-4">
-              <div>
-                <Label htmlFor="entry-date">Date</Label>
-                <Input
-                  id="entry-date"
-                  type="date"
-                  value={manualEntry.date}
-                  onChange={(e) => setManualEntry(prev => ({ ...prev, date: e.target.value }))}
-                  max={format(new Date(), 'yyyy-MM-dd')}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="job-select">Job Site</Label>
-                <Select
-                  value={manualEntry.job_id}
-                  onValueChange={(value) => setManualEntry(prev => ({ ...prev, job_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a job site" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobs.map(job => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.name} ({job.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="clock-in">Clock In Time</Label>
-                  <Input
-                    id="clock-in"
-                    type="time"
-                    value={manualEntry.clock_in_time}
-                    onChange={(e) => setManualEntry(prev => ({ ...prev, clock_in_time: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="clock-out">Clock Out Time</Label>
-                  <Input
-                    id="clock-out"
-                    type="time"
-                    value={manualEntry.clock_out_time}
-                    onChange={(e) => setManualEntry(prev => ({ ...prev, clock_out_time: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Input
-                  id="notes"
-                  type="text"
-                  placeholder="Reason for manual entry"
-                  value={manualEntry.notes}
-                  onChange={(e) => setManualEntry(prev => ({ ...prev, notes: e.target.value }))}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowManualEntry(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={submitManualEntry}
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  disabled={submittingManual}
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {submittingManual ? 'Adding...' : 'Add Entry'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* Navigation */}
         <div className="mt-8 space-y-2">
