@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import moment from 'moment';
+import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
 
 interface Amendment {
   id: string;
@@ -102,11 +103,14 @@ export default function AdminAmendments() {
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Time Amendments</h1>
-          <p className="text-muted-foreground">Review and approve worker time change requests</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Admin Management</h1>
+          <p className="text-muted-foreground">Manage time amendments and expense types</p>
         </div>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <div className="space-y-6">
+          <ExpenseTypesManager />
+
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="h-5 w-5" />
@@ -177,7 +181,8 @@ export default function AdminAmendments() {
               </Table>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
 
         {selectedAmendment && (
           <Dialog open={true} onOpenChange={() => setSelectedAmendment(null)}>
