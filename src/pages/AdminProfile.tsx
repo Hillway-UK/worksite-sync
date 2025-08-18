@@ -69,35 +69,38 @@ export default function AdminProfile() {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile?.id) {
+      toast({
+        title: "Error",
+        description: "Profile not found",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSaving(true);
     try {
+      // Update the manager record
       const { error } = await supabase
         .from('managers')
         .update({
-          name: formData.name.trim(),
-          pin: formData.pin || null,
+          name: formData.name || '',
+          pin: formData.pin || null
         })
         .eq('id', profile.id);
 
       if (error) throw error;
 
-      // Update local profile state to reflect saved changes
-      setProfile({
-        ...profile,
-        name: formData.name.trim(),
-        pin: formData.pin || null
-      });
-      
+      // Update local profile state
+      setProfile(prev => prev ? { ...prev, ...formData } : null);
       setHasChanges(false);
-
+      
       toast({
         title: "Success",
         description: "Profile updated successfully",
       });
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Save error:', error);
       toast({
         title: "Error",
         description: "Failed to update profile",
@@ -108,19 +111,6 @@ export default function AdminProfile() {
     }
   };
 
-  const handleInputChange = (field: 'name' | 'pin', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Check if there are changes compared to original profile
-    const hasChanged = field === 'name' 
-      ? value.trim() !== profile?.name
-      : value !== (profile?.pin || '');
-    
-    setHasChanges(hasChanged || formData[field === 'name' ? 'pin' : 'name'] !== (profile?.[field === 'name' ? 'pin' : 'name'] || ''));
-  };
 
   if (loading) {
     return (
@@ -164,13 +154,35 @@ export default function AdminProfile() {
               <CardTitle>Profile Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                />
+              {/* Name Field */}
+              <div className="space-y-2">
+                <Label htmlFor="name" className="font-body font-semibold text-[#111111]">
+                  Full Name
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData(prev => ({ ...prev, name: newValue }));
+                      setHasChanges(true);
+                    }}
+                    onKeyDown={(e) => {
+                      // Allow all normal typing
+                      e.stopPropagation();
+                    }}
+                    className="font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30] pr-10"
+                    placeholder="Enter your name"
+                    disabled={loading}
+                  />
+                  {hasChanges && formData.name !== profile?.name && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <span className="text-xs text-[#ED8936] font-body">Modified</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -192,7 +204,11 @@ export default function AdminProfile() {
                   id="pin"
                   type="password"
                   value={formData.pin}
-                  onChange={(e) => handleInputChange('pin', e.target.value)}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setFormData(prev => ({ ...prev, pin: newValue }));
+                    setHasChanges(true);
+                  }}
                   placeholder="Enter 4-digit PIN"
                   maxLength={4}
                 />
