@@ -23,10 +23,26 @@ export default function AdminProfile() {
   const [profile, setProfile] = useState<ManagerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    pin: ''
+  });
 
   useEffect(() => {
     fetchProfile();
   }, [user]);
+
+  // Sync form data when profile loads
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name,
+        pin: profile.pin || ''
+      });
+      setHasChanges(false);
+    }
+  }, [profile]);
 
   const fetchProfile = async () => {
     if (!user?.email) return;
@@ -60,12 +76,21 @@ export default function AdminProfile() {
       const { error } = await supabase
         .from('managers')
         .update({
-          name: profile.name,
-          pin: profile.pin,
+          name: formData.name.trim(),
+          pin: formData.pin || null,
         })
         .eq('id', profile.id);
 
       if (error) throw error;
+
+      // Update local profile state to reflect saved changes
+      setProfile({
+        ...profile,
+        name: formData.name.trim(),
+        pin: formData.pin || null
+      });
+      
+      setHasChanges(false);
 
       toast({
         title: "Success",
@@ -83,9 +108,18 @@ export default function AdminProfile() {
     }
   };
 
-  const handleInputChange = (field: keyof ManagerProfile, value: string) => {
-    if (!profile) return;
-    setProfile({ ...profile, [field]: value });
+  const handleInputChange = (field: 'name' | 'pin', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Check if there are changes compared to original profile
+    const hasChanged = field === 'name' 
+      ? value.trim() !== profile?.name
+      : value !== (profile?.pin || '');
+    
+    setHasChanges(hasChanged || formData[field === 'name' ? 'pin' : 'name'] !== (profile?.[field === 'name' ? 'pin' : 'name'] || ''));
   };
 
   if (loading) {
@@ -134,7 +168,7 @@ export default function AdminProfile() {
                 <Label htmlFor="name">Full Name</Label>
                 <Input
                   id="name"
-                  value={profile.name}
+                  value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                 />
               </div>
@@ -157,15 +191,20 @@ export default function AdminProfile() {
                 <Input
                   id="pin"
                   type="password"
-                  value={profile.pin || ''}
+                  value={formData.pin}
                   onChange={(e) => handleInputChange('pin', e.target.value)}
                   placeholder="Enter 4-digit PIN"
                   maxLength={4}
                 />
               </div>
 
-              <Button onClick={handleSave} disabled={saving} className="w-full">
-                {saving ? 'Saving...' : 'Save Changes'}
+              <Button 
+                onClick={handleSave} 
+                disabled={saving || !hasChanges} 
+                className="w-full"
+                variant={hasChanges ? "default" : "secondary"}
+              >
+                {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
               </Button>
             </CardContent>
           </Card>
