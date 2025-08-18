@@ -16,7 +16,6 @@ import { validatePostcode, geocodePostcode, formatLegacyAddress, formatPostcode 
 const jobSchema = z.object({
   code: z.string().min(1, 'Job code is required'),
   name: z.string().min(1, 'Job name is required'),
-  address: z.string().min(1, 'Address is required'), // Legacy field
   address_line_1: z.string().min(1, 'Address Line 1 is required'),
   address_line_2: z.string().optional(),
   city: z.string().min(1, 'City/Town is required'),
@@ -75,7 +74,6 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
     defaultValues: job ? {
       code: job.code,
       name: job.name,
-      address: job.address,
       address_line_1: job.address_line_1 || '',
       address_line_2: job.address_line_2 || '',
       city: job.city || '',
@@ -87,7 +85,6 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
     } : {
       code: '',
       name: '',
-      address: '',
       address_line_1: '',
       address_line_2: '',
       city: '',
@@ -139,10 +136,13 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
   }, [watchedPostcode]);
 
   const onSubmit = async (data: JobFormData) => {
+    console.log('Form submission started', data);
+    console.log('Selected location:', selectedLocation);
+    
     if (!selectedLocation) {
       toast({
         title: "Error",
-        description: "Please select a location on the map",
+        description: "Please select a location on the map or enter a valid postcode",
         variant: "destructive",
       });
       return;
