@@ -115,6 +115,57 @@ export function ExpenseTypesManager() {
     setDialogOpen(true);
   };
 
+  const handleDelete = async (id: string) => {
+    // Check if expense type is in use
+    const { data: usageCheck, error: usageError } = await supabase
+      .from('additional_costs')
+      .select('id')
+      .eq('expense_type_id', id)
+      .limit(1);
+
+    if (usageError) {
+      toast({
+        title: "Error",
+        description: "Error checking expense usage",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (usageCheck && usageCheck.length > 0) {
+      toast({
+        title: "Cannot Delete",
+        description: "Cannot delete expense type that has been used in claims. Deactivate instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Confirm deletion
+    if (!confirm('Are you sure you want to permanently delete this expense type? This cannot be undone.')) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('expense_types')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete expense type",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Expense type deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['expense-types'] });
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
@@ -282,6 +333,13 @@ export function ExpenseTypesManager() {
                         >
                           <ToggleLeft className="h-4 w-4 mr-2" />
                           {expenseType.is_active ? 'Deactivate' : 'Activate'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(expenseType.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 font-body"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Permanently
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

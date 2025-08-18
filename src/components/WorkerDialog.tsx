@@ -101,6 +101,7 @@ Please change your password on first login for security.`;
           .from('workers')
           .update({
             name: data.name,
+            email: data.email,
             phone: data.phone || null,
             hourly_rate: data.hourly_rate,
           })
@@ -211,21 +212,24 @@ Please change your password on first login for security.`;
               )}
             </div>
 
-            <div>
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="font-body font-semibold text-[#111111]">
+                Email Address *
+              </Label>
               <Input
                 id="email"
                 type="email"
                 {...register('email')}
-                placeholder="worker@company.com"
-                disabled={!!worker}
+                placeholder="worker@example.com"
+                className="font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30]"
+                required
               />
               {errors.email && (
                 <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
               )}
               {worker && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Email cannot be changed after creation
+                <p className="text-xs text-[#939393] font-body">
+                  Changing email will require the worker to login with the new email address
                 </p>
               )}
             </div>

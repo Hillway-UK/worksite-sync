@@ -17,35 +17,45 @@ export type Database = {
       additional_costs: {
         Row: {
           amount: number
+          clock_entry_id: string | null
           cost_type: string
           created_at: string | null
-          date: string
+          date: string | null
           description: string
           expense_type_id: string | null
           id: string
-          worker_id: string
+          worker_id: string | null
         }
         Insert: {
           amount: number
+          clock_entry_id?: string | null
           cost_type: string
           created_at?: string | null
-          date: string
+          date?: string | null
           description: string
           expense_type_id?: string | null
           id?: string
-          worker_id: string
+          worker_id?: string | null
         }
         Update: {
           amount?: number
+          clock_entry_id?: string | null
           cost_type?: string
           created_at?: string | null
-          date?: string
+          date?: string | null
           description?: string
           expense_type_id?: string | null
           id?: string
-          worker_id?: string
+          worker_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "additional_costs_clock_entry_id_fkey"
+            columns: ["clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "additional_costs_expense_type_id_fkey"
             columns: ["expense_type_id"]
@@ -254,6 +264,8 @@ export type Database = {
       }
       time_amendments: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           clock_entry_id: string
           created_at: string | null
           id: string
@@ -267,6 +279,8 @@ export type Database = {
           worker_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           clock_entry_id: string
           created_at?: string | null
           id?: string
@@ -280,6 +294,8 @@ export type Database = {
           worker_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           clock_entry_id?: string
           created_at?: string | null
           id?: string
@@ -366,6 +382,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_is_manager: {
+        Args: { user_email: string }
+        Returns: boolean
+      }
       get_clocked_in_workers: {
         Args: Record<PropertyKey, never>
         Returns: {

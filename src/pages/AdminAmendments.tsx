@@ -23,6 +23,8 @@ interface Amendment {
   status: string;
   created_at: string;
   manager_notes?: string;
+  approved_by?: string;
+  approved_at?: string;
 }
 
 export default function AdminAmendments() {
@@ -60,12 +62,21 @@ export default function AdminAmendments() {
 
   const handleApproval = async (amendmentId: string, status: 'approved' | 'rejected') => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: manager } = await supabase
+        .from('managers')
+        .select('name')
+        .eq('email', user?.email)
+        .single();
+
       const { error } = await supabase
         .from('time_amendments')
         .update({
           status,
           manager_notes: managerNotes,
-          processed_at: new Date().toISOString()
+          processed_at: new Date().toISOString(),
+          approved_by: manager?.name || user?.email,
+          approved_at: status === 'approved' ? new Date().toISOString() : null
         })
         .eq('id', amendmentId);
 
@@ -171,7 +182,14 @@ export default function AdminAmendments() {
                       <TableCell className="max-w-xs">
                         <p className="truncate">{amendment.reason}</p>
                       </TableCell>
-                      <TableCell>{getStatusBadge(amendment.status)}</TableCell>
+                      <TableCell>
+                        {getStatusBadge(amendment.status)}
+                        {amendment.status === 'approved' && amendment.approved_by && (
+                          <span className="text-xs text-[#939393] font-body block">
+                            Approved by: {amendment.approved_by}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {amendment.status === 'pending' && (
                           <Button

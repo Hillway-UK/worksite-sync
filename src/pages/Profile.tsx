@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { User, Clock, Calendar } from 'lucide-react';
+import { User, Clock, Calendar, Check, X, Edit } from 'lucide-react';
 
 interface WorkerProfile {
   id: string;
@@ -27,6 +27,8 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [totalHours, setTotalHours] = useState(0);
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState('');
 
   useEffect(() => {
     fetchProfile();
@@ -45,6 +47,7 @@ export default function Profile() {
 
       if (worker) {
         setProfile(worker);
+        setName(worker.name);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -105,6 +108,45 @@ export default function Profile() {
       toast({
         title: 'Error',
         description: 'Failed to update profile. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!name || name.trim() === '') {
+      toast({
+        title: 'Error',
+        description: 'Name cannot be empty',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!profile) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('workers')
+        .update({ name: name.trim() })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile({ ...profile, name: name.trim() });
+      setEditingName(false);
+      toast({
+        title: 'Profile Updated',
+        description: 'Your name has been successfully updated.',
+      });
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update name. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -193,12 +235,44 @@ export default function Profile() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                    />
+                    <Label htmlFor="name" className="font-body font-semibold text-[#111111]">Full Name</Label>
+                    {editingName ? (
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveName();
+                            if (e.key === 'Escape') {
+                              setEditingName(false);
+                              setName(profile?.name || '');
+                            }
+                          }}
+                          className="flex-1 font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30]"
+                          placeholder="Enter your name"
+                          autoFocus
+                        />
+                        <Button onClick={handleSaveName} size="sm" className="bg-[#702D30] hover:bg-[#420808]">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => { setEditingName(false); setName(profile?.name || ''); }} size="sm" variant="outline">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="name"
+                          value={profile.name}
+                          disabled
+                          className="flex-1 bg-muted font-body"
+                        />
+                        <Button onClick={() => setEditingName(true)} size="sm" variant="outline">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
