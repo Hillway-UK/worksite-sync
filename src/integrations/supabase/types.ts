@@ -351,6 +351,10 @@ export type Database = {
         Args: { week_start: string; worker_uuid: string }
         Returns: number
       }
+      is_manager: {
+        Args: { user_email: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
