@@ -7,8 +7,10 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, User, FileText, LogOut } from 'lucide-react';
+import { Clock, MapPin, User, FileText, LogOut, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { NotificationService } from '@/services/notifications';
+import { toast } from 'sonner';
 
 const localizer = momentLocalizer(moment);
 
@@ -40,29 +42,47 @@ export default function Dashboard() {
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [worker, setWorker] = useState<any>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
-    fetchClockEntries();
+    fetchWorker();
   }, [user]);
 
-  const fetchClockEntries = async () => {
+  useEffect(() => {
+    if (worker) {
+      fetchClockEntries();
+      setupNotifications();
+    }
+  }, [worker]);
+
+  const fetchWorker = async () => {
     if (!user?.email) return;
 
     try {
-      const { data: worker } = await supabase
+      const { data, error } = await supabase
         .from('workers')
-        .select('id')
+        .select('*')
         .eq('email', user.email)
         .single();
 
-      if (!worker) return;
+      if (error) throw error;
+      setWorker(data);
+    } catch (error) {
+      console.error('Error fetching worker:', error);
+    }
+  };
 
+  const fetchClockEntries = async () => {
+    if (!worker?.id) return;
+
+    try {
       const { data: entries } = await supabase
         .from('clock_entries')
         .select(`
           *,
           jobs:job_id(name, code),
-          time_amendments!inner(status)
+          time_amendments(status)
         `)
         .eq('worker_id', worker.id)
         .order('clock_in', { ascending: false });
@@ -72,6 +92,28 @@ export default function Dashboard() {
       console.error('Error fetching clock entries:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setupNotifications = async () => {
+    try {
+      const permission = await NotificationService.requestPermission();
+      if (permission && worker?.id) {
+        const subscription = await NotificationService.subscribeToPushNotifications(worker.id);
+        setNotificationsEnabled(!!subscription);
+        
+        if (subscription) {
+          toast.success('Notifications enabled successfully');
+          
+          // Show a test notification
+          NotificationService.showLocalNotification(
+            'Pioneer Timesheets',
+            'Notifications are now enabled! You\'ll receive reminders for clock-in and clock-out.'
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error setting up notifications:', error);
     }
   };
 
@@ -132,7 +174,15 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-foreground mb-2">My Time Calendar</h1>
             <p className="text-muted-foreground">View your clock entries and request amendments</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* Notification Status */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted mr-4">
+              <Bell className={`h-4 w-4 ${notificationsEnabled ? 'text-green-600' : 'text-gray-400'}`} />
+              <span className="text-sm">
+                {notificationsEnabled ? 'Notifications On' : 'Notifications Off'}
+              </span>
+            </div>
+            
             <Button
               onClick={() => navigate('/profile')}
               variant="outline"
