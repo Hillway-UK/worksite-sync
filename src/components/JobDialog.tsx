@@ -136,7 +136,7 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
 
     const timeoutId = setTimeout(handleGeocoding, 500); // Debounce
     return () => clearTimeout(timeoutId);
-  }, [watchedPostcode, setValue, geocoding]);
+  }, [watchedPostcode]);
 
   const onSubmit = async (data: JobFormData) => {
     if (!selectedLocation) {
