@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { JobDialog } from '@/components/JobDialog';
+import { AddressDisplay } from '@/components/AddressDisplay';
 import { toast } from '@/hooks/use-toast';
 import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight } from 'lucide-react';
 
@@ -14,7 +15,12 @@ interface Job {
   id: string;
   code: string;
   name: string;
-  address: string;
+  address: string; // Legacy field
+  address_line_1?: string;
+  address_line_2?: string;
+  city?: string;
+  county?: string;
+  postcode?: string;
   latitude: number;
   longitude: number;
   geofence_radius: number;
@@ -101,11 +107,18 @@ export default function AdminJobs() {
     }
   };
 
-  const filteredJobs = jobs.filter(job =>
-    job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.address.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter jobs based on search term
+  const filteredJobs = jobs.filter(job => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      job.name.toLowerCase().includes(searchLower) ||
+      job.code.toLowerCase().includes(searchLower) ||
+      job.address.toLowerCase().includes(searchLower) ||
+      job.address_line_1?.toLowerCase().includes(searchLower) ||
+      job.city?.toLowerCase().includes(searchLower) ||
+      job.postcode?.toLowerCase().includes(searchLower)
+    );
+  });
 
   if (loading) {
     return (
@@ -170,9 +183,19 @@ export default function AdminJobs() {
                   ) : (
                     filteredJobs.map((job) => (
                       <TableRow key={job.id}>
-                        <TableCell className="font-medium">{job.code}</TableCell>
-                        <TableCell>{job.name}</TableCell>
-                        <TableCell className="max-w-xs truncate">{job.address}</TableCell>
+                <TableCell className="font-medium">{job.code}</TableCell>
+                <TableCell>{job.name}</TableCell>
+                <TableCell className="max-w-xs">
+                  <AddressDisplay
+                    address={job.address}
+                    address_line_1={job.address_line_1}
+                    address_line_2={job.address_line_2}
+                    city={job.city}
+                    county={job.county}
+                    postcode={job.postcode}
+                    className="text-sm"
+                  />
+                </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />

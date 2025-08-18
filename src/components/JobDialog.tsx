@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,21 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, MapPin } from 'lucide-react';
-import { MapComponent } from './MapComponent';
+import { LeafletMap } from './LeafletMap';
+import { validatePostcode, geocodePostcode, formatLegacyAddress, formatPostcode } from '@/lib/postcode-utils';
 
 const jobSchema = z.object({
   code: z.string().min(1, 'Job code is required'),
   name: z.string().min(1, 'Job name is required'),
-  address: z.string().min(1, 'Address is required'),
+  address: z.string().min(1, 'Address is required'), // Legacy field
+  address_line_1: z.string().min(1, 'Address Line 1 is required'),
+  address_line_2: z.string().optional(),
+  city: z.string().min(1, 'City/Town is required'),
+  county: z.string().optional(),
+  postcode: z.string().min(1, 'Postcode is required').refine(
+    (val) => validatePostcode(val),
+    { message: 'Invalid UK postcode format' }
+  ),
   latitude: z.number(),
   longitude: z.number(),
   geofence_radius: z.number().min(50).max(500),
@@ -27,7 +36,12 @@ interface Job {
   id: string;
   code: string;
   name: string;
-  address: string;
+  address: string; // Legacy field
+  address_line_1?: string;
+  address_line_2?: string;
+  city?: string;
+  county?: string;
+  postcode?: string;
   latitude: number;
   longitude: number;
   geofence_radius: number;
@@ -43,6 +57,7 @@ interface JobDialogProps {
 export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | undefined>(
     job ? [job.latitude, job.longitude] : undefined
   );
@@ -61,6 +76,11 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
       code: job.code,
       name: job.name,
       address: job.address,
+      address_line_1: job.address_line_1 || '',
+      address_line_2: job.address_line_2 || '',
+      city: job.city || '',
+      county: job.county || '',
+      postcode: job.postcode || '',
       latitude: job.latitude,
       longitude: job.longitude,
       geofence_radius: job.geofence_radius,
@@ -68,11 +88,55 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
       code: '',
       name: '',
       address: '',
+      address_line_1: '',
+      address_line_2: '',
+      city: '',
+      county: '',
+      postcode: '',
       latitude: 51.5074,
       longitude: -0.1278,
       geofence_radius: 100,
     },
   });
+
+  // Watch postcode field for auto-geocoding
+  const watchedPostcode = watch('postcode');
+
+  // Auto-geocode when postcode changes
+  useEffect(() => {
+    const handleGeocoding = async () => {
+      if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding) return;
+      
+      setGeocoding(true);
+      try {
+        const result = await geocodePostcode(watchedPostcode);
+        if (result) {
+          setSelectedLocation([result.latitude, result.longitude]);
+          setValue('latitude', result.latitude);
+          setValue('longitude', result.longitude);
+          setValue('postcode', result.formatted_postcode);
+          
+          toast({
+            title: "Success",
+            description: "Location found and updated on map",
+          });
+        } else {
+          toast({
+            title: "Warning",
+            description: "Could not find location for this postcode",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Geocoding error:', error);
+      } finally {
+        setGeocoding(false);
+      }
+    };
+
+    const timeoutId = setTimeout(handleGeocoding, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [watchedPostcode, setValue, geocoding]);
 
   const onSubmit = async (data: JobFormData) => {
     if (!selectedLocation) {
@@ -86,10 +150,24 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
 
     setLoading(true);
     try {
+      // Create legacy address field from structured data
+      const legacyAddress = formatLegacyAddress(
+        data.address_line_1,
+        data.address_line_2,
+        data.city,
+        data.county,
+        data.postcode
+      );
+
       const jobData = {
         code: data.code,
         name: data.name,
-        address: data.address,
+        address: legacyAddress, // Legacy field for backward compatibility
+        address_line_1: data.address_line_1,
+        address_line_2: data.address_line_2 || null,
+        city: data.city,
+        county: data.county || null,
+        postcode: formatPostcode(data.postcode),
         latitude: selectedLocation[0],
         longitude: selectedLocation[1],
         geofence_radius: radius,
@@ -188,16 +266,75 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              {...register('address')}
-              placeholder="Full address of the job site"
-            />
-            {errors.address && (
-              <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
-            )}
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="address_line_1">Address Line 1 *</Label>
+              <Input
+                id="address_line_1"
+                {...register('address_line_1')}
+                placeholder="House number and street name"
+              />
+              {errors.address_line_1 && (
+                <p className="text-sm text-destructive mt-1">{errors.address_line_1.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="address_line_2">Address Line 2</Label>
+              <Input
+                id="address_line_2"
+                {...register('address_line_2')}
+                placeholder="Apartment, suite, etc. (optional)"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="city">City/Town *</Label>
+                <Input
+                  id="city"
+                  {...register('city')}
+                  placeholder="City or town"
+                />
+                {errors.city && (
+                  <p className="text-sm text-destructive mt-1">{errors.city.message}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="county">County</Label>
+                <Input
+                  id="county"
+                  {...register('county')}
+                  placeholder="County (optional)"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="postcode" className="flex items-center gap-2">
+                Postcode *
+                {geocoding && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                )}
+              </Label>
+              <Input
+                id="postcode"
+                {...register('postcode')}
+                placeholder="e.g., SW1A 1AA"
+                className="uppercase"
+                onChange={(e) => {
+                  e.target.value = e.target.value.toUpperCase();
+                  setValue('postcode', e.target.value);
+                }}
+              />
+              {errors.postcode && (
+                <p className="text-sm text-destructive mt-1">{errors.postcode.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Location will be automatically found when you enter a valid postcode
+              </p>
+            </div>
           </div>
 
           <div>
@@ -205,12 +342,13 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
               <MapPin className="h-4 w-4" />
               Location (Click on map to set)
             </Label>
-            <MapComponent
+            <LeafletMap
               center={selectedLocation || [51.5074, -0.1278]}
               zoom={13}
               onLocationSelect={handleLocationSelect}
               selectedLocation={selectedLocation}
               radius={radius}
+              className="h-64 w-full"
             />
           </div>
 

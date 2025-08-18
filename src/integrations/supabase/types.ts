@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
@@ -134,7 +134,11 @@ export type Database = {
       jobs: {
         Row: {
           address: string
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
           code: string
+          county: string | null
           created_at: string | null
           geofence_radius: number | null
           id: string
@@ -142,10 +146,15 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          postcode: string | null
         }
         Insert: {
           address: string
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
           code: string
+          county?: string | null
           created_at?: string | null
           geofence_radius?: number | null
           id?: string
@@ -153,10 +162,15 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          postcode?: string | null
         }
         Update: {
           address?: string
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
           code?: string
+          county?: string | null
           created_at?: string | null
           geofence_radius?: number | null
           id?: string
@@ -164,6 +178,7 @@ export type Database = {
           latitude?: number
           longitude?: number
           name?: string
+          postcode?: string | null
         }
         Relationships: []
       }
@@ -311,21 +326,21 @@ export type Database = {
       get_clocked_in_workers: {
         Args: Record<PropertyKey, never>
         Returns: {
+          clock_in: string
+          job_name: string
           worker_id: string
           worker_name: string
-          job_name: string
-          clock_in: string
         }[]
       }
       get_recent_activity: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          worker_name: string
-          job_name: string
           clock_in: string
           clock_out: string
+          id: string
+          job_name: string
           total_hours: number
+          worker_name: string
         }[]
       }
       get_total_hours_today: {
@@ -333,7 +348,7 @@ export type Database = {
         Returns: number
       }
       get_worker_weekly_hours: {
-        Args: { worker_uuid: string; week_start: string }
+        Args: { week_start: string; worker_uuid: string }
         Returns: number
       }
     }
