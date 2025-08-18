@@ -150,6 +150,16 @@ export const Navigation: React.FC = () => {
                 >
                   Weekly Reports
                 </Link>
+                <Link
+                  to="/admin/profile"
+                  className={`${
+                    location.pathname === '/admin/profile' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Profile
+                </Link>
                 <button
                   onClick={handleSignOut}
                   className="text-white/90 hover:text-white hover:bg-[#420808]/30 px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200"
@@ -181,6 +191,13 @@ export const Navigation: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Weekly Reports
+              </Link>
+              <Link
+                to="/admin/profile"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Profile
               </Link>
               <button
                 onClick={handleSignOut}
