@@ -7,7 +7,7 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, User, FileText } from 'lucide-react';
+import { Clock, MapPin, User, FileText, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const localizer = momentLocalizer(moment);
@@ -142,12 +142,23 @@ export default function Dashboard() {
               Profile
             </Button>
             <Button
-              onClick={() => navigate('/reports')}
+              onClick={() => navigate('/timesheets')}
               variant="outline"
               className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
             >
               <FileText className="mr-2 h-4 w-4" />
-              Reports
+              Timesheets
+            </Button>
+            <Button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/login');
+              }}
+              variant="outline"
+              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
             </Button>
           </div>
         </div>

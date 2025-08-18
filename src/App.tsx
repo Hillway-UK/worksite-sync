@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import Timesheets from "./pages/Timesheets";
 import Amendments from "./pages/Amendments";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
@@ -42,6 +43,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="worker">
                   <Profile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/timesheets" 
+              element={
+                <ProtectedRoute requireRole="worker">
+                  <Timesheets />
                 </ProtectedRoute>
               } 
             />
@@ -109,7 +118,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

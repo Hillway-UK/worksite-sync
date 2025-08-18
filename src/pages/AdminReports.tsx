@@ -324,10 +324,15 @@ export default function AdminReports() {
         .from('additional_costs')
         .select(`
           *,
-          workers (id, name, email, address)
+          workers (id, name, email, address),
+          clock_entries!inner (
+            id,
+            jobs (id, name)
+          )
         `)
         .gte('date', format(weekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+        .lte('date', format(weekEnd, 'yyyy-MM-dd'))
+        .not('clock_entry_id', 'is', null);
 
       if (costsError) throw costsError;
 
@@ -342,6 +347,10 @@ export default function AdminReports() {
           jobName: string;
           totalHours: number;
           hourlyRate: number;
+          expenses: Array<{
+            amount: number;
+            description: string;
+          }>;
         }>;
         additionalCosts: Array<{
           amount: number;
@@ -373,7 +382,8 @@ export default function AdminReports() {
             jobId,
             jobName: entry.jobs.name,
             totalHours: 0,
-            hourlyRate: entry.workers.hourly_rate
+            hourlyRate: entry.workers.hourly_rate,
+            expenses: []
           });
         }
         
@@ -381,16 +391,30 @@ export default function AdminReports() {
         job.totalHours += parseFloat(entry.total_hours) || 0;
       });
 
-      // Process additional costs
+      // Process additional costs and link them to specific jobs
       costsData?.forEach((cost: any) => {
         const workerId = cost.workers.id;
+        const jobId = cost.clock_entries?.jobs?.id;
+        const jobName = cost.clock_entries?.jobs?.name;
         
         if (workerMap.has(workerId)) {
           const worker = workerMap.get(workerId)!;
-          worker.additionalCosts.push({
-            amount: parseFloat(cost.amount) || 0,
-            description: cost.description || 'Additional Cost'
-          });
+          
+          // If we have a job ID, link the expense to that specific job
+          if (jobId && worker.jobs.has(jobId)) {
+            const job = worker.jobs.get(jobId)!;
+            job.expenses.push({
+              amount: parseFloat(cost.amount) || 0,
+              description: cost.description || 'Additional Cost'
+            });
+          } else {
+            // Fallback: add to general additional costs
+            worker.additionalCosts.push({
+              amount: parseFloat(cost.amount) || 0,
+              description: cost.description || 'Additional Cost',
+              jobName: jobName || 'General'
+            });
+          }
         }
       });
 
@@ -449,7 +473,8 @@ export default function AdminReports() {
       // Add line items for each job the worker worked on
       worker.jobs.forEach((job) => {
         if (job.totalHours > 0) {
-          const row = [
+          // Add labour line item
+          const labourRow = [
             `"${worker.workerName}"`,
             `"${worker.workerEmail}"`,
             `"${addressInfo.addressLine1}"`,
@@ -477,11 +502,44 @@ export default function AdminReports() {
             '""', // TrackingOption2
             '"GBP"'
           ];
-          csvContent += row.join(',') + '\n';
+          csvContent += labourRow.join(',') + '\n';
+
+          // Add expenses for this specific job
+          job.expenses.forEach((expense) => {
+            const expenseRow = [
+              `"${worker.workerName}"`,
+              `"${worker.workerEmail}"`,
+              `"${addressInfo.addressLine1}"`,
+              '""', // POAddressLine2
+              '""', // POAddressLine3
+              '""', // POAddressLine4
+              `"${addressInfo.city}"`,
+              `"${addressInfo.region}"`,
+              `"${addressInfo.postcode}"`,
+              '"United Kingdom"',
+              `"${invoiceNum}"`,
+              `"${invoiceDate}"`,
+              `"${dueDateStr}"`,
+              '""', // Total (Xero calculates)
+              '""', // InventoryItemCode
+              `"${expense.description} - ${job.jobName} - Week ${weekNumber} ${year}"`,
+              '1',
+              expense.amount.toFixed(2),
+              `"${xeroSettings.accountCode}"`,
+              `"${xeroSettings.taxType}"`,
+              '""', // TaxAmount (Xero calculates)
+              '"Project"',
+              `"${job.jobName}"`, // Same job tracking as labour
+              '""', // TrackingName2
+              '""', // TrackingOption2
+              '"GBP"'
+            ];
+            csvContent += expenseRow.join(',') + '\n';
+          });
         }
       });
 
-      // Add additional costs as separate line items
+      // Add any general additional costs (fallback for expenses not linked to specific clock entries)
       worker.additionalCosts.forEach((cost) => {
         const row = [
           `"${worker.workerName}"`,
@@ -506,7 +564,7 @@ export default function AdminReports() {
           `"${xeroSettings.taxType}"`,
           '""', // TaxAmount (Xero calculates)
           '"Project"',
-          '"General"', // Default project for additional costs
+          `"${cost.jobName || 'General'}"`, // Use job name from cost or default to General
           '""', // TrackingName2
           '""', // TrackingOption2
           '"GBP"'
