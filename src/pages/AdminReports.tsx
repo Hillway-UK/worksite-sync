@@ -776,43 +776,47 @@ export default function AdminReports() {
                                   {moment(date).format('dddd DD/MM')} | {dayEntries[0]?.job_name}
                                 </div>
                                 {dayEntries.map(entry => (
-                                  <div key={entry.id} className="ml-4 text-sm flex items-center gap-4 py-1">
-                                    <span>Clock In: {moment(entry.clock_in).format('HH:mm')}</span>
-                                    {entry.clock_in_photo && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-auto p-1"
-                                        onClick={() => setPhotoModal({
-                                          isOpen: true,
-                                          photoUrl: entry.clock_in_photo!,
-                                          workerName: entry.worker_name,
-                                          timestamp: moment(entry.clock_in).format('DD/MM/YYYY HH:mm'),
-                                          jobName: entry.job_name,
-                                        })}
-                                      >
-                                        <Camera className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                    <span>| Clock Out: {moment(entry.clock_out).format('HH:mm')}</span>
-                                    {entry.clock_out_photo && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-auto p-1"
-                                        onClick={() => setPhotoModal({
-                                          isOpen: true,
-                                          photoUrl: entry.clock_out_photo!,
-                                          workerName: entry.worker_name,
-                                          timestamp: moment(entry.clock_out).format('DD/MM/YYYY HH:mm'),
-                                          jobName: entry.job_name,
-                                        })}
-                                      >
-                                        <Camera className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                    <span>| Hours: {entry.hours.toFixed(1)}</span>
-                                  </div>
+                                   <div key={entry.id} className="ml-4 text-sm space-y-2 py-2">
+                                     <div className="flex items-center gap-4">
+                                       <span>Clock In: {moment(entry.clock_in).format('HH:mm')}</span>
+                                       <span>| Clock Out: {moment(entry.clock_out).format('HH:mm')}</span>
+                                       <span>| Hours: {entry.hours.toFixed(1)}</span>
+                                     </div>
+                                     
+                                     {(entry.clock_in_photo || entry.clock_out_photo) && (
+                                       <div className="grid grid-cols-2 gap-2 mt-2">
+                                         {entry.clock_in_photo && (
+                                           <div className="space-y-1">
+                                             <p className="text-xs font-semibold text-[#111111]">Clock In Photo</p>
+                                             <div className="relative group">
+                                               <img 
+                                                 src={entry.clock_in_photo} 
+                                                 alt="Clock in verification" 
+                                                 className="w-full h-20 object-cover rounded border-2 border-[#EAEAEA] cursor-pointer transition-all duration-200 hover:border-[#702D30] hover:shadow-lg"
+                                                 onClick={() => window.open(entry.clock_in_photo, '_blank')}
+                                               />
+                                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded transition-all duration-200 pointer-events-none"></div>
+                                             </div>
+                                           </div>
+                                         )}
+                                         
+                                         {entry.clock_out_photo && (
+                                           <div className="space-y-1">
+                                             <p className="text-xs font-semibold text-[#111111]">Clock Out Photo</p>
+                                             <div className="relative group">
+                                               <img 
+                                                 src={entry.clock_out_photo} 
+                                                 alt="Clock out verification" 
+                                                 className="w-full h-20 object-cover rounded border-2 border-[#EAEAEA] cursor-pointer transition-all duration-200 hover:border-[#702D30] hover:shadow-lg"
+                                                 onClick={() => window.open(entry.clock_out_photo, '_blank')}
+                                               />
+                                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded transition-all duration-200 pointer-events-none"></div>
+                                             </div>
+                                           </div>
+                                         )}
+                                       </div>
+                                     )}
+                                   </div>
                                 ))}
                               </div>
                             ))}

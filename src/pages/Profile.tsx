@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { User, Clock, Calendar, Check, X, Edit2 } from 'lucide-react';
 
 interface WorkerProfile {
@@ -99,17 +99,10 @@ export default function Profile() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Profile Updated',
-        description: 'Your profile has been successfully updated.',
-      });
+      toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile. Please try again.',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -119,11 +112,7 @@ export default function Profile() {
     const trimmedName = tempName.trim();
     
     if (!trimmedName) {
-      toast({
-        title: 'Error',
-        description: 'Name cannot be empty',
-        variant: 'destructive',
-      });
+      toast.error('Name cannot be empty');
       return;
     }
 
@@ -140,28 +129,17 @@ export default function Profile() {
 
       if (error) {
         console.error('Error updating name:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to update name',
-          variant: 'destructive',
-        });
+        toast.error('Failed to update name');
         return;
       }
 
       // Update local state
       setProfile(prev => prev ? { ...prev, name: trimmedName } : null);
       setEditingName(false);
-      toast({
-        title: 'Success',
-        description: 'Name updated successfully',
-      });
+      toast.success('Name updated successfully');
     } catch (error) {
       console.error('Error:', error);
-      toast({
-        title: 'Error',
-        description: 'An error occurred while updating name',
-        variant: 'destructive',
-      });
+      toast.error('An error occurred while updating name');
     }
   };
 

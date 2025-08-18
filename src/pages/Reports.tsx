@@ -278,40 +278,34 @@ export default function Reports() {
                         {entry.clock_out ? moment(entry.clock_out).format('h:mm A') : '-'}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          {entry.clock_in_photo && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPhotoModal({
-                                isOpen: true,
-                                photoUrl: entry.clock_in_photo!,
-                                workerName: user?.email || 'Worker',
-                                timestamp: moment(entry.clock_in).format('DD/MM/YYYY HH:mm'),
-                                jobName: entry.job?.name,
-                              })}
-                            >
-                              <Camera className="h-4 w-4" />
-                              In
-                            </Button>
-                          )}
-                          {entry.clock_out_photo && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPhotoModal({
-                                isOpen: true,
-                                photoUrl: entry.clock_out_photo!,
-                                workerName: user?.email || 'Worker',
-                                timestamp: moment(entry.clock_out).format('DD/MM/YYYY HH:mm'),
-                                jobName: entry.job?.name,
-                              })}
-                            >
-                              <Camera className="h-4 w-4" />
-                              Out
-                            </Button>
-                          )}
-                        </div>
+                        {(entry.clock_in_photo || entry.clock_out_photo) ? (
+                          <div className="flex gap-2">
+                            {entry.clock_in_photo && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-[#111111]">In</p>
+                                <img 
+                                  src={entry.clock_in_photo} 
+                                  alt="Clock in verification" 
+                                  className="w-8 h-8 object-cover rounded border cursor-pointer transition-all duration-200 hover:border-[#702D30]"
+                                  onClick={() => window.open(entry.clock_in_photo, '_blank')}
+                                />
+                              </div>
+                            )}
+                            {entry.clock_out_photo && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-[#111111]">Out</p>
+                                <img 
+                                  src={entry.clock_out_photo} 
+                                  alt="Clock out verification" 
+                                  className="w-8 h-8 object-cover rounded border cursor-pointer transition-all duration-200 hover:border-[#702D30]"
+                                  onClick={() => window.open(entry.clock_out_photo, '_blank')}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No photos</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {entry.total_hours?.toFixed(2) || '-'}
