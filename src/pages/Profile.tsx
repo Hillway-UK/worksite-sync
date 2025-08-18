@@ -1,351 +1,312 @@
 import React, { useState, useEffect } from 'react';
-import { Layout } from '@/components/Layout';
-import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Save, Lock, User, FileText, Camera } from 'lucide-react';
 import { toast } from 'sonner';
-import { User, Clock, Calendar, Check, X, Edit2 } from 'lucide-react';
-
-interface WorkerProfile {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  emergency_contact?: string;
-  emergency_phone?: string;
-  hourly_rate: number;
-  date_started: string;
-}
 
 export default function Profile() {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<WorkerProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [currentEmail, setCurrentEmail] = useState('');
+  const [hourlyRate, setHourlyRate] = useState(0);
+  const [workerId, setWorkerId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
-  const [totalHours, setTotalHours] = useState(0);
-  const [editingName, setEditingName] = useState(false);
-  const [tempName, setTempName] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
 
   useEffect(() => {
-    fetchProfile();
-    fetchTotalHours();
-  }, [user]);
+    loadWorker();
+  }, []);
 
-  const fetchProfile = async () => {
-    if (!user?.email) return;
-
-    try {
-      const { data: worker } = await supabase
-        .from('workers')
-        .select('*')
-        .eq('email', user.email)
-        .single();
-
-      if (worker) {
-        setProfile(worker);
-        setTempName(worker.name);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
+  const loadWorker = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    const { data } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+    
+    if (data) {
+      setName(data.name || '');
+      setEmail(data.email || '');
+      setCurrentEmail(data.email || '');
+      setHourlyRate(data.hourly_rate || 0);
+      setWorkerId(data.id);
+      setPhotoUrl(data.photo_url || '');
     }
   };
 
-  const fetchTotalHours = async () => {
-    if (!user?.email) return;
-
-    try {
-      const { data: worker } = await supabase
-        .from('workers')
-        .select('id')
-        .eq('email', user.email)
-        .single();
-
-      if (!worker) return;
-
-      const { data: entries } = await supabase
-        .from('clock_entries')
-        .select('total_hours')
-        .eq('worker_id', worker.id)
-        .not('total_hours', 'is', null);
-
-      const total = entries?.reduce((sum, entry) => sum + (entry.total_hours || 0), 0) || 0;
-      setTotalHours(total);
-    } catch (error) {
-      console.error('Error fetching total hours:', error);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!profile) return;
-
+  const saveProfile = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Update name in database
+      const { error: dbError } = await supabase
         .from('workers')
-        .update({
-          name: profile.name,
-          phone: profile.phone,
-          address: profile.address,
-          emergency_contact: profile.emergency_contact,
-          emergency_phone: profile.emergency_phone
-        })
-        .eq('id', profile.id);
+        .update({ name: name })
+        .eq('id', workerId);
+      
+      if (dbError) throw dbError;
 
-      if (error) throw error;
+      // Update email if changed
+      if (email !== currentEmail) {
+        // Update auth email
+        const { error: authError } = await supabase.auth.updateUser({
+          email: email
+        });
+        
+        if (authError) throw authError;
 
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile. Please try again.');
+        // Update database email
+        const { error: emailDbError } = await supabase
+          .from('workers')
+          .update({ email: email })
+          .eq('id', workerId);
+        
+        if (emailDbError) throw emailDbError;
+        
+        toast.success('Profile updated! Check your new email for verification.');
+        setCurrentEmail(email);
+      } else {
+        toast.success('Profile updated successfully!');
+      }
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast.error(error.message || 'Failed to save profile');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveName = async () => {
-    const trimmedName = tempName.trim();
+  const changePassword = async () => {
+    // Validate passwords
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
     
-    if (!trimmedName) {
-      toast.error('Name cannot be empty');
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
       return;
     }
 
-    if (trimmedName === profile?.name) {
-      setEditingName(false);
-      return;
-    }
-
+    setSaving(true);
     try {
-      const { error } = await supabase
-        .from('workers')
-        .update({ name: trimmedName })
-        .eq('id', profile?.id);
-
-      if (error) {
-        console.error('Error updating name:', error);
-        toast.error('Failed to update name');
-        return;
-      }
-
-      // Update local state
-      setProfile(prev => prev ? { ...prev, name: trimmedName } : null);
-      setEditingName(false);
-      toast.success('Name updated successfully');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('An error occurred while updating name');
+      // Update password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
+      
+      // Clear password fields
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      toast.success('Password changed successfully!');
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      toast.error(error.message || 'Failed to change password');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleInputChange = (field: keyof WorkerProfile, value: string) => {
-    if (!profile) return;
-    setProfile({ ...profile, [field]: value });
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSaving(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${workerId}-${Date.now()}.${fileExt}`;
+      const filePath = `worker-photos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('worker-photos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('worker-photos')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('workers')
+        .update({ photo_url: publicUrl })
+        .eq('id', workerId);
+
+      if (updateError) throw updateError;
+
+      setPhotoUrl(publicUrl);
+      toast.success('Photo updated successfully!');
+    } catch (error: any) {
+      toast.error('Failed to upload photo');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-lg text-muted-foreground">Loading profile...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-lg text-muted-foreground">Profile not found</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
-    <Layout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-4">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">My Profile</h1>
-          <p className="text-muted-foreground">Manage your personal information and view work statistics</p>
+          <div className="flex gap-2 mb-4">
+            <Button
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Button>
+            <Button
+              onClick={() => navigate('/timesheets')}
+              variant="outline"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Timesheets
+            </Button>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">Worker Profile</h1>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Profile Stats */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Hours Worked</CardTitle>
-                <Clock className="h-4 w-4 ml-auto text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalHours.toFixed(1)}h</div>
-                <p className="text-xs text-muted-foreground">All time</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Date Started</CardTitle>
-                <Calendar className="h-4 w-4 ml-auto text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {new Date(profile.date_started).toLocaleDateString()}
+        
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Profile Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Profile Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Photo Section */}
+              <div className="flex items-center gap-4">
+                {photoUrl && (
+                  <img src={photoUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
+                )}
+                <div>
+                  <input
+                    type="file"
+                    id="photo-upload"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={saving}
+                  />
+                  <label htmlFor="photo-upload">
+                    <Button variant="outline" size="sm" asChild>
+                      <span>
+                        <Camera className="mr-2 h-4 w-4" />
+                        Upload Photo
+                      </span>
+                    </Button>
+                  </label>
                 </div>
-                <p className="text-xs text-muted-foreground">Employment start date</p>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Hourly Rate</CardTitle>
-                <User className="h-4 w-4 ml-auto text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${profile.hourly_rate}</div>
-                <p className="text-xs text-muted-foreground">Per hour</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Profile Form */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="font-body font-semibold text-[#111111]">Name</Label>
-                    {editingName ? (
-                      <div className="flex gap-2">
-                        <Input
-                          type="text"
-                          value={tempName}
-                          onChange={(e) => setTempName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && tempName.trim()) {
-                              handleSaveName();
-                            }
-                            if (e.key === 'Escape') {
-                              setEditingName(false);
-                              setTempName(profile?.name || '');
-                            }
-                          }}
-                          className="flex-1 font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30]"
-                          placeholder="Enter your name"
-                          autoFocus
-                        />
-                        <Button 
-                          onClick={handleSaveName} 
-                          size="sm" 
-                          className="bg-[#702D30] hover:bg-[#420808] text-white"
-                          disabled={!tempName.trim()}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          onClick={() => {
-                            setEditingName(false);
-                            setTempName(profile?.name || '');
-                          }} 
-                          size="sm" 
-                          variant="outline"
-                          className="border-[#939393] hover:bg-[#EAEAEA]"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="font-body text-[#111111]">{profile?.name || 'Not set'}</span>
-                        <Button
-                          onClick={() => {
-                            setEditingName(true);
-                            setTempName(profile?.name || '');
-                          }}
-                          size="sm"
-                          variant="ghost"
-                          className="text-[#702D30] hover:bg-[#702D30]/10"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      value={profile.email}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      value={profile.phone || ''}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      value={profile.address || ''}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      placeholder="123 Main St, City, State"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="emergency_contact">Emergency Contact Name</Label>
-                    <Input
-                      id="emergency_contact"
-                      value={profile.emergency_contact || ''}
-                      onChange={(e) => handleInputChange('emergency_contact', e.target.value)}
-                      placeholder="John Doe"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="emergency_phone">Emergency Contact Phone</Label>
-                    <Input
-                      id="emergency_phone"
-                      value={profile.emergency_phone || ''}
-                      onChange={(e) => handleInputChange('emergency_phone', e.target.value)}
-                      placeholder="(555) 987-6543"
-                    />
-                  </div>
-                </div>
-
-                <Button 
-                  onClick={handleSave} 
+              <div>
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your name"
                   disabled={saving}
-                  className="w-full"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  disabled={saving}
+                />
+                {email !== currentEmail && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    You'll need to verify your new email address
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label>Hourly Rate</Label>
+                <div className="text-lg font-semibold">£{hourlyRate.toFixed(2)}/hour</div>
+                <p className="text-sm text-muted-foreground">Contact your manager to update</p>
+              </div>
+              
+              <Button 
+                onClick={saveProfile} 
+                className="w-full"
+                disabled={saving}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? 'Saving...' : 'Save Profile'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Change Password Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Change Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 characters)"
+                  disabled={saving}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  disabled={saving}
+                />
+              </div>
+              
+              <Button 
+                onClick={changePassword} 
+                className="w-full"
+                disabled={saving || !newPassword || !confirmPassword}
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                {saving ? 'Changing...' : 'Change Password'}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
