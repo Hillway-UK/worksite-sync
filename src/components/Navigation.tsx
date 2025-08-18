@@ -98,82 +98,65 @@ export const Navigation: React.FC = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Link
-                to="/admin"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Dashboard
-              </Link>
-              <Link
-                to="/admin/profile"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin/profile')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Link>
-              <Link
-                to="/admin/workers"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin/workers')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Workers
-              </Link>
-              <Link
-                to="/admin/jobs"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin/jobs')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <Briefcase className="h-4 w-4 mr-2" />
-                Jobs
-              </Link>
-              <Link
-                to="/admin/amendments"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin/amendments')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Amendments
-              </Link>
-              <Link
-                to="/admin/reports"
-                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/admin/reports')
-                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
-                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
-                }`}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Weekly Reports
-              </Link>
-              <Button
-                onClick={handleSignOut}
-                variant="ghost"
-                size="sm"
-                className="text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 min-h-[44px] hover:scale-105 transition-all duration-200"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
+            <div className="hidden md:block">
+              <div className="ml-10 flex items-baseline space-x-4">
+                <Link
+                  to="/admin"
+                  className={`${
+                    location.pathname === '/admin' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/admin/workers"
+                  className={`${
+                    location.pathname === '/admin/workers' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Workers
+                </Link>
+                <Link
+                  to="/admin/jobs"
+                  className={`${
+                    location.pathname === '/admin/jobs' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Jobs
+                </Link>
+                <Link
+                  to="/admin/amendments"
+                  className={`${
+                    location.pathname === '/admin/amendments' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Amendments
+                </Link>
+                <Link
+                  to="/admin/reports"
+                  className={`${
+                    location.pathname === '/admin/reports' 
+                      ? 'bg-[#420808]/50 text-white' 
+                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                >
+                  Weekly Reports
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-white/90 hover:text-white hover:bg-[#420808]/30 px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -193,89 +176,18 @@ export const Navigation: React.FC = () => {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 space-y-2 animate-slide-in-right">
               <Link
-                to="/admin"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Dashboard
-              </Link>
-              <Link
-                to="/admin/profile"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin/profile')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Link>
-              <Link
-                to="/admin/workers"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin/workers')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Workers
-              </Link>
-              <Link
-                to="/admin/jobs"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin/jobs')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Briefcase className="h-4 w-4 mr-2" />
-                Jobs
-              </Link>
-              <Link
-                to="/admin/amendments"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin/amendments')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Amendments
-              </Link>
-              <Link
                 to="/admin/reports"
-                className={`flex items-center px-4 py-3 rounded-md text-sm font-medium min-h-[44px] transition-all duration-200 ease-in-out ${
-                  isActive('/admin/reports')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <FileText className="h-4 w-4 mr-2" />
                 Weekly Reports
               </Link>
-              <Button
-                onClick={() => {
-                  handleSignOut();
-                  setIsMobileMenuOpen(false);
-                }}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start min-h-[44px] hover:bg-secondary/80"
+              <button
+                onClick={handleSignOut}
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block w-full text-left px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
               >
-                <LogOut className="h-4 w-4 mr-2" />
                 Logout
-              </Button>
+              </button>
             </div>
           )}
         </div>

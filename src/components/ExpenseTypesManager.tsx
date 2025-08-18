@@ -339,7 +339,7 @@ export function ExpenseTypesManager() {
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 font-body"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Permanently
+                          Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
