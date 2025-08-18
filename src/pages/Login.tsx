@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-const COMPANY_LOGO_URL = '/lovable-uploads/81534cbc-ebc0-4c27-9d16-6c2069e07bf2.png';
+import { PioneerLogo } from '@/components/PioneerLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -75,15 +75,17 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-muted to-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-2xl border-0">
+        <CardHeader className="space-y-1 pb-6 bg-card rounded-t-lg">
           <div className="flex justify-center mb-4">
-            <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-12 w-auto" loading="eager" />
+            <PioneerLogo className="h-14" />
           </div>
-          <CardTitle className="text-2xl font-bold">Time Keeper</CardTitle>
-          <CardDescription>
-            Sign in to your workforce account
+          <CardTitle className="text-2xl text-center font-heading font-extrabold text-foreground">
+            Manager Portal
+          </CardTitle>
+          <CardDescription className="text-center text-muted-foreground font-body text-sm">
+            Workforce Management System
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,7 +127,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full min-h-[44px]"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-heading font-semibold py-3 transition-all duration-200 transform hover:scale-[1.02] min-h-[44px]"
               disabled={isLoading}
             >
               {isLoading ? 'Signing in...' : 'Sign In'}

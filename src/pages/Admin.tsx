@@ -160,11 +160,11 @@ export default function Admin() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
           <Briefcase className="h-16 w-16 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-3xl font-heading font-extrabold text-foreground mb-2">
             Welcome, {managerName || 'Manager'}
           </h1>
-          <p className="text-muted-foreground">
-            Manager dashboard for workforce management
+          <p className="text-muted-foreground font-body">
+            Pioneer Auto Timesheets - Manager Console
           </p>
         </div>
 
@@ -176,20 +176,20 @@ export default function Admin() {
             title="Click to view all workers"
             style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
-            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 relative">
-              <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-xl group-hover:border-primary/20 bg-gradient-to-br from-primary to-primary/90 group-hover:from-primary/90 group-hover:to-primary relative">
+              <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-primary-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">Currently Clocked In</CardTitle>
+                <CardTitle className="text-sm font-heading font-bold text-primary-foreground">Currently Clocked In</CardTitle>
                 <div className="group-hover:scale-110 transition-transform duration-200">
-                  <Clock className="h-4 w-4 text-blue-600" />
+                  <Clock className="h-4 w-4 text-primary-foreground" />
                 </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold text-blue-800 group-hover:text-primary/80">{clockedInWorkers.length}</div>
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <div className="text-4xl font-heading font-extrabold text-primary-foreground">{clockedInWorkers.length}</div>
+                  <TrendingUp className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <p className="text-xs text-blue-600/80">
+                <p className="text-xs text-primary-foreground/90">
                   workers on site
                 </p>
               </CardContent>

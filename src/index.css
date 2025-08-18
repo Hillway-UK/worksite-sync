@@ -8,33 +8,45 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Pioneer Auto Timesheets Color Palette */
+    --pioneer-burgundy: 355 49% 31%;     /* #702D30 */
+    --pioneer-deep-burgundy: 0 75% 15%;  /* #420808 */
+    --pioneer-charcoal: 0 0% 7%;         /* #111111 */
+    --pioneer-mid-grey: 0 0% 58%;        /* #939393 */
+    --pioneer-light-grey: 0 0% 92%;      /* #EAEAEA */
+    --pioneer-white: 0 0% 100%;          /* #FFFFFF */
+    --pioneer-success: 152 56% 50%;      /* #48BB78 */
+    --pioneer-danger: 0 71% 67%;         /* #F56565 */
+    --pioneer-warning: 26 77% 58%;       /* #ED8936 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Main Design System Colors mapped to Pioneer palette */
+    --background: var(--pioneer-white);
+    --foreground: var(--pioneer-charcoal);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --card: var(--pioneer-white);
+    --card-foreground: var(--pioneer-charcoal);
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 210 40% 98%;
+    --popover: var(--pioneer-white);
+    --popover-foreground: var(--pioneer-charcoal);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: var(--pioneer-burgundy);
+    --primary-foreground: var(--pioneer-white);
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --secondary: var(--pioneer-light-grey);
+    --secondary-foreground: var(--pioneer-charcoal);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: var(--pioneer-light-grey);
+    --muted-foreground: var(--pioneer-mid-grey);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --accent: var(--pioneer-light-grey);
+    --accent-foreground: var(--pioneer-burgundy);
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: var(--pioneer-danger);
+    --destructive-foreground: var(--pioneer-white);
+
+    --border: var(--pioneer-light-grey);
+    --input: var(--pioneer-light-grey);
+    --ring: var(--pioneer-burgundy);
 
     --radius: 0.5rem;
 
@@ -56,33 +68,34 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode using Pioneer colors */
+    --background: var(--pioneer-charcoal);
+    --foreground: var(--pioneer-white);
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: var(--pioneer-charcoal);
+    --card-foreground: var(--pioneer-white);
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: var(--pioneer-charcoal);
+    --popover-foreground: var(--pioneer-white);
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: var(--pioneer-burgundy);
+    --primary-foreground: var(--pioneer-white);
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: var(--pioneer-mid-grey);
+    --secondary-foreground: var(--pioneer-white);
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: var(--pioneer-mid-grey);
+    --muted-foreground: var(--pioneer-light-grey);
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: var(--pioneer-burgundy);
+    --accent-foreground: var(--pioneer-white);
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: var(--pioneer-danger);
+    --destructive-foreground: var(--pioneer-white);
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: var(--pioneer-mid-grey);
+    --input: var(--pioneer-mid-grey);
+    --ring: var(--pioneer-burgundy);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
-const COMPANY_LOGO_URL = '/lovable-uploads/81534cbc-ebc0-4c27-9d16-6c2069e07bf2.png';
+import { PioneerLogo } from '@/components/PioneerLogo';
 
 export const Navigation: React.FC = () => {
   const { userRole, signOut } = useAuth();
@@ -21,12 +21,11 @@ export const Navigation: React.FC = () => {
 
   if (userRole === 'worker') {
     return (
-      <nav className="bg-white border-b border-border shadow-sm">
+      <nav className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-8 w-auto mr-2" loading="eager" />
-              <span className="font-bold text-lg">Time Keeper</span>
+              <PioneerLogo className="h-8" />
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -91,22 +90,21 @@ export const Navigation: React.FC = () => {
 
   if (userRole === 'manager') {
     return (
-      <nav className="bg-white border-b border-border shadow-sm">
+      <nav className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <img src={COMPANY_LOGO_URL} alt="Pioneer Construction logo" className="h-8 w-auto mr-2" loading="eager" />
-              <span className="font-bold text-lg">Time Keeper Admin</span>
+              <PioneerLogo className="h-10" variant="light" />
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-4">
               <Link
                 to="/admin"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -114,10 +112,10 @@ export const Navigation: React.FC = () => {
               </Link>
               <Link
                 to="/admin/profile"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin/profile')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <User className="h-4 w-4 mr-2" />
@@ -125,10 +123,10 @@ export const Navigation: React.FC = () => {
               </Link>
               <Link
                 to="/admin/workers"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin/workers')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <Users className="h-4 w-4 mr-2" />
@@ -136,10 +134,10 @@ export const Navigation: React.FC = () => {
               </Link>
               <Link
                 to="/admin/jobs"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin/jobs')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <Briefcase className="h-4 w-4 mr-2" />
@@ -147,10 +145,10 @@ export const Navigation: React.FC = () => {
               </Link>
               <Link
                 to="/admin/amendments"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin/amendments')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <Clock className="h-4 w-4 mr-2" />
@@ -158,10 +156,10 @@ export const Navigation: React.FC = () => {
               </Link>
               <Link
                 to="/admin/reports"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
+                className={`px-4 py-2 rounded-md text-sm font-heading font-semibold min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
                   isActive('/admin/reports')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
+                    ? 'bg-primary/20 text-primary-foreground shadow-sm'
+                    : 'text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 hover:scale-105'
                 }`}
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -171,7 +169,7 @@ export const Navigation: React.FC = () => {
                 onClick={handleSignOut}
                 variant="ghost"
                 size="sm"
-                className="min-h-[44px] hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
+                className="text-primary-foreground/90 hover:text-primary-foreground hover:bg-primary/20 min-h-[44px] hover:scale-105 transition-all duration-200"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout

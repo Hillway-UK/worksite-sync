@@ -116,10 +116,10 @@ export default function AdminProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
           <User className="h-16 w-16 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-3xl font-heading font-extrabold text-foreground mb-2">
             Manager Profile
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground font-body">
             Manage your personal information
           </p>
         </div>
