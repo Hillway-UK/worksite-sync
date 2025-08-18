@@ -277,36 +277,37 @@ export default function Reports() {
                       <TableCell>
                         {entry.clock_out ? moment(entry.clock_out).format('h:mm A') : '-'}
                       </TableCell>
-                      <TableCell>
-                        {(entry.clock_in_photo || entry.clock_out_photo) ? (
-                          <div className="flex gap-2">
-                            {entry.clock_in_photo && (
-                              <div className="space-y-1">
-                                <p className="text-xs font-semibold text-[#111111]">In</p>
-                                <img 
-                                  src={entry.clock_in_photo} 
-                                  alt="Clock in verification" 
-                                  className="w-8 h-8 object-cover rounded border cursor-pointer transition-all duration-200 hover:border-[#702D30]"
-                                  onClick={() => window.open(entry.clock_in_photo, '_blank')}
-                                />
-                              </div>
-                            )}
-                            {entry.clock_out_photo && (
-                              <div className="space-y-1">
-                                <p className="text-xs font-semibold text-[#111111]">Out</p>
-                                <img 
-                                  src={entry.clock_out_photo} 
-                                  alt="Clock out verification" 
-                                  className="w-8 h-8 object-cover rounded border cursor-pointer transition-all duration-200 hover:border-[#702D30]"
-                                  onClick={() => window.open(entry.clock_out_photo, '_blank')}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No photos</span>
-                        )}
-                      </TableCell>
+                       <TableCell>
+                         {(entry.clock_in_photo || entry.clock_out_photo) ? (
+                           <div className="flex items-center gap-4">
+                             {entry.clock_in_photo && (
+                               <div className="flex flex-col items-center">
+                                 <p className="text-xs font-body text-muted-foreground mb-1">Clock In</p>
+                                 <img 
+                                   src={entry.clock_in_photo} 
+                                   alt="Clock in" 
+                                   className="w-14 h-14 rounded-full object-cover border-2 border-border cursor-pointer hover:border-primary hover:shadow-md transition-all duration-200"
+                                   onClick={() => window.open(entry.clock_in_photo, '_blank')}
+                                 />
+                               </div>
+                             )}
+                             
+                             {entry.clock_out_photo && (
+                               <div className="flex flex-col items-center">
+                                 <p className="text-xs font-body text-muted-foreground mb-1">Clock Out</p>
+                                 <img 
+                                   src={entry.clock_out_photo} 
+                                   alt="Clock out" 
+                                   className="w-14 h-14 rounded-full object-cover border-2 border-border cursor-pointer hover:border-primary hover:shadow-md transition-all duration-200"
+                                   onClick={() => window.open(entry.clock_out_photo, '_blank')}
+                                 />
+                               </div>
+                             )}
+                           </div>
+                         ) : (
+                           <span className="text-muted-foreground text-sm">No photos</span>
+                         )}
+                       </TableCell>
                       <TableCell className="text-right">
                         {entry.total_hours?.toFixed(2) || '-'}
                       </TableCell>

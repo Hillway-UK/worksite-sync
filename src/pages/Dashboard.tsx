@@ -7,7 +7,8 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, User, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const localizer = momentLocalizer(moment);
 
@@ -35,6 +36,7 @@ interface CalendarEvent {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,9 +127,29 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">My Time Calendar</h1>
-          <p className="text-muted-foreground">View your clock entries and request amendments</p>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">My Time Calendar</h1>
+            <p className="text-muted-foreground">View your clock entries and request amendments</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => navigate('/profile')}
+              variant="outline"
+              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            >
+              <User className="mr-2 h-4 w-4" />
+              Profile
+            </Button>
+            <Button
+              onClick={() => navigate('/reports')}
+              variant="outline"
+              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Reports
+            </Button>
+          </div>
         </div>
 
         <div className="bg-card rounded-lg border p-4 mb-6">

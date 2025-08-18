@@ -783,39 +783,45 @@ export default function AdminReports() {
                                        <span>| Hours: {entry.hours.toFixed(1)}</span>
                                      </div>
                                      
-                                     {(entry.clock_in_photo || entry.clock_out_photo) && (
-                                       <div className="grid grid-cols-2 gap-2 mt-2">
-                                         {entry.clock_in_photo && (
-                                           <div className="space-y-1">
-                                             <p className="text-xs font-semibold text-[#111111]">Clock In Photo</p>
-                                             <div className="relative group">
-                                               <img 
-                                                 src={entry.clock_in_photo} 
-                                                 alt="Clock in verification" 
-                                                 className="w-full h-20 object-cover rounded border-2 border-[#EAEAEA] cursor-pointer transition-all duration-200 hover:border-[#702D30] hover:shadow-lg"
-                                                 onClick={() => window.open(entry.clock_in_photo, '_blank')}
-                                               />
-                                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded transition-all duration-200 pointer-events-none"></div>
-                                             </div>
-                                           </div>
-                                         )}
-                                         
-                                         {entry.clock_out_photo && (
-                                           <div className="space-y-1">
-                                             <p className="text-xs font-semibold text-[#111111]">Clock Out Photo</p>
-                                             <div className="relative group">
-                                               <img 
-                                                 src={entry.clock_out_photo} 
-                                                 alt="Clock out verification" 
-                                                 className="w-full h-20 object-cover rounded border-2 border-[#EAEAEA] cursor-pointer transition-all duration-200 hover:border-[#702D30] hover:shadow-lg"
-                                                 onClick={() => window.open(entry.clock_out_photo, '_blank')}
-                                               />
-                                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded transition-all duration-200 pointer-events-none"></div>
-                                             </div>
-                                           </div>
-                                         )}
-                                       </div>
-                                     )}
+                                      {(entry.clock_in_photo || entry.clock_out_photo) && (
+                                        <div className="flex items-center gap-4 mt-3">
+                                          {entry.clock_in_photo && (
+                                            <div className="flex flex-col items-center">
+                                              <p className="text-xs font-body text-muted-foreground mb-1">Clock In</p>
+                                              <div className="relative group">
+                                                <img 
+                                                  src={entry.clock_in_photo} 
+                                                  alt="Clock in" 
+                                                  className="w-16 h-16 rounded-full object-cover border-2 border-border cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg"
+                                                  onClick={() => window.open(entry.clock_in_photo, '_blank')}
+                                                />
+                                                <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/20 transition-all duration-200 pointer-events-none"></div>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground font-body mt-1">
+                                                {moment(entry.clock_in).format('h:mm A')}
+                                              </p>
+                                            </div>
+                                          )}
+                                          
+                                          {entry.clock_out_photo && (
+                                            <div className="flex flex-col items-center">
+                                              <p className="text-xs font-body text-muted-foreground mb-1">Clock Out</p>
+                                              <div className="relative group">
+                                                <img 
+                                                  src={entry.clock_out_photo} 
+                                                  alt="Clock out" 
+                                                  className="w-16 h-16 rounded-full object-cover border-2 border-border cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg"
+                                                  onClick={() => window.open(entry.clock_out_photo, '_blank')}
+                                                />
+                                                <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/20 transition-all duration-200 pointer-events-none"></div>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground font-body mt-1">
+                                                {entry.clock_out ? moment(entry.clock_out).format('h:mm A') : 'Active'}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                    </div>
                                 ))}
                               </div>
