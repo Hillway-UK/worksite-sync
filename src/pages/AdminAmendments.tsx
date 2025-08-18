@@ -106,63 +106,76 @@ export default function AdminAmendments() {
           <p className="text-muted-foreground">Review and approve worker time change requests</p>
         </div>
 
-        <Card>
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="h-5 w-5" />
               <span>Amendment Requests</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Worker</TableHead>
-                  <TableHead>Requested</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {amendments.map((amendment) => (
-                  <TableRow key={amendment.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{amendment.worker?.name}</div>
-                        <div className="text-sm text-muted-foreground">{amendment.worker?.email}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>Submitted: {moment(amendment.created_at).format('MMM D, h:mm A')}</div>
-                        {amendment.requested_clock_in && (
-                          <div>In: {moment(amendment.requested_clock_in).format('MMM D, h:mm A')}</div>
-                        )}
-                        {amendment.requested_clock_out && (
-                          <div>Out: {moment(amendment.requested_clock_out).format('MMM D, h:mm A')}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-xs">
-                      <p className="truncate">{amendment.reason}</p>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(amendment.status)}</TableCell>
-                    <TableCell>
-                      {amendment.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedAmendment(amendment)}
-                        >
-                          Review
-                        </Button>
-                      )}
-                    </TableCell>
+          <CardContent className="p-6">
+            {amendments.length === 0 ? (
+              <div className="text-center py-12">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground text-lg font-medium mb-2">
+                  No amendment requests at this time
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Worker time change requests will appear here
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Worker</TableHead>
+                    <TableHead>Requested</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {amendments.map((amendment) => (
+                    <TableRow key={amendment.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{amendment.worker?.name}</div>
+                          <div className="text-sm text-muted-foreground">{amendment.worker?.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>Submitted: {moment(amendment.created_at).format('MMM D, h:mm A')}</div>
+                          {amendment.requested_clock_in && (
+                            <div>In: {moment(amendment.requested_clock_in).format('MMM D, h:mm A')}</div>
+                          )}
+                          {amendment.requested_clock_out && (
+                            <div>Out: {moment(amendment.requested_clock_out).format('MMM D, h:mm A')}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <p className="truncate">{amendment.reason}</p>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(amendment.status)}</TableCell>
+                      <TableCell>
+                        {amendment.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="hover:bg-secondary/80"
+                            onClick={() => setSelectedAmendment(amendment)}
+                          >
+                            Review
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -185,7 +198,7 @@ export default function AdminAmendments() {
                 <div className="flex space-x-2">
                   <Button
                     onClick={() => handleApproval(selectedAmendment.id, 'approved')}
-                    className="flex-1"
+                    className="flex-1 hover:bg-primary/90"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Approve
@@ -193,7 +206,7 @@ export default function AdminAmendments() {
                   <Button
                     onClick={() => handleApproval(selectedAmendment.id, 'rejected')}
                     variant="destructive"
-                    className="flex-1"
+                    className="flex-1 hover:bg-destructive/90"
                   >
                     <XCircle className="h-4 w-4 mr-2" />
                     Reject

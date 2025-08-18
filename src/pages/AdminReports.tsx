@@ -13,6 +13,7 @@ import { PhotoModal } from '@/components/PhotoModal';
 import { XeroSettingsModal } from '@/components/XeroSettingsModal';
 import { toast } from '@/hooks/use-toast';
 import { FileText, Download, ChevronDown, Camera } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfWeek, endOfWeek, addDays, getWeek, getYear } from 'date-fns';
 import moment from 'moment';
 

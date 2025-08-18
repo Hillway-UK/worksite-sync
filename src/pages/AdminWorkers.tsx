@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WorkerDialog } from '@/components/WorkerDialog';
 import { PhotoModal } from '@/components/PhotoModal';
 import { toast } from '@/hooks/use-toast';
-import { Users, Search, ToggleLeft, ToggleRight, Camera } from 'lucide-react';
+import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Worker {
   id: string;
@@ -146,7 +147,61 @@ export default function AdminWorkers() {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading workers...</div>
+          <div className="text-center mb-8">
+            <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
+            <Skeleton className="h-8 w-64 mx-auto mb-2" />
+            <Skeleton className="h-4 w-48 mx-auto" />
+          </div>
+          
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <Skeleton className="h-6 w-32" />
+              <div className="flex gap-4">
+                <Skeleton className="h-9 w-64" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Worker</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Hourly Rate</TableHead>
+                      <TableHead>Weekly Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Skeleton className="h-8 w-8" />
+                            <Skeleton className="h-8 w-8" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
@@ -165,7 +220,7 @@ export default function AdminWorkers() {
           </p>
         </div>
 
-        <Card>
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Workers ({workers.length})</CardTitle>
             <div className="flex gap-4">
@@ -181,7 +236,7 @@ export default function AdminWorkers() {
               <WorkerDialog onSave={fetchWorkers} />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -198,8 +253,32 @@ export default function AdminWorkers() {
                 <TableBody>
                   {filteredWorkers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6">
-                        {searchTerm ? 'No workers found matching your search.' : 'No workers found.'}
+                      <TableCell colSpan={7} className="text-center py-12">
+                        {searchTerm ? (
+                          <div>
+                            <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground text-lg font-medium mb-2">
+                              No workers found matching your search
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Try adjusting your search terms
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground text-lg font-medium mb-4">
+                              Add your first worker to get started
+                            </p>
+                            <Button 
+                              className="hover:bg-primary/90"
+                              onClick={() => {/* This will open the WorkerDialog when clicked */}}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Worker
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -230,7 +309,7 @@ export default function AdminWorkers() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-auto p-0 text-xs text-muted-foreground"
+                                  className="h-auto p-0 text-xs text-muted-foreground hover:scale-105 transition-transform duration-200"
                                   onClick={() => setPhotoModal({
                                     isOpen: true,
                                     photoUrl: worker.profile_photo!,
@@ -265,6 +344,7 @@ export default function AdminWorkers() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
                               onClick={() => toggleWorkerStatus(worker.id, worker.is_active)}
                             >
                               {worker.is_active ? (

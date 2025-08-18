@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { JobDialog } from '@/components/JobDialog';
 import { AddressDisplay } from '@/components/AddressDisplay';
 import { toast } from '@/hooks/use-toast';
-import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight, Plus } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Job {
   id: string;
@@ -124,7 +125,56 @@ export default function AdminJobs() {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading jobs...</div>
+          <div className="text-center mb-8">
+            <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
+            <Skeleton className="h-8 w-64 mx-auto mb-2" />
+            <Skeleton className="h-4 w-48 mx-auto" />
+          </div>
+          
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <Skeleton className="h-6 w-24" />
+              <div className="flex gap-4">
+                <Skeleton className="h-9 w-64" />
+                <Skeleton className="h-9 w-20" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job Code</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Geofence</TableHead>
+                      <TableHead>Workers On Site</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-8 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Skeleton className="h-8 w-8" />
+                            <Skeleton className="h-8 w-8" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
@@ -143,7 +193,7 @@ export default function AdminJobs() {
           </p>
         </div>
 
-        <Card>
+        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Jobs ({jobs.length})</CardTitle>
             <div className="flex gap-4">
@@ -159,7 +209,7 @@ export default function AdminJobs() {
               <JobDialog onSave={fetchJobs} />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -176,8 +226,32 @@ export default function AdminJobs() {
                 <TableBody>
                   {filteredJobs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-6">
-                        {searchTerm ? 'No jobs found matching your search.' : 'No jobs found.'}
+                      <TableCell colSpan={7} className="text-center py-12">
+                        {searchTerm ? (
+                          <div>
+                            <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground text-lg font-medium mb-2">
+                              No jobs found matching your search
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Try adjusting your search terms
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground text-lg font-medium mb-4">
+                              Add your first job to get started
+                            </p>
+                            <Button 
+                              className="hover:bg-primary/90"
+                              onClick={() => {/* This will open the JobDialog when clicked */}}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Job
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -221,6 +295,7 @@ export default function AdminJobs() {
                             <Button
                               variant="outline"
                               size="sm"
+                              className="hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
                               onClick={() => toggleJobStatus(job.id, job.is_active)}
                             >
                               {job.is_active ? (

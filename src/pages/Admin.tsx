@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Briefcase, Users, Clock, FileText, AlertTriangle } from 'lucide-react';
+import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 
 interface CllockedInWorker {
@@ -102,7 +103,49 @@ export default function Admin() {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading dashboard...</div>
+          <div className="text-center mb-8">
+            <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
+            <Skeleton className="h-8 w-64 mx-auto mb-2" />
+            <Skeleton className="h-4 w-48 mx-auto" />
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4 rounded" />
+                </CardHeader>
+                <CardContent className="p-6">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-2">
+            {[...Array(2)].map((_, i) => (
+              <Card key={i} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="flex justify-between items-center">
+                        <div>
+                          <Skeleton className="h-4 w-24 mb-1" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </Layout>
     );
@@ -123,53 +166,65 @@ export default function Admin() {
 
         {/* Statistics Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:scale-105 transition-transform">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Currently Clocked In</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Clock className="h-4 w-4 text-blue-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{clockedInWorkers.length}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-blue-800">{clockedInWorkers.length}</div>
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+              </div>
+              <p className="text-xs text-blue-600/80">
                 workers on site
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 bg-gradient-to-br from-green-50 to-green-100 hover:scale-105 transition-transform">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Hours Today</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Clock className="h-4 w-4 text-green-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalHoursToday.toFixed(1)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-green-800">{totalHoursToday.toFixed(1)}</div>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </div>
+              <p className="text-xs text-green-600/80">
                 hours logged today
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 bg-gradient-to-br from-orange-50 to-orange-100 hover:scale-105 transition-transform">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending Amendments</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingAmendments}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-orange-800">{pendingAmendments}</div>
+                {pendingAmendments > 0 && <TrendingUp className="h-4 w-4 text-orange-600" />}
+              </div>
+              <p className="text-xs text-orange-600/80">
                 awaiting review
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200 bg-gradient-to-br from-purple-50 to-purple-100 hover:scale-105 transition-transform">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Workers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-4 w-4 text-purple-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeWorkers}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-purple-800">{activeWorkers}</div>
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+              </div>
+              <p className="text-xs text-purple-600/80">
                 total workforce
               </p>
             </CardContent>
@@ -178,15 +233,21 @@ export default function Admin() {
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Currently Clocked In Workers */}
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader>
               <CardTitle>Workers On Site</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {clockedInWorkers.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No workers currently clocked in
-                </p>
+                <div className="text-center py-8">
+                  <Users2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground text-lg font-medium mb-2">
+                    No workers currently clocked in
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Workers will appear here when they clock in
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {clockedInWorkers.map((worker, index) => (
@@ -211,15 +272,21 @@ export default function Admin() {
           </Card>
 
           {/* Recent Activity */}
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {recentActivity.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No recent activity
-                </p>
+                <div className="text-center py-8">
+                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground text-lg font-medium mb-2">
+                    No recent activity
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Recent clock entries will appear here
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {recentActivity.map((activity) => (
