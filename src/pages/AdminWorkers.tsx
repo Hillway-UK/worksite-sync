@@ -10,8 +10,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WorkerDialog } from '@/components/WorkerDialog';
 import { PhotoModal } from '@/components/PhotoModal';
 import { toast } from '@/hooks/use-toast';
-import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus } from 'lucide-react';
+import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Mail, Trash2, MoreVertical } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface Worker {
   id: string;
@@ -39,6 +41,21 @@ export default function AdminWorkers() {
     photoUrl: '',
     workerName: '',
     timestamp: '',
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    worker: Worker | null;
+  }>({
+    isOpen: false,
+    worker: null,
+  });
+  const [operationLoading, setOperationLoading] = useState<Record<string, boolean>>({});
+  const [invitationDialog, setInvitationDialog] = useState<{
+    isOpen: boolean;
+    credentials: { email: string; password: string } | null;
+  }>({
+    isOpen: false,
+    credentials: null,
   });
 
   useEffect(() => {
@@ -134,6 +151,88 @@ export default function AdminWorkers() {
         title: "Error",
         description: "Failed to update worker status",
         variant: "destructive",
+      });
+    }
+  };
+
+  const deleteWorker = async (worker: Worker) => {
+    setOperationLoading(prev => ({ ...prev, [worker.id]: true }));
+    try {
+      const { error } = await supabase
+        .from('workers')
+        .delete()
+        .eq('id', worker.id);
+
+      if (error) throw error;
+
+      setWorkers(workers.filter(w => w.id !== worker.id));
+      setDeleteDialog({ isOpen: false, worker: null });
+      
+      toast({
+        title: "Success",
+        description: `Worker ${worker.name} has been deleted`,
+      });
+    } catch (error) {
+      console.error('Error deleting worker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete worker",
+        variant: "destructive",
+      });
+    } finally {
+      setOperationLoading(prev => ({ ...prev, [worker.id]: false }));
+    }
+  };
+
+  const resendInvitation = async (worker: Worker) => {
+    setOperationLoading(prev => ({ ...prev, [worker.id]: true }));
+    try {
+      // Generate new temporary password
+      const tempPassword = `temp${Math.random().toString(36).slice(2, 10)}${Math.floor(Math.random() * 100)}`;
+      
+      // Update the auth user's password
+      const { error: authError } = await supabase.auth.admin.updateUserById(
+        worker.id, // Note: This assumes worker.id matches auth.users.id
+        { password: tempPassword }
+      );
+
+      if (authError) {
+        // If admin API isn't available, show a message to the user
+        throw new Error('Unable to reset password. Please contact your system administrator.');
+      }
+
+      setInvitationDialog({
+        isOpen: true,
+        credentials: {
+          email: worker.email,
+          password: tempPassword,
+        },
+      });
+
+      toast({
+        title: "Success",
+        description: `New credentials generated for ${worker.name}`,
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to resend invitation",
+        variant: "destructive",
+      });
+    } finally {
+      setOperationLoading(prev => ({ ...prev, [worker.id]: false }));
+    }
+  };
+
+  const copyCredentialsToClipboard = () => {
+    if (invitationDialog.credentials) {
+      const text = `Email: ${invitationDialog.credentials.email}\nPassword: ${invitationDialog.credentials.password}`;
+      navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied!",
+        description: "Credentials copied to clipboard",
       });
     }
   };
@@ -341,18 +440,52 @@ export default function AdminWorkers() {
                               worker={worker} 
                               onSave={fetchWorkers}
                             />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
-                              onClick={() => toggleWorkerStatus(worker.id, worker.is_active)}
-                            >
-                              {worker.is_active ? (
-                                <ToggleRight className="h-4 w-4" />
-                              ) : (
-                                <ToggleLeft className="h-4 w-4" />
-                              )}
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="hover:bg-secondary/80"
+                                  disabled={operationLoading[worker.id]}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => resendInvitation(worker)}
+                                  disabled={operationLoading[worker.id]}
+                                >
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend Invitation
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => toggleWorkerStatus(worker.id, worker.is_active)}
+                                  disabled={operationLoading[worker.id]}
+                                >
+                                  {worker.is_active ? (
+                                    <>
+                                      <ToggleLeft className="h-4 w-4 mr-2" />
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ToggleRight className="h-4 w-4 mr-2" />
+                                      Activate
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteDialog({ isOpen: true, worker })}
+                                  className="text-destructive"
+                                  disabled={operationLoading[worker.id]}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Worker
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -371,6 +504,59 @@ export default function AdminWorkers() {
           workerName={photoModal.workerName}
           timestamp={photoModal.timestamp}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialog.isOpen} onOpenChange={(open) => !open && setDeleteDialog({ isOpen: false, worker: null })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Worker</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <strong>{deleteDialog.worker?.name}</strong>? 
+                This action cannot be undone and will permanently remove the worker and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteDialog.worker && deleteWorker(deleteDialog.worker)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete Worker
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Resend Invitation Success Dialog */}
+        <AlertDialog open={invitationDialog.isOpen} onOpenChange={(open) => !open && setInvitationDialog({ isOpen: false, credentials: null })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>New Credentials Generated</AlertDialogTitle>
+              <AlertDialogDescription>
+                New temporary credentials have been generated. Please share these with the worker:
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {invitationDialog.credentials && (
+              <div className="bg-muted p-4 rounded-md space-y-2">
+                <div>
+                  <strong>Email:</strong> {invitationDialog.credentials.email}
+                </div>
+                <div>
+                  <strong>Temporary Password:</strong> {invitationDialog.credentials.password}
+                </div>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogAction
+                onClick={copyCredentialsToClipboard}
+                className="mr-2"
+              >
+                Copy to Clipboard
+              </AlertDialogAction>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
