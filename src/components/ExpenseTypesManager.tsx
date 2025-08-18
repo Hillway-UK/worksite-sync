@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, DollarSign } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ExpenseTypeDialog } from './ExpenseTypeDialog';
+import { Plus, MoreHorizontal, Wallet, Search, Pencil, ToggleLeft, Trash2, DollarSign } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface ExpenseType {
   id: string;
@@ -26,23 +23,12 @@ interface ExpenseType {
   updated_at: string;
 }
 
-interface ExpenseTypeForm {
-  name: string;
-  amount: string;
-  description: string;
-  is_active: boolean;
-}
-
 export function ExpenseTypesManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<ExpenseType | null>(null);
-  const [formData, setFormData] = useState<ExpenseTypeForm>({
-    name: '',
-    amount: '',
-    description: '',
-    is_active: true
-  });
-
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [presetData, setPresetData] = useState<{ name: string; amount: number; description?: string } | undefined>();
   const queryClient = useQueryClient();
 
   const { data: expenseTypes = [], isLoading } = useQuery({
@@ -58,85 +44,44 @@ export function ExpenseTypesManager() {
     }
   });
 
-  const { data: currentManager } = useQuery({
-    queryKey: ['current-manager'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) throw new Error('No user found');
+  // Filter expense types based on search and status
+  const filteredExpenseTypes = expenseTypes?.filter(expenseType => {
+    const matchesSearch = expenseType.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         expenseType.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && expenseType.is_active) ||
+                         (statusFilter === 'inactive' && !expenseType.is_active);
+    return matchesSearch && matchesStatus;
+  }) || [];
 
-      const { data, error } = await supabase
-        .from('managers')
-        .select('id')
-        .eq('email', user.email)
-        .single();
+  // Real-time updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expense_types'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['expense-types'] });
+        }
+      )
+      .subscribe();
 
-      if (error) throw error;
-      return data;
-    }
-  });
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
-  const createMutation = useMutation({
-    mutationFn: async (data: Omit<ExpenseType, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data: result, error } = await supabase
-        .from('expense_types')
-        .insert([data])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expense-types'] });
-      toast({
-        title: "Success",
-        description: "Expense type created successfully"
-      });
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create expense type",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: Partial<ExpenseType> & { id: string }) => {
-      const { data: result, error } = await supabase
-        .from('expense_types')
-        .update(data)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['expense-types'] });
-      toast({
-        title: "Success",
-        description: "Expense type updated successfully"
-      });
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update expense type",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase
         .from('expense_types')
-        .update({ is_active: false })
+        .update({ is_active })
         .eq('id', id);
 
       if (error) throw error;
@@ -145,96 +90,63 @@ export function ExpenseTypesManager() {
       queryClient.invalidateQueries({ queryKey: ['expense-types'] });
       toast({
         title: "Success",
-        description: "Expense type deactivated successfully"
+        description: "Expense type status updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to deactivate expense type",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
     }
   });
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      amount: '',
-      description: '',
-      is_active: true
-    });
+  // Form handlers
+  const handleQuickAdd = (preset: { name: string; amount: number; description?: string }) => {
+    setPresetData(preset);
     setEditingType(null);
-    setDialogOpen(false);
+    setDialogOpen(true);
   };
 
   const handleEdit = (expenseType: ExpenseType) => {
     setEditingType(expenseType);
-    setFormData({
-      name: expenseType.name,
-      amount: expenseType.amount.toString(),
-      description: expenseType.description || '',
-      is_active: expenseType.is_active
-    });
+    setPresetData(undefined);
     setDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name.trim() || !formData.amount.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name and amount are required",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Amount must be a positive number",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!currentManager?.id) {
-      toast({
-        title: "Error",
-        description: "Manager information not found",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const expenseTypeData = {
-      name: formData.name.trim(),
-      amount,
-      description: formData.description.trim() || null,
-      is_active: formData.is_active,
-      created_by: currentManager.id
-    };
-
-    if (editingType) {
-      updateMutation.mutate({ id: editingType.id, ...expenseTypeData });
-    } else {
-      createMutation.mutate(expenseTypeData);
-    }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP'
+    }).format(amount);
   };
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
         <CardHeader>
-          <CardTitle>Expense Types</CardTitle>
-          <CardDescription>Loading expense types...</CardDescription>
+          <CardTitle>Manage Expense Types</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
+          <div className="space-y-4">
+            <div className="flex space-x-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-32" />
+              ))}
+            </div>
+            <Skeleton className="h-10 w-full" />
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -242,170 +154,178 @@ export function ExpenseTypesManager() {
   }
 
   return (
-    <Card>
+    <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Expense Types
-            </CardTitle>
-            <CardDescription>
-              Manage predefined expense categories and amounts for workers
-            </CardDescription>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setEditingType(null)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Expense Type
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingType ? 'Edit Expense Type' : 'Create Expense Type'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingType ? 'Update the expense type details' : 'Add a new predefined expense type for workers to use'}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Lunch Allowance, Travel Expenses"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (£) *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="15.00"
-                    value={formData.amount}
-                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Additional details about this expense type..."
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-                  />
-                  <Label htmlFor="is_active">Active</Label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleSubmit}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <CardTitle>Manage Expense Types</CardTitle>
+          <Button 
+            onClick={() => {
+              setEditingType(null);
+              setPresetData(undefined);
+              setDialogOpen(true);
+            }}
+            className="hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Expense Type
+          </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        {expenseTypes.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No expense types found</p>
-            <p className="text-sm">Create your first expense type to get started</p>
+      
+      <CardContent className="space-y-6">
+        {/* Quick Actions */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAdd({ name: 'Lunch', amount: 15, description: 'Daily lunch allowance' })}
+            >
+              Quick Add: Lunch (£15)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAdd({ name: 'Travel', amount: 25, description: 'Travel expenses' })}
+            >
+              Quick Add: Travel (£25)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAdd({ name: 'Parking', amount: 10, description: 'Parking fees' })}
+            >
+              Quick Add: Parking (£10)
+            </Button>
           </div>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expenseTypes.map((expenseType) => (
-                  <TableRow key={expenseType.id}>
-                    <TableCell className="font-medium">{expenseType.name}</TableCell>
-                    <TableCell>£{expenseType.amount.toFixed(2)}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {expenseType.description || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={expenseType.is_active ? "default" : "secondary"}>
-                        {expenseType.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(expenseType.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+
+          {/* Search and Filter */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search expense types..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('all')}
+              >
+                All
+              </Button>
+              <Button
+                variant={statusFilter === 'active' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('active')}
+              >
+                Active
+              </Button>
+              <Button
+                variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('inactive')}
+              >
+                Inactive
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {filteredExpenseTypes.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type Name</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredExpenseTypes.map((expenseType) => (
+                <TableRow key={expenseType.id}>
+                  <TableCell className="font-medium">{expenseType.name}</TableCell>
+                  <TableCell>{formatCurrency(expenseType.amount)}</TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {expenseType.description || '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={expenseType.is_active ? 'default' : 'secondary'}>
+                      {expenseType.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
                           onClick={() => handleEdit(expenseType)}
                         >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {expenseType.is_active && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Deactivate Expense Type</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to deactivate "{expenseType.name}"? 
-                                  This will hide it from workers but preserve existing expense records.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteMutation.mutate(expenseType.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Deactivate
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => toggleStatusMutation.mutate({
+                            id: expenseType.id,
+                            is_active: !expenseType.is_active
+                          })}
+                        >
+                          <ToggleLeft className="h-4 w-4 mr-2" />
+                          {expenseType.is_active ? 'Deactivate' : 'Activate'}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
+              <Wallet className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              {searchTerm || statusFilter !== 'all' ? 'No matching expense types' : 'No expense types found'}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {searchTerm || statusFilter !== 'all' 
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Create expense types that workers can claim for their work.'
+              }
+            </p>
+            <Button onClick={() => {
+              setEditingType(null);
+              setPresetData(undefined);
+              setDialogOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Expense Type
+            </Button>
           </div>
         )}
       </CardContent>
+
+      <ExpenseTypeDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        expenseType={editingType}
+        presetData={presetData}
+        onSuccess={() => {
+          setEditingType(null);
+          setPresetData(undefined);
+        }}
+      />
     </Card>
   );
 }

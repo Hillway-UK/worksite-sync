@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import moment from 'moment';
@@ -107,10 +108,18 @@ export default function AdminAmendments() {
           <p className="text-muted-foreground">Manage time amendments and expense types</p>
         </div>
 
-        <div className="space-y-6">
-          <ExpenseTypesManager />
-
-          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Tabs defaultValue="expenses" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="expenses">Expense Types</TabsTrigger>
+            <TabsTrigger value="amendments">Time Amendments</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="expenses" className="space-y-6">
+            <ExpenseTypesManager />
+          </TabsContent>
+          
+          <TabsContent value="amendments" className="space-y-6">
+            <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="h-5 w-5" />
@@ -182,7 +191,8 @@ export default function AdminAmendments() {
             )}
           </CardContent>
           </Card>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         {selectedAmendment && (
           <Dialog open={true} onOpenChange={() => setSelectedAmendment(null)}>
