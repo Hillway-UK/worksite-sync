@@ -76,6 +76,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          auto_clocked_out: boolean | null
           clock_in: string
           clock_in_lat: number | null
           clock_in_lng: number | null
@@ -87,13 +88,16 @@ export type Database = {
           created_at: string | null
           id: string
           job_id: string
+          manual_entry: boolean | null
           needs_approval: boolean | null
+          notes: string | null
           total_hours: number | null
           worker_id: string
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_clocked_out?: boolean | null
           clock_in: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -105,13 +109,16 @@ export type Database = {
           created_at?: string | null
           id?: string
           job_id: string
+          manual_entry?: boolean | null
           needs_approval?: boolean | null
+          notes?: string | null
           total_hours?: number | null
           worker_id: string
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_clocked_out?: boolean | null
           clock_in?: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -123,7 +130,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           job_id?: string
+          manual_entry?: boolean | null
           needs_approval?: boolean | null
+          notes?: string | null
           total_hours?: number | null
           worker_id?: string
         }
@@ -262,6 +271,53 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          enabled_days: number[] | null
+          evening_reminder: boolean | null
+          id: string
+          morning_reminder: boolean | null
+          push_token: string | null
+          reminder_time_evening: string | null
+          reminder_time_morning: string | null
+          updated_at: string | null
+          worker_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled_days?: number[] | null
+          evening_reminder?: boolean | null
+          id?: string
+          morning_reminder?: boolean | null
+          push_token?: string | null
+          reminder_time_evening?: string | null
+          reminder_time_morning?: string | null
+          updated_at?: string | null
+          worker_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled_days?: number[] | null
+          evening_reminder?: boolean | null
+          id?: string
+          morning_reminder?: boolean | null
+          push_token?: string | null
+          reminder_time_evening?: string | null
+          reminder_time_morning?: string | null
+          updated_at?: string | null
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_amendments: {
         Row: {
           approved_at: string | null
@@ -385,6 +441,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_clock_out_after_12_hours: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_is_manager: {
         Args: { user_email: string }
         Returns: boolean
