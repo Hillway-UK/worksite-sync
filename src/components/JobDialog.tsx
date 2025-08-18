@@ -57,7 +57,6 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | undefined>(
     job ? [job.latitude, job.longitude] : undefined
   );
@@ -97,56 +96,43 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
     },
   });
 
-  // Watch postcode field for auto-geocoding
+  // Watch postcode field
   const watchedPostcode = watch('postcode');
 
-  // Auto-geocode when postcode changes (only after initial load)
-  useEffect(() => {
-    const handleGeocoding = async () => {
-      if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding || isInitialLoad) return;
-      
-      setGeocoding(true);
-      try {
-        const result = await geocodePostcode(watchedPostcode);
-        if (result) {
-          setSelectedLocation([result.latitude, result.longitude]);
-          setValue('latitude', result.latitude);
-          setValue('longitude', result.longitude);
-          setValue('postcode', result.formatted_postcode);
-          
-          toast({
-            title: "Success",
-            description: "Location found and updated on map",
-          });
-        } else {
-          toast({
-            title: "Warning",
-            description: "Could not find location for this postcode",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Geocoding error:', error);
-      } finally {
-        setGeocoding(false);
+  const handleManualGeocode = async () => {
+    if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding) return;
+    
+    setGeocoding(true);
+    try {
+      const result = await geocodePostcode(watchedPostcode);
+      if (result) {
+        setSelectedLocation([result.latitude, result.longitude]);
+        setValue('latitude', result.latitude);
+        setValue('longitude', result.longitude);
+        setValue('postcode', result.formatted_postcode);
+        
+        toast({
+          title: "Success",
+          description: "Location found and updated on map",
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: "Could not find location for this postcode",
+          variant: "destructive",
+        });
       }
-    };
-
-    const timeoutId = setTimeout(handleGeocoding, 500); // Debounce
-    return () => clearTimeout(timeoutId);
-  }, [watchedPostcode, isInitialLoad, geocoding, setValue]);
-
-  // Reset initial load flag after component mounts and form is initialized
-  useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
-        setIsInitialLoad(false);
-      }, 100); // Small delay to ensure form is fully initialized
-      return () => clearTimeout(timer);
-    } else {
-      setIsInitialLoad(true); // Reset when dialog closes
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to geocode postcode",
+        variant: "destructive",
+      });
+    } finally {
+      setGeocoding(false);
     }
-  }, [open]);
+  };
 
   const onSubmit = async (data: JobFormData) => {
     console.log('Form submission started', data);
@@ -325,27 +311,39 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
             </div>
 
             <div>
-              <Label htmlFor="postcode" className="flex items-center gap-2">
-                Postcode *
-                {geocoding && (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                )}
-              </Label>
-              <Input
-                id="postcode"
-                {...register('postcode')}
-                placeholder="e.g., SW1A 1AA"
-                className="uppercase"
-                onChange={(e) => {
-                  e.target.value = e.target.value.toUpperCase();
-                  setValue('postcode', e.target.value);
-                }}
-              />
+              <Label htmlFor="postcode">Postcode *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="postcode"
+                  {...register('postcode')}
+                  placeholder="e.g., SW1A 1AA"
+                  className="uppercase flex-1"
+                  onChange={(e) => {
+                    e.target.value = e.target.value.toUpperCase();
+                    setValue('postcode', e.target.value);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  onClick={handleManualGeocode}
+                  disabled={!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding}
+                  className="shrink-0"
+                >
+                  {geocoding ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  ) : (
+                    <MapPin className="h-4 w-4" />
+                  )}
+                  {geocoding ? 'Finding...' : 'Find Location'}
+                </Button>
+              </div>
               {errors.postcode && (
                 <p className="text-sm text-destructive mt-1">{errors.postcode.message}</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Location will be automatically found when you enter a valid postcode
+                Click "Find Location" to geocode the postcode and update the map
               </p>
             </div>
           </div>
