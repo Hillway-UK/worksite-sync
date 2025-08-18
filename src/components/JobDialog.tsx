@@ -57,6 +57,7 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | undefined>(
     job ? [job.latitude, job.longitude] : undefined
   );
@@ -99,10 +100,10 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
   // Watch postcode field for auto-geocoding
   const watchedPostcode = watch('postcode');
 
-  // Auto-geocode when postcode changes
+  // Auto-geocode when postcode changes (only after initial load)
   useEffect(() => {
     const handleGeocoding = async () => {
-      if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding) return;
+      if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding || isInitialLoad) return;
       
       setGeocoding(true);
       try {
@@ -133,7 +134,19 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
 
     const timeoutId = setTimeout(handleGeocoding, 500); // Debounce
     return () => clearTimeout(timeoutId);
-  }, [watchedPostcode]);
+  }, [watchedPostcode, isInitialLoad, geocoding, setValue]);
+
+  // Reset initial load flag after component mounts and form is initialized
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        setIsInitialLoad(false);
+      }, 100); // Small delay to ensure form is fully initialized
+      return () => clearTimeout(timer);
+    } else {
+      setIsInitialLoad(true); // Reset when dialog closes
+    }
+  }, [open]);
 
   const onSubmit = async (data: JobFormData) => {
     console.log('Form submission started', data);
