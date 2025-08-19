@@ -57,6 +57,7 @@ export default function AdminWorkers() {
     isOpen: false,
     credentials: null,
   });
+  const [workerDialogOpen, setWorkerDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchWorkers();
@@ -237,6 +238,43 @@ export default function AdminWorkers() {
     }
   };
 
+  const handleAddWorker = async () => {
+    // Check worker limit
+    try {
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('max_workers')
+        .single();
+      
+      if (orgError) throw orgError;
+
+      const { count: currentWorkers, error: countError } = await supabase
+        .from('workers')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      if (countError) throw countError;
+
+      if ((currentWorkers || 0) >= (org?.max_workers || 0)) {
+        toast({
+          title: "Worker limit reached",
+          description: `You've reached your limit of ${org?.max_workers} workers. Please upgrade your subscription to add more.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setWorkerDialogOpen(true);
+    } catch (error) {
+      console.error('Error checking worker limit:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check worker limit",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredWorkers = workers.filter(worker =>
     worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     worker.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -332,7 +370,13 @@ export default function AdminWorkers() {
                   className="pl-9 w-64"
                 />
               </div>
-              <WorkerDialog onSave={fetchWorkers} />
+              <Button 
+                onClick={() => handleAddWorker()}
+                className="bg-[#702D30] hover:bg-[#420808]"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Worker
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -370,8 +414,8 @@ export default function AdminWorkers() {
                               Add your first worker to get started
                             </p>
                             <Button 
-                              className="hover:bg-primary/90"
-                              onClick={() => {/* This will open the WorkerDialog when clicked */}}
+                              className="bg-[#702D30] hover:bg-[#420808]"
+                              onClick={() => handleAddWorker()}
                             >
                               <Plus className="h-4 w-4 mr-2" />
                               Add Worker
@@ -440,6 +484,15 @@ export default function AdminWorkers() {
                               worker={worker} 
                               onSave={fetchWorkers}
                             />
+        
+        {workerDialogOpen && (
+          <WorkerDialog 
+            onSave={() => {
+              fetchWorkers();
+              setWorkerDialogOpen(false);
+            }}
+          />
+        )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
