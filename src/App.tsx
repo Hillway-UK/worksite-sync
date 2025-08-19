@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Index from "./pages/Index";
+import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
 import Timesheets from "./pages/Timesheets";
 import Amendments from "./pages/Amendments";
@@ -30,7 +32,9 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Super Admin Routes */}
             <Route 

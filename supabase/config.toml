@@ -1,1 +1,7 @@
 project_id = "kejblmetyrsehzvrxgmt"
+
+[functions.create-subscription]
+verify_jwt = true
+
+[functions.setup-organization]
+verify_jwt = false
