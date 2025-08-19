@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PioneerLogo } from '@/components/PioneerLogo';
-import { Clock, MapPin, Users, BarChart3, Shield, Smartphone } from 'lucide-react';
+import { DemoRequestModal } from '@/components/DemoRequestModal';
+import { Clock, MapPin, Users, BarChart3, Shield, Smartphone, Mail } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -55,11 +56,17 @@ const Index = () => {
               </div>
             </div>
             <div className="flex space-x-4">
+              <DemoRequestModal>
+                <Button variant="ghost">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Request Demo
+                </Button>
+              </DemoRequestModal>
               <Button variant="ghost" onClick={() => navigate('/login')}>
                 Sign In
               </Button>
               <Button onClick={() => navigate('/onboarding')}>
-                Start Free Trial
+                Get Started
               </Button>
             </div>
           </div>
@@ -79,14 +86,17 @@ const Index = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" onClick={() => navigate('/onboarding')} className="px-8">
-              Start 14-Day Free Trial
+              Get Started Today
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/login')}>
-              Sign In to Your Account
-            </Button>
+            <DemoRequestModal>
+              <Button size="lg" variant="outline">
+                <Mail className="h-4 w-4 mr-2" />
+                Request Demo
+              </Button>
+            </DemoRequestModal>
           </div>
           <p className="text-sm text-muted-foreground mt-4">
-            No credit card required • Cancel anytime • Full access for 14 days
+            Professional time tracking starts here • Pay monthly • Cancel anytime
           </p>
         </div>
       </section>
@@ -152,13 +162,13 @@ const Index = () => {
               </div>
               <hr />
               <div className="text-sm text-muted-foreground">
-                <p>• 14-day free trial</p>
                 <p>• No setup fees</p>
                 <p>• Cancel anytime</p>
                 <p>• Only pay for active users</p>
+                <p>• Professional support included</p>
               </div>
               <Button className="w-full" onClick={() => navigate('/onboarding')}>
-                Start Your Free Trial
+                Get Started Today
               </Button>
             </CardContent>
           </Card>

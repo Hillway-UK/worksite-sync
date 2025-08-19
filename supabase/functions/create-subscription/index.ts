@@ -45,6 +45,9 @@ serve(async (req) => {
     const { plan } = await req.json();
     logStep("Request data parsed", { plan });
 
+    // If it's a monthly subscription plan, create Stripe checkout session
+    if (plan === 'monthly') {
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
     // Check if customer exists
@@ -62,7 +65,44 @@ serve(async (req) => {
       logStep("Created new customer", { customerId });
     }
 
-    // Get organization to update with Stripe customer ID
+      // Create Stripe checkout session for monthly subscription
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        line_items: [
+          {
+            price_data: {
+              currency: "gbp",
+              product_data: {
+                name: "Pioneer Auto Timesheets - Monthly Subscription",
+                description: "Professional time tracking for construction teams"
+              },
+              unit_amount: 2650, // £26.50 base price in pence
+              recurring: { interval: "month" }
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "subscription",
+        success_url: `${req.headers.get("origin")}/organization?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.get("origin")}/onboarding`,
+        metadata: {
+          user_id: user.id,
+          plan: 'monthly'
+        }
+      });
+
+      logStep("Created Stripe checkout session", { sessionId: session.id });
+
+      return new Response(JSON.stringify({ 
+        url: session.url,
+        session_id: session.id
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // Get organization to update with Stripe customer ID (for non-subscription flows)
     const { data: org, error: orgError } = await supabaseClient
       .from('organizations')
       .select('id')
@@ -85,7 +125,7 @@ serve(async (req) => {
         .from('organizations')
         .update({ 
           stripe_customer_id: customerId,
-          subscription_status: 'trial'
+          subscription_status: 'inactive'
         })
         .eq('id', admin.organization_id);
 
@@ -97,7 +137,7 @@ serve(async (req) => {
         .from('organizations')
         .update({ 
           stripe_customer_id: customerId,
-          subscription_status: 'trial'
+          subscription_status: 'inactive'
         })
         .eq('id', org.id);
 
@@ -105,13 +145,12 @@ serve(async (req) => {
       logStep("Updated organization with stripe customer ID", { orgId: org.id });
     }
 
-    // For now, just return success for trial setup
-    // Real subscription creation would happen after trial
-    logStep("Trial setup complete");
+    // Legacy response for non-subscription flows
+    logStep("Customer setup complete");
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: "Trial activated successfully",
+      message: "Customer created successfully",
       customer_id: customerId
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

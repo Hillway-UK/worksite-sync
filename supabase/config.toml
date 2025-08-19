@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.setup-organization]
 verify_jwt = false
+
+[functions.send-demo-request]
+verify_jwt = false

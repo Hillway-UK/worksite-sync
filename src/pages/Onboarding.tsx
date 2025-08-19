@@ -60,7 +60,7 @@ export default function Onboarding() {
 
         if (setupError) throw setupError;
 
-        toast.success('Organization created! Starting trial...');
+        toast.success('Organization created! Setting up payment...');
         setStep(2);
       }
     } catch (error: any) {
@@ -71,20 +71,24 @@ export default function Onboarding() {
     }
   };
 
-  const handleTrialSetup = async () => {
+  const handlePaymentSetup = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('create-subscription', {
-        body: { plan: 'trial' }
+      const { data, error } = await supabase.functions.invoke('create-subscription', {
+        body: { plan: 'monthly' }
       });
 
       if (error) throw error;
 
-      toast.success('14-day trial activated!');
-      setStep(3);
+      // Redirect to Stripe checkout
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast.success('Redirecting to payment setup...');
+        setStep(3); // Continue to team setup
+      }
     } catch (error: any) {
-      console.error('Trial setup error:', error);
-      toast.error(error.message || 'Failed to activate trial');
+      console.error('Payment setup error:', error);
+      toast.error(error.message || 'Failed to set up payment');
     } finally {
       setLoading(false);
     }
@@ -98,7 +102,7 @@ export default function Onboarding() {
           <div className="flex items-center space-x-4">
             <StepIndicator number={1} label="Organization" active={step === 1} complete={step > 1} />
             <div className="w-16 h-1 bg-border" />
-            <StepIndicator number={2} label="Trial Setup" active={step === 2} complete={step > 2} />
+            <StepIndicator number={2} label="Payment" active={step === 2} complete={step > 2} />
             <div className="w-16 h-1 bg-border" />
             <StepIndicator number={3} label="Team Setup" active={step === 3} complete={step > 3} />
           </div>
@@ -112,7 +116,7 @@ export default function Onboarding() {
                 Set Up Your Organization
               </CardTitle>
               <CardDescription>
-                Start your 14-day free trial of Pioneer Auto Timesheets
+                Set up your organization and admin account to get started
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -198,7 +202,7 @@ export default function Onboarding() {
                 disabled={loading}
                 className="w-full"
               >
-                {loading ? 'Creating Organization...' : 'Create Organization & Start Free Trial'}
+                {loading ? 'Creating Organization...' : 'Create Organization & Continue'}
               </Button>
             </CardContent>
           </Card>
@@ -209,10 +213,10 @@ export default function Onboarding() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-6 w-6 text-primary" />
-                Activate Your Free Trial
+                Set Up Your Subscription
               </CardTitle>
               <CardDescription>
-                14-day free trial with full access to all features
+                Complete your subscription to access all Pioneer features
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -235,26 +239,30 @@ export default function Onboarding() {
               </div>
 
               <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-2 text-green-600">
+                <div className="flex items-center justify-center gap-2 text-primary">
                   <Check className="h-5 w-5" />
-                  <span className="font-medium">14 days completely free</span>
+                  <span className="font-medium">Professional time tracking</span>
                 </div>
-                <div className="flex items-center justify-center gap-2 text-green-600">
+                <div className="flex items-center justify-center gap-2 text-primary">
                   <Check className="h-5 w-5" />
-                  <span className="font-medium">No credit card required</span>
+                  <span className="font-medium">GPS verification & geofencing</span>
                 </div>
-                <div className="flex items-center justify-center gap-2 text-green-600">
+                <div className="flex items-center justify-center gap-2 text-primary">
+                  <Check className="h-5 w-5" />
+                  <span className="font-medium">Detailed reports & analytics</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-primary">
                   <Check className="h-5 w-5" />
                   <span className="font-medium">Cancel anytime</span>
                 </div>
               </div>
 
               <Button
-                onClick={handleTrialSetup}
+                onClick={handlePaymentSetup}
                 disabled={loading}
                 className="w-full"
               >
-                {loading ? 'Activating Trial...' : 'Activate 14-Day Free Trial'}
+                {loading ? 'Setting up Payment...' : 'Set Up Subscription'}
               </Button>
             </CardContent>
           </Card>
