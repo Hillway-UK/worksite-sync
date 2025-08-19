@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireRole?: 'manager' | 'worker';
+  requireRole?: 'super_admin' | 'manager' | 'worker';
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
@@ -38,7 +38,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (requireRole && userRole !== requireRole) {
-    const redirectPath = userRole === 'manager' ? '/admin' : '/clock';
+    // Super admins can access manager and worker routes
+    if (userRole === 'super_admin' && (requireRole === 'manager' || requireRole === 'worker')) {
+      return <>{children}</>;
+    }
+    
+    // Redirect based on user role
+    let redirectPath = '/dashboard';
+    if (userRole === 'super_admin') redirectPath = '/organization';
+    else if (userRole === 'manager') redirectPath = '/admin';
+    else if (userRole === 'worker') redirectPath = '/clock';
+    
     return <Navigate to={redirectPath} replace />;
   }
 

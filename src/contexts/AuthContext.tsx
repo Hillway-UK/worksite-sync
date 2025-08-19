@@ -6,7 +6,9 @@ import { toast } from '@/hooks/use-toast';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  userRole: 'manager' | 'worker' | null;
+  userRole: 'super_admin' | 'manager' | 'worker' | null;
+  organizationId: string | null;
+  organization: any | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
@@ -25,11 +27,13 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<'manager' | 'worker' | null>(null);
+  const [userRole, setUserRole] = useState<'super_admin' | 'manager' | 'worker' | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organization, setOrganization] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCheckingRole, setIsCheckingRole] = useState(false);
 
-  const checkUserRole = async (userEmail: string): Promise<'manager' | 'worker' | null> => {
+  const checkUserRole = async (userEmail: string): Promise<'super_admin' | 'manager' | 'worker' | null> => {
     if (isCheckingRole) {
       console.log('Role check already in progress, skipping');
       return userRole;
@@ -46,10 +50,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(() => reject(new Error('Role check timeout')), 10000);
       });
       
+      // Check super admin role first
+      const superAdminCheck = supabase
+        .from('super_admins')
+        .select('*, organizations(*)')
+        .eq('email', userEmail)
+        .maybeSingle();
+      
+      const superAdminResult = await Promise.race([superAdminCheck, timeoutPromise]);
+      
+      if (superAdminResult && typeof superAdminResult === 'object' && 'data' in superAdminResult) {
+        const { data: superAdminData, error: superAdminError } = superAdminResult;
+        
+        console.log('Super admin query result:', { 
+          found: !!superAdminData, 
+          error: superAdminError 
+        });
+        
+        if (superAdminData && !superAdminError) {
+          console.log('✓ User is a SUPER ADMIN');
+          setUserRole('super_admin');
+          setOrganizationId(superAdminData.organization_id);
+          setOrganization(superAdminData.organizations);
+          return 'super_admin';
+        }
+      }
+      
       // Check manager role with timeout
       const managerCheck = supabase
         .from('managers')
-        .select('*')
+        .select('*, organizations(*)')
         .eq('email', userEmail)
         .maybeSingle();
       
@@ -66,6 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (managerData && !managerError) {
           console.log('✓ User is a MANAGER');
           setUserRole('manager');
+          setOrganizationId(managerData.organization_id);
+          setOrganization(managerData.organizations);
           return 'manager';
         }
       }
@@ -73,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check worker role with timeout
       const workerCheck = supabase
         .from('workers')
-        .select('*')
+        .select('*, organizations(*)')
         .eq('email', userEmail)
         .maybeSingle();
       
@@ -90,17 +122,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (workerData && !workerError) {
           console.log('✓ User is a WORKER');
           setUserRole('worker');
+          setOrganizationId(workerData.organization_id);
+          setOrganization(workerData.organizations);
           return 'worker';
         }
       }
       
-      console.log('✗ User not found in either table');
+      console.log('✗ User not found in any table');
       setUserRole(null);
+      setOrganizationId(null);
+      setOrganization(null);
       return null;
       
     } catch (error) {
       console.error('Error in checkUserRole:', error);
       setUserRole(null);
+      setOrganizationId(null);
+      setOrganization(null);
       return null;
     } finally {
       setIsCheckingRole(false);
@@ -194,6 +232,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setUserRole(null);
+    setOrganizationId(null);
+    setOrganization(null);
     setLoading(false);
   };
 
@@ -201,6 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     userRole,
+    organizationId,
+    organization,
     loading,
     signIn,
     signOut,

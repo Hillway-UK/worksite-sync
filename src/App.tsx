@@ -17,6 +17,7 @@ import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
 import AdminAmendments from "./pages/AdminAmendments";
 import AdminProfile from "./pages/AdminProfile";
+import OrganizationDashboard from "./pages/OrganizationDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,18 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            
+            {/* Super Admin Routes */}
+            <Route 
+              path="/organization" 
+              element={
+                <ProtectedRoute requireRole="super_admin">
+                  <OrganizationDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Worker Routes */}
             <Route 
               path="/dashboard" 
               element={
@@ -70,6 +83,8 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+
+            {/* Manager Routes (accessible by super_admin too) */}
             <Route 
               path="/admin" 
               element={
@@ -118,6 +133,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
