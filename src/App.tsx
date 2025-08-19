@@ -36,11 +36,11 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/onboarding" element={<Onboarding />} />
             
-            {/* Super Admin Routes */}
+            {/* Organization Routes - accessible by both super_admin and manager */}
             <Route 
               path="/organization" 
               element={
-                <ProtectedRoute requireRole="super_admin">
+                <ProtectedRoute requireRole="manager">
                   <OrganizationDashboard />
                 </ProtectedRoute>
               } 

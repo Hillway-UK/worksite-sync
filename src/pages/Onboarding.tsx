@@ -35,62 +35,86 @@ export default function Onboarding() {
     try {
       setLoading(true);
       
-      // Create the organization and admin user
+      // Validate required fields
+      if (!orgData.name || !orgData.admin_email || !orgData.admin_password) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      if (orgData.admin_password.length < 8) {
+        toast.error('Password must be at least 8 characters');
+        return;
+      }
+
+      console.log('Creating organization with data:', orgData);
+
+      // Step 1: Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: orgData.admin_email,
         password: orgData.admin_password,
         options: {
           data: {
             name: orgData.admin_name,
-            role: 'super_admin'
-          },
-          emailRedirectTo: `${window.location.origin}/`
+            role: 'manager' // Change from 'super_admin' to 'manager' for now
+          }
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
 
-      // Create organization with user limits
+      console.log('Auth user created:', authData.user?.id);
+
+      // Step 2: Create organization (without super_admins table for now)
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name: orgData.name,
-          address: orgData.address,
-          phone: orgData.phone,
+          address: orgData.address || '',
+          phone: orgData.phone || '',
           email: orgData.email || orgData.admin_email,
-          max_workers: orgData.workerCount,
-          max_managers: orgData.managerCount,
+          max_workers: orgData.workerCount || 5,
+          max_managers: orgData.managerCount || 1,
           subscription_status: 'pending_payment'
         })
         .select()
         .single();
 
-      if (orgError) throw orgError;
+      if (orgError) {
+        console.error('Organization error:', orgError);
+        throw orgError;
+      }
 
-      // Create super admin
-      const { error: adminError } = await supabase
-        .from('super_admins')
+      console.log('Organization created:', org.id);
+
+      // Step 3: Create manager record instead of super_admin
+      const { error: managerError } = await supabase
+        .from('managers')
         .insert({
           email: orgData.admin_email,
           name: orgData.admin_name,
           organization_id: org.id,
-          is_owner: true
+          pin: null
         });
 
-      if (adminError) throw adminError;
+      if (managerError) {
+        console.error('Manager error:', managerError);
+        throw managerError;
+      }
 
-      // Store organization ID for payment step
+      // Store data for payment step
+      sessionStorage.setItem('orgData', JSON.stringify(orgData));
       sessionStorage.setItem('organizationId', org.id);
-      sessionStorage.setItem('orgData', JSON.stringify({
-        ...orgData,
-        monthlyTotal: calculateMonthlyTotal()
-      }));
+      sessionStorage.setItem('userEmail', orgData.admin_email);
 
+      console.log('Moving to payment step');
       setCurrentStep('payment');
-      toast.success('Organization created! Please complete payment to continue.');
+      
     } catch (error: any) {
-      console.error('Error:', error);
-      toast.error(error.message);
+      console.error('Error in handleCreateOrganization:', error);
+      toast.error(`Error: ${error.message || 'Failed to create organization'}`);
     } finally {
       setLoading(false);
     }
