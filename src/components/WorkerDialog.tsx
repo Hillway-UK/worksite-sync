@@ -95,6 +95,18 @@ Please change your password on first login for security.`;
   const onSubmit = async (data: WorkerFormData) => {
     setLoading(true);
     try {
+      // Get current user's organization
+      const { data: currentUser, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data: manager, error: managerError } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', currentUser.user?.email)
+        .single();
+
+      if (managerError) throw managerError;
+
       if (worker) {
         // Update existing worker
         const { error } = await supabase
@@ -114,7 +126,7 @@ Please change your password on first login for security.`;
           description: "Worker updated successfully",
         });
       } else {
-        // Create new worker
+        // Create new worker with organization_id
         const { error: workerError } = await supabase
           .from('workers')
           .insert({
@@ -122,25 +134,16 @@ Please change your password on first login for security.`;
             email: data.email,
             phone: data.phone || null,
             hourly_rate: data.hourly_rate,
+            organization_id: manager.organization_id,
+            is_active: true,
           });
 
         if (workerError) throw workerError;
 
-        // Create auth user with temporary password
+        // Generate temporary password for display only
         const tempPassword = Math.random().toString(36).slice(-8) + '!1A';
         
-        const { error: authError } = await supabase.auth.admin.createUser({
-          email: data.email,
-          password: tempPassword,
-          email_confirm: true,
-        });
-
-        if (authError) {
-          console.warn('Auth user creation failed:', authError);
-          // Don't throw - worker was created successfully
-        }
-
-        // Store credentials and show success modal for new workers
+        // Store credentials for display (they'll need to sign up themselves)
         setWorkerCredentials({
           name: data.name,
           email: data.email,
@@ -150,8 +153,8 @@ Please change your password on first login for security.`;
 
         toast({
           title: "Success",
-          description: "Worker created successfully. Login credentials have been generated and should be shared securely with the worker.",
-          duration: 30000,
+          description: "Worker created successfully. Share the login details with them to create their account.",
+          duration: 10000,
         });
       }
 
@@ -164,7 +167,7 @@ Please change your password on first login for security.`;
       console.error('Error saving worker:', error);
       toast({
         title: "Error",
-        description: "Failed to save worker",
+        description: error instanceof Error ? error.message : "Failed to save worker",
         variant: "destructive",
       });
     } finally {

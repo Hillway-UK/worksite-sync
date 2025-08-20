@@ -186,6 +186,34 @@ export const Navigation: React.FC = () => {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 space-y-2 animate-slide-in-right">
               <Link
+                to="/admin"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/admin/workers"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Workers
+              </Link>
+              <Link
+                to="/admin/jobs"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Jobs
+              </Link>
+              <Link
+                to="/admin/amendments"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Amendments
+              </Link>
+              <Link
                 to="/admin/reports"
                 className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -198,6 +226,13 @@ export const Navigation: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Profile
+              </Link>
+              <Link
+                to="/organization"
+                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Organization
               </Link>
               <button
                 onClick={handleSignOut}
