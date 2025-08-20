@@ -60,3 +60,6 @@ verify_jwt = false
 
 [functions.send-demo-request]
 verify_jwt = false
+
+[functions.create-payment-intent]
+verify_jwt = false

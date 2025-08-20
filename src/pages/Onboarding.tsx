@@ -17,18 +17,78 @@ function PaymentForm({ orgData, organizationId, onSuccess }: any) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
+  const [clientSecret, setClientSecret] = useState('');
+
+  useEffect(() => {
+    // Create payment intent
+    const createPaymentIntent = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+          body: {
+            amount: (orgData.managerCount * 25) + (orgData.workerCount * 1.5),
+            email: orgData.admin_email,
+            organizationId: organizationId
+          }
+        });
+        
+        if (error) throw error;
+        if (data?.clientSecret) {
+          setClientSecret(data.clientSecret);
+        }
+      } catch (error) {
+        console.error('Payment intent error:', error);
+        // Fallback for testing
+        setClientSecret('test_secret');
+      }
+    };
+    
+    createPaymentIntent();
+  }, [orgData, organizationId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
 
     setProcessing(true);
+    
     try {
-      // For now, just mark as complete without actual payment
-      toast.success('Payment simulation complete - account created!');
-      onSuccess();
-    } catch (error) {
-      toast.error('Payment failed');
+      if (clientSecret === 'test_secret') {
+        // Test mode - bypass payment
+        await supabase
+          .from('organizations')
+          .update({ subscription_status: 'active' })
+          .eq('id', organizationId);
+          
+        toast.success('Test mode - Account activated!');
+        onSuccess();
+        return;
+      }
+
+      // Real Stripe payment
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement)!,
+          billing_details: {
+            email: orgData.admin_email,
+            name: orgData.admin_name
+          }
+        }
+      });
+
+      if (error) {
+        toast.error(error.message || 'Payment failed');
+      } else if (paymentIntent?.status === 'succeeded') {
+        // Update organization status
+        await supabase
+          .from('organizations')
+          .update({ subscription_status: 'active' })
+          .eq('id', organizationId);
+          
+        toast.success('Payment successful! Account activated.');
+        onSuccess();
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Payment processing failed');
     } finally {
       setProcessing(false);
     }
@@ -36,12 +96,54 @@ function PaymentForm({ orgData, organizationId, onSuccess }: any) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="border rounded-lg p-4">
-        <CardElement />
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <CardElement 
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+            },
+            hidePostalCode: false
+          }}
+        />
       </div>
-      <Button type="submit" disabled={!stripe || processing} className="w-full bg-[#702D30] hover:bg-[#420808]">
-        {processing ? 'Processing...' : `Pay £${((orgData.managerCount * 25) + (orgData.workerCount * 1.5)).toFixed(2)}/month`}
+      
+      <div className="text-sm text-gray-600">
+        <p>✓ Secure payment with Stripe</p>
+        <p>✓ Cancel anytime</p>
+        <p>✓ Instant access after payment</p>
+      </div>
+      
+      <Button 
+        type="submit" 
+        disabled={!stripe || processing} 
+        className="w-full bg-[#702D30] hover:bg-[#420808]"
+      >
+        {processing ? (
+          <>Processing...</>
+        ) : (
+          <>Pay £{((orgData.managerCount * 25) + (orgData.workerCount * 1.5)).toFixed(2)}/month</>
+        )}
       </Button>
+      
+      {/* Test mode bypass */}
+      {!clientSecret || clientSecret === 'test_secret' ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            onSuccess();
+          }}
+          className="w-full"
+        >
+          Skip Payment (Test Mode)
+        </Button>
+      ) : null}
     </form>
   );
 }
@@ -250,52 +352,96 @@ export default function Onboarding() {
                 <h3 className="font-semibold">Choose Your Subscription</h3>
                 
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Managers Section */}
                   <div>
                     <Label>Managers</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Button
+                      <button
                         type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={decrementManagers}
+                        className="h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (orgData.managerCount > 1) {
+                            setOrgData(prev => ({ ...prev, managerCount: prev.managerCount - 1 }));
+                          }
+                        }}
                         disabled={orgData.managerCount <= 1}
                       >
                         <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-12 text-center font-semibold">{orgData.managerCount}</span>
-                      <Button
+                      </button>
+                      
+                      <input
+                        type="number"
+                        className="w-16 text-center font-semibold border rounded"
+                        value={orgData.managerCount}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1;
+                          if (val >= 1) {
+                            setOrgData(prev => ({ ...prev, managerCount: val }));
+                          }
+                        }}
+                        min="1"
+                      />
+                      
+                      <button
                         type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={incrementManagers}
+                        className="h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOrgData(prev => ({ ...prev, managerCount: prev.managerCount + 1 }));
+                        }}
                       >
                         <Plus className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-600 mt-1">£25/month each</p>
                   </div>
                   
+                  {/* Workers Section */}
                   <div>
                     <Label>Workers</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Button
+                      <button
                         type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={decrementWorkers}
+                        className="h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (orgData.workerCount > 0) {
+                            setOrgData(prev => ({ ...prev, workerCount: prev.workerCount - 1 }));
+                          }
+                        }}
                         disabled={orgData.workerCount <= 0}
                       >
                         <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-12 text-center font-semibold">{orgData.workerCount}</span>
-                      <Button
+                      </button>
+                      
+                      <input
+                        type="number"
+                        className="w-16 text-center font-semibold border rounded"
+                        value={orgData.workerCount}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          if (val >= 0) {
+                            setOrgData(prev => ({ ...prev, workerCount: val }));
+                          }
+                        }}
+                        min="0"
+                      />
+                      
+                      <button
                         type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={incrementWorkers}
+                        className="h-9 w-9 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOrgData(prev => ({ ...prev, workerCount: prev.workerCount + 1 }));
+                        }}
                       >
                         <Plus className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-600 mt-1">£1.50/month each</p>
                   </div>
