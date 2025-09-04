@@ -26,7 +26,7 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { name, email, company, phone, message } = await req.json();
+    const { name, email, company, phone, message, admin_users = 1, worker_count = 0, monthly_cost } = await req.json();
     logStep("Request data parsed", { name, email, company, phone });
 
     if (!name || !email || !company) {
@@ -42,6 +42,9 @@ serve(async (req) => {
         company,
         phone,
         message,
+        admin_users,
+        worker_count,
+        status: 'pending',
         created_at: new Date().toISOString()
       });
 
@@ -67,15 +70,23 @@ serve(async (req) => {
               ${phone ? `<p><strong>Phone:</strong> <a href="tel:${phone}">${phone}</a></p>` : ''}
             </div>
 
+            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #333;">Requirements & Pricing</h3>
+              <p><strong>Admin Users:</strong> ${admin_users} (£${admin_users * 25}/month)</p>
+              <p><strong>Workers:</strong> ${worker_count} (£${(worker_count * 1.5).toFixed(2)}/month)</p>
+              <p><strong>Total Monthly Cost:</strong> <span style="color: #702D30; font-size: 1.2em; font-weight: bold;">£${monthly_cost || (admin_users * 25 + worker_count * 1.5).toFixed(2)} + VAT</span></p>
+            </div>
+
             ${message ? `
               <div style="background-color: #fff; padding: 20px; border-left: 4px solid #702D30; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #333;">Message</h3>
+                <h3 style="margin-top: 0; color: #333;">Additional Message</h3>
                 <p style="line-height: 1.6;">${message}</p>
               </div>
             ` : ''}
 
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
               <p>This email was automatically generated from the Pioneer Auto Timesheets demo request form.</p>
+              <p><strong>Action Required:</strong> Please follow up with this prospect within 24 hours.</p>
             </div>
           </div>
         `

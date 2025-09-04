@@ -162,34 +162,49 @@ export type Database = {
       }
       demo_requests: {
         Row: {
+          admin_users: number | null
           company: string | null
+          contacted_at: string | null
           created_at: string
           email: string
           id: string
           message: string | null
           name: string
+          notes: string | null
           phone: string | null
+          status: string | null
           updated_at: string
+          worker_count: number | null
         }
         Insert: {
+          admin_users?: number | null
           company?: string | null
+          contacted_at?: string | null
           created_at?: string
           email: string
           id?: string
           message?: string | null
           name: string
+          notes?: string | null
           phone?: string | null
+          status?: string | null
           updated_at?: string
+          worker_count?: number | null
         }
         Update: {
+          admin_users?: number | null
           company?: string | null
+          contacted_at?: string | null
           created_at?: string
           email?: string
           id?: string
           message?: string | null
           name?: string
+          notes?: string | null
           phone?: string | null
+          status?: string | null
           updated_at?: string
+          worker_count?: number | null
         }
         Relationships: []
       }
