@@ -65,10 +65,37 @@ export default function AdminWorkers() {
 
   const fetchWorkers = async () => {
     try {
-      // Fetch workers with their first clock-in photos
+      // Get current user's organization first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        toast({
+          title: "Error",
+          description: "Not authenticated",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: manager, error: managerError } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', user.email)
+        .single();
+      
+      if (managerError || !manager?.organization_id) {
+        toast({
+          title: "Error", 
+          description: "Your admin account is not linked to an organization. Please contact support.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Fetch only workers from this organization
       const { data: workersData, error: workersError } = await supabase
         .from('workers')
         .select('*')
+        .eq('organization_id', manager.organization_id)
         .order('name');
 
       if (workersError) throw workersError;

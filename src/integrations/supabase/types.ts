@@ -311,7 +311,7 @@ export type Database = {
           is_admin: boolean | null
           is_super: boolean | null
           name: string
-          organization_id: string | null
+          organization_id: string
           pin: string | null
         }
         Insert: {
@@ -321,7 +321,7 @@ export type Database = {
           is_admin?: boolean | null
           is_super?: boolean | null
           name: string
-          organization_id?: string | null
+          organization_id: string
           pin?: string | null
         }
         Update: {
@@ -331,10 +331,17 @@ export type Database = {
           is_admin?: boolean | null
           is_super?: boolean | null
           name?: string
-          organization_id?: string | null
+          organization_id?: string
           pin?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_managers_organization"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "managers_organization_id_fkey"
             columns: ["organization_id"]
@@ -647,6 +654,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_workers_organization"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workers_organization_id_fkey"
             columns: ["organization_id"]

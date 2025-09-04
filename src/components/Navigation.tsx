@@ -13,17 +13,31 @@ export const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSuper, setIsSuper] = useState(false);
+  const [organizationName, setOrganizationName] = useState<string>('');
 
   useEffect(() => {
     const checkSuper = async () => {
-      if (userRole === 'manager') {
-        const { data } = await supabase
+      if (userRole === 'manager' && user?.email) {
+        // Get manager data and organization separately to avoid join issues
+        const { data: managerData } = await supabase
           .from('managers')
-          .select('is_super')
-          .eq('email', user?.email)
+          .select('is_super, organization_id')
+          .eq('email', user.email)
           .single();
         
-        setIsSuper(data?.is_super || false);
+        setIsSuper(managerData?.is_super || false);
+        
+        if (managerData?.organization_id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', managerData.organization_id)
+            .single();
+          
+          if (orgData?.name) {
+            setOrganizationName(orgData.name);
+          }
+        }
       }
     };
     checkSuper();
@@ -140,6 +154,11 @@ export const Navigation: React.FC = () => {
               }}
             >
               <PioneerLogo className="h-10" variant="light" />
+              {organizationName && (
+                <span className="ml-3 text-sm text-white/80 font-medium">
+                  {organizationName}
+                </span>
+              )}
             </div>
 
             {/* Desktop Navigation */}

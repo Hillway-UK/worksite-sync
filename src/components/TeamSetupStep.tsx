@@ -15,7 +15,11 @@ interface TeamMember {
   hourlyRate?: number;
 }
 
-export const TeamSetupStep: React.FC = () => {
+interface TeamSetupStepProps {
+  organizationId?: string;
+}
+
+export const TeamSetupStep: React.FC<TeamSetupStepProps> = ({ organizationId }) => {
   const navigate = useNavigate();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
     { name: '', email: '', role: 'manager' }
@@ -41,6 +45,28 @@ export const TeamSetupStep: React.FC = () => {
   const handleCreateTeam = async () => {
     setLoading(true);
     try {
+      // Get organization ID if not provided as prop
+      let orgId = organizationId;
+      
+      if (!orgId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) {
+          throw new Error('Not authenticated');
+        }
+
+        const { data: managerData } = await supabase
+          .from('managers')
+          .select('organization_id')
+          .eq('email', user.email)
+          .single();
+        
+        if (!managerData?.organization_id) {
+          throw new Error('No organization found for current user');
+        }
+        
+        orgId = managerData.organization_id;
+      }
+
       // Filter out empty entries
       const validMembers = teamMembers.filter(member => 
         member.name.trim() && member.email.trim()
@@ -55,11 +81,16 @@ export const TeamSetupStep: React.FC = () => {
       for (const member of validMembers) {
         const table = member.role === 'manager' ? 'managers' : 'workers';
         const insertData = member.role === 'manager' 
-          ? { name: member.name, email: member.email }
+          ? { 
+              name: member.name, 
+              email: member.email,
+              organization_id: orgId 
+            }
           : { 
               name: member.name, 
               email: member.email, 
-              hourly_rate: member.hourlyRate || 25.00 
+              hourly_rate: member.hourlyRate || 25.00,
+              organization_id: orgId
             };
 
         const { error } = await supabase
