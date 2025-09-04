@@ -1,10 +1,11 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireRole?: 'super_admin' | 'manager' | 'worker';
+  requireRole?: 'super_admin' | 'manager' | 'worker' | 'super';
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
@@ -38,6 +39,36 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (requireRole && userRole !== requireRole) {
+    // Handle super user requirement
+    if (requireRole === 'super') {
+      // Check if user is a manager with super privileges
+      const checkSuperUser = async () => {
+        if (userRole === 'manager') {
+          try {
+            const { data: manager } = await supabase
+              .from('managers')
+              .select('is_super')
+              .eq('email', user?.email)
+              .single();
+            
+            if (!manager?.is_super) {
+              return <Navigate to="/admin" replace />;
+            }
+          } catch (error) {
+            console.error('Error checking super user status:', error);
+            return <Navigate to="/admin" replace />;
+          }
+        } else {
+          return <Navigate to="/admin" replace />;
+        }
+      };
+      
+      // For now, just redirect non-managers away from super routes
+      if (userRole !== 'manager') {
+        return <Navigate to="/admin" replace />;
+      }
+    }
+    
     // Super admins can access manager and worker routes
     if (userRole === 'super_admin' && (requireRole === 'manager' || requireRole === 'worker')) {
       return <>{children}</>;

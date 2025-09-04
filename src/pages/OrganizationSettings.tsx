@@ -116,9 +116,9 @@ export default function OrganizationSettings() {
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center mb-8">
           <Building className="h-16 w-16 text-[#702D30] mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground mb-2">Organization Settings</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Organisation Settings</h1>
           <p className="text-muted-foreground">
-            Manage your organization details and subscription
+            Manage your organisation details and subscription
           </p>
         </div>
         

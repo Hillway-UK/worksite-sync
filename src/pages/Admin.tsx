@@ -326,62 +326,13 @@ export default function Admin() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          {/* Recent Activity - Temporarily Hidden */}
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
-              {recentActivity.length === 0 ? (
-                <div className="text-center py-8">
-                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground text-lg font-medium mb-2">
-                    No recent activity
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Recent clock entries will appear here
-                  </p>
-                  <Button 
-                    onClick={() => navigate('/admin/reports')}
-                    variant="outline"
-                    size="sm"
-                  >
-                    View Reports
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{activity.worker_name}</p>
-                        <p className="text-sm text-muted-foreground">{activity.job_name}</p>
-                      </div>
-                      <div className="text-right">
-                        {activity.clock_out ? (
-                          <>
-                            <Badge variant="outline">
-                              {activity.total_hours?.toFixed(1)}h
-                            </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Completed
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <Badge variant="secondary">
-                              Active
-                            </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(activity.clock_in), 'HH:mm')}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <CardContent>
+              <p className="text-gray-500">Activity tracking coming soon</p>
             </CardContent>
           </Card>
         </div>

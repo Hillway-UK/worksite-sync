@@ -23,6 +23,7 @@ import AdminReports from "./pages/AdminReports";
 import AdminAmendments from "./pages/AdminAmendments";
 import AdminProfile from "./pages/AdminProfile";
 import OrganizationDashboard from "./pages/OrganizationDashboard";
+import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,12 +43,12 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
             
-            {/* Organization Routes - accessible by both super_admin and manager */}
+            {/* Organization Routes - accessible by super users only */}
             <Route 
               path="/organization" 
               element={
-                <ProtectedRoute requireRole="manager">
-                  <OrganizationDashboard />
+                <ProtectedRoute requireRole="super">
+                  <OrganizationSettings />
                 </ProtectedRoute>
               } 
             />

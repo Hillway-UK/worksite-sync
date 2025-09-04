@@ -3,14 +3,31 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PioneerLogo } from '@/components/PioneerLogo';
+import { supabase } from '@/integrations/supabase/client';
 
 export const Navigation: React.FC = () => {
-  const { userRole, signOut } = useAuth();
+  const { userRole, signOut, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSuper, setIsSuper] = useState(false);
+
+  useEffect(() => {
+    const checkSuper = async () => {
+      if (userRole === 'manager') {
+        const { data } = await supabase
+          .from('managers')
+          .select('is_super')
+          .eq('email', user?.email)
+          .single();
+        
+        setIsSuper(data?.is_super || false);
+      }
+    };
+    checkSuper();
+  }, [user, userRole]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -24,7 +41,10 @@ export const Navigation: React.FC = () => {
       <nav className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div 
+              className="flex items-center cursor-pointer" 
+              onClick={() => navigate('/')}
+            >
               <PioneerLogo className="h-8" />
             </div>
             <div className="flex items-center space-x-4">
@@ -93,7 +113,10 @@ export const Navigation: React.FC = () => {
       <nav className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div 
+              className="flex items-center cursor-pointer" 
+              onClick={() => navigate('/')}
+            >
               <PioneerLogo className="h-10" variant="light" />
             </div>
 
@@ -160,6 +183,18 @@ export const Navigation: React.FC = () => {
                 >
                   Profile
                 </Link>
+                {isSuper && (
+                  <Link
+                    to="/organization"
+                    className={`${
+                      location.pathname === '/organization' 
+                        ? 'bg-[#420808]/50 text-white' 
+                        : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
+                    } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                  >
+                    Organisation
+                  </Link>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="text-white/90 hover:text-white hover:bg-[#420808]/30 px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200"
@@ -227,13 +262,15 @@ export const Navigation: React.FC = () => {
               >
                 Profile
               </Link>
-              <Link
-                to="/organization"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Organization
-              </Link>
+              {isSuper && (
+                <Link
+                  to="/organization"
+                  className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Organisation
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
                 className="text-white/90 hover:text-white hover:bg-[#420808]/30 block w-full text-left px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"

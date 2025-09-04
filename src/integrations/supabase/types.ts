@@ -309,6 +309,7 @@ export type Database = {
           email: string
           id: string
           is_admin: boolean | null
+          is_super: boolean | null
           name: string
           organization_id: string | null
           pin: string | null
@@ -318,6 +319,7 @@ export type Database = {
           email: string
           id?: string
           is_admin?: boolean | null
+          is_super?: boolean | null
           name: string
           organization_id?: string | null
           pin?: string | null
@@ -327,6 +329,7 @@ export type Database = {
           email?: string
           id?: string
           is_admin?: boolean | null
+          is_super?: boolean | null
           name?: string
           organization_id?: string | null
           pin?: string | null

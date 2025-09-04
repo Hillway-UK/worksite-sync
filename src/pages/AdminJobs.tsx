@@ -108,6 +108,34 @@ export default function AdminJobs() {
     }
   };
 
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', jobId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Job deleted successfully",
+      });
+      fetchJobs(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error deleting job:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete job",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Filter jobs based on search term
   const filteredJobs = jobs.filter(job => {
     const searchLower = searchTerm.toLowerCase();
@@ -303,6 +331,14 @@ export default function AdminJobs() {
                               ) : (
                                 <ToggleLeft className="h-4 w-4" />
                               )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50"
+                              onClick={() => handleDeleteJob(job.id)}
+                            >
+                              Delete
                             </Button>
                           </div>
                         </TableCell>
