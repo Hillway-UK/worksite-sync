@@ -43,7 +43,15 @@ export const Navigation: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div 
               className="flex items-center cursor-pointer" 
-              onClick={() => navigate('/')}
+              onClick={() => {
+                // If logged in, go to appropriate dashboard
+                if (user) {
+                  navigate('/dashboard');
+                } else {
+                  // If not logged in, go to homepage
+                  navigate('/');
+                }
+              }}
             >
               <PioneerLogo className="h-8" />
             </div>
@@ -115,7 +123,21 @@ export const Navigation: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div 
               className="flex items-center cursor-pointer" 
-              onClick={() => navigate('/')}
+              onClick={() => {
+                // If logged in, go to appropriate dashboard
+                if (user) {
+                  if (userRole === 'manager') {
+                    navigate('/admin');
+                  } else if (userRole === 'worker') {
+                    navigate('/dashboard');
+                  } else {
+                    navigate('/');
+                  }
+                } else {
+                  // If not logged in, go to homepage
+                  navigate('/');
+                }
+              }}
             >
               <PioneerLogo className="h-10" variant="light" />
             </div>
@@ -185,9 +207,9 @@ export const Navigation: React.FC = () => {
                 </Link>
                 {isSuper && (
                   <Link
-                    to="/organization"
+                    to="/organisation"
                     className={`${
-                      location.pathname === '/organization' 
+                      location.pathname === '/organisation' 
                         ? 'bg-[#420808]/50 text-white' 
                         : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
                     } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
@@ -264,7 +286,7 @@ export const Navigation: React.FC = () => {
               </Link>
               {isSuper && (
                 <Link
-                  to="/organization"
+                  to="/organisation"
                   className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

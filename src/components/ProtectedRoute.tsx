@@ -76,9 +76,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     
     // Redirect based on user role
     let redirectPath = '/dashboard';
-    if (userRole === 'super_admin') redirectPath = '/organization';
+    if (userRole === 'super_admin') redirectPath = '/organisation';
     else if (userRole === 'manager') redirectPath = '/admin';
-    else if (userRole === 'worker') redirectPath = '/clock';
+    else if (userRole === 'worker') redirectPath = '/dashboard';
     
     return <Navigate to={redirectPath} replace />;
   }

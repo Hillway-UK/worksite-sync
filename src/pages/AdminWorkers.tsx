@@ -239,39 +239,65 @@ export default function AdminWorkers() {
   };
 
   const handleAddWorker = async () => {
-    // Check worker limit
     try {
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .select('max_workers')
-        .single();
-      
-      if (orgError) throw orgError;
-
-      const { count: currentWorkers, error: countError } = await supabase
-        .from('workers')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-      if (countError) throw countError;
-
-      if ((currentWorkers || 0) >= (org?.max_workers || 0)) {
-        toast({
-          title: "Worker limit reached",
-          description: `You've reached your limit of ${org?.max_workers} workers. Please upgrade your subscription to add more.`,
-          variant: "destructive",
-        });
+      // Get current user's organization first
+      const { data: currentUser, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('User fetch error:', userError);
+        setWorkerDialogOpen(true);
         return;
       }
+
+      const { data: manager, error: managerError } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', currentUser.user?.email)
+        .single();
+
+      if (managerError) {
+        console.error('Manager fetch error:', managerError);
+        setWorkerDialogOpen(true);
+        return;
+      }
+
+      // Get organization with max_workers
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, max_workers')
+        .eq('id', manager.organization_id)
+        .single();
       
+      if (orgError || !org) {
+        console.error('Organization fetch error:', orgError);
+        // If no org or max_workers, just proceed without limit check
+        setWorkerDialogOpen(true);
+        return;
+      }
+
+      // Check current worker count if max_workers is set
+      if (org.max_workers && org.max_workers > 0) {
+        const { count: currentWorkers } = await supabase
+          .from('workers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', org.id)
+          .eq('is_active', true);
+
+        if (currentWorkers && currentWorkers >= org.max_workers) {
+          toast({
+            title: "Worker limit reached",
+            description: `You've reached your limit of ${org.max_workers} workers. Please contact support to add more.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
+      // Open dialog if checks pass
       setWorkerDialogOpen(true);
     } catch (error) {
       console.error('Error checking worker limit:', error);
-      toast({
-        title: "Error",
-        description: "Failed to check worker limit",
-        variant: "destructive",
-      });
+      // On any error, just open the dialog
+      setWorkerDialogOpen(true);
     }
   };
 
@@ -484,15 +510,6 @@ export default function AdminWorkers() {
                               worker={worker} 
                               onSave={fetchWorkers}
                             />
-        
-        {workerDialogOpen && (
-          <WorkerDialog 
-            onSave={() => {
-              fetchWorkers();
-              setWorkerDialogOpen(false);
-            }}
-          />
-        )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -549,6 +566,13 @@ export default function AdminWorkers() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Add Worker Dialog */}
+        <WorkerDialog 
+          open={workerDialogOpen}
+          onOpenChange={setWorkerDialogOpen}
+          onSave={fetchWorkers}
+        />
 
         <PhotoModal
           isOpen={photoModal.isOpen}

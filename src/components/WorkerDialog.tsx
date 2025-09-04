@@ -16,6 +16,9 @@ const workerSchema = z.object({
   email: z.string().email('Valid email is required'),
   phone: z.string().optional(),
   hourly_rate: z.number().min(0, 'Hourly rate must be positive'),
+  address: z.string().optional(),
+  emergency_contact: z.string().optional(),
+  date_started: z.string().optional(),
 });
 
 type WorkerFormData = z.infer<typeof workerSchema>;
@@ -27,16 +30,21 @@ interface Worker {
   phone: string | null;
   hourly_rate: number;
   is_active: boolean;
+  address?: string | null;
+  emergency_contact?: string | null;
+  date_started?: string | null;
 }
 
 interface WorkerDialogProps {
   worker?: Worker;
   onSave: () => void;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function WorkerDialog({ worker, onSave, trigger }: WorkerDialogProps) {
-  const [open, setOpen] = useState(false);
+export function WorkerDialog({ worker, onSave, trigger, open: controlledOpen, onOpenChange }: WorkerDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [workerCredentials, setWorkerCredentials] = useState<{
@@ -44,6 +52,10 @@ export function WorkerDialog({ worker, onSave, trigger }: WorkerDialogProps) {
     email: string;
     password: string;
   } | null>(null);
+
+  // Use controlled open state if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   const copyCredentialsToClipboard = async () => {
     if (!workerCredentials) return;
@@ -84,11 +96,17 @@ Please change your password on first login for security.`;
       email: worker.email,
       phone: worker.phone || '',
       hourly_rate: worker.hourly_rate,
+      address: worker.address || '',
+      emergency_contact: worker.emergency_contact || '',
+      date_started: worker.date_started || '',
     } : {
       name: '',
       email: '',
       phone: '',
       hourly_rate: 25,
+      address: '',
+      emergency_contact: '',
+      date_started: new Date().toISOString().split('T')[0],
     },
   });
 
@@ -116,6 +134,9 @@ Please change your password on first login for security.`;
             email: data.email,
             phone: data.phone || null,
             hourly_rate: data.hourly_rate,
+            address: data.address || null,
+            emergency_contact: data.emergency_contact || null,
+            date_started: data.date_started || null,
           })
           .eq('id', worker.id);
 
@@ -134,6 +155,9 @@ Please change your password on first login for security.`;
             email: data.email,
             phone: data.phone || null,
             hourly_rate: data.hourly_rate,
+            address: data.address || null,
+            emergency_contact: data.emergency_contact || null,
+            date_started: data.date_started || null,
             organization_id: manager.organization_id,
             is_active: true,
           });
@@ -258,6 +282,33 @@ Please change your password on first login for security.`;
               {errors.hourly_rate && (
                 <p className="text-sm text-destructive mt-1">{errors.hourly_rate.message}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="address">Address (Optional)</Label>
+              <Input
+                id="address"
+                {...register('address')}
+                placeholder="Home address"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="emergency_contact">Emergency Contact (Optional)</Label>
+              <Input
+                id="emergency_contact"
+                {...register('emergency_contact')}
+                placeholder="Name and phone number"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="date_started">Start Date</Label>
+              <Input
+                id="date_started"
+                type="date"
+                {...register('date_started')}
+              />
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">
