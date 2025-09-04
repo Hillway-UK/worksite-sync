@@ -220,13 +220,13 @@ Please change your password on first login for security.`;
         <DialogTrigger asChild>
           {trigger || defaultTrigger}
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
             <DialogTitle>
               {worker ? 'Edit Worker' : 'Add New Worker'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pb-4">
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input

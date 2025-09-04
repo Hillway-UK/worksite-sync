@@ -439,13 +439,6 @@ export default function AdminWorkers() {
                             <p className="text-muted-foreground text-lg font-medium mb-4">
                               Add your first worker to get started
                             </p>
-                            <Button 
-                              className="bg-[#702D30] hover:bg-[#420808]"
-                              onClick={() => handleAddWorker()}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Worker
-                            </Button>
                           </div>
                         )}
                       </TableCell>
