@@ -111,59 +111,163 @@ Please change your password on first login for security.`;
   });
 
   const onSubmit = async (data: WorkerFormData) => {
-    setLoading(true);
-    try {
-      // Get current user's organization
-      const { data: currentUser, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
+    // Enhanced validation
+    if (!data.name?.trim() || !data.email?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Name and email are required fields",
+        variant: "destructive",
+      });
+      return;
+    }
 
-      const { data: manager, error: managerError } = await supabase
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email)) {
+      toast({
+        title: "Validation Error", 
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      console.log('Starting worker save process...');
+      
+      const { data: user, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user?.user?.email) {
+        console.error('Authentication error:', userError);
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to manage workers",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('User authenticated:', user.user.email);
+
+      // Get the manager's organization ID with better error handling
+      const { data: managerData, error: managerError } = await supabase
         .from('managers')
         .select('organization_id')
-        .eq('email', currentUser.user?.email)
-        .single();
+        .eq('email', user.user.email)
+        .maybeSingle();
 
-      if (managerError) throw managerError;
+      if (managerError) {
+        console.error('Manager query error:', managerError);
+        toast({
+          title: "Database Error",
+          description: `Failed to fetch manager data: ${managerError.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!managerData?.organization_id) {
+        console.error('No organization found for manager:', user.user.email);
+        toast({
+          title: "Organization Error",
+          description: "Could not find your organization. Please contact support.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Manager organization ID:', managerData.organization_id);
+
+      // Check for duplicate email (only for new workers)
+      if (!worker) {
+        const { data: existingWorker, error: duplicateError } = await supabase
+          .from('workers')
+          .select('id')
+          .eq('email', data.email.trim().toLowerCase())
+          .eq('organization_id', managerData.organization_id)
+          .maybeSingle();
+
+        if (duplicateError) {
+          console.error('Duplicate check error:', duplicateError);
+          toast({
+            title: "Database Error",
+            description: `Failed to check for existing worker: ${duplicateError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (existingWorker) {
+          toast({
+            title: "Duplicate Worker",
+            description: "A worker with this email already exists in your organization",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Prepare worker data with proper type conversion
+      const workerData = {
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+        phone: data.phone?.trim() || null,
+        address: data.address?.trim() || null,
+        emergency_contact: data.emergency_contact?.trim() || null,
+        date_started: data.date_started || null,
+        organization_id: managerData.organization_id,
+        hourly_rate: parseFloat(data.hourly_rate.toString()) || 0,
+        is_active: true,
+      };
+
+      console.log('Prepared worker data:', workerData);
 
       if (worker) {
-        // Update existing worker
+        console.log('Updating existing worker with id:', worker.id);
         const { error } = await supabase
           .from('workers')
-          .update({
-            name: data.name,
-            email: data.email,
-            phone: data.phone || null,
-            hourly_rate: data.hourly_rate,
-            address: data.address || null,
-            emergency_contact: data.emergency_contact || null,
-            date_started: data.date_started || null,
-          })
+          .update(workerData)
           .eq('id', worker.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Worker update error:', error);
+          toast({
+            title: "Update Failed",
+            description: `Failed to update worker: ${error.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
 
+        console.log('Worker updated successfully');
         toast({
           title: "Success",
           description: "Worker updated successfully",
         });
+
+        setOpen(false);
+        reset();
+        onSave();
       } else {
-        // Create new worker with organization_id
+        console.log('Creating new worker');
         const { error: workerError } = await supabase
           .from('workers')
-          .insert({
-            name: data.name,
-            email: data.email,
-            phone: data.phone || null,
-            hourly_rate: data.hourly_rate,
-            address: data.address || null,
-            emergency_contact: data.emergency_contact || null,
-            date_started: data.date_started || null,
-            organization_id: manager.organization_id,
-            is_active: true,
+          .insert(workerData);
+
+        if (workerError) {
+          console.error('Worker insert error:', workerError);
+          toast({
+            title: "Creation Failed", 
+            description: `Failed to add worker: ${workerError.message}`,
+            variant: "destructive",
           });
+          return;
+        }
 
-        if (workerError) throw workerError;
-
+        console.log('Worker created successfully');
+        
         // Generate temporary password for display only
         const tempPassword = Math.random().toString(36).slice(-8) + '!1A';
         
@@ -181,17 +285,12 @@ Please change your password on first login for security.`;
           duration: 10000,
         });
       }
-
-      if (worker) {
-        setOpen(false);
-        reset();
-        onSave();
-      }
-    } catch (error) {
-      console.error('Error saving worker:', error);
+      
+    } catch (error: any) {
+      console.error('Unexpected error in worker save:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save worker",
+        title: "Unexpected Error",
+        description: `An unexpected error occurred: ${error?.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {

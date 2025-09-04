@@ -609,7 +609,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
-          organization_id: string | null
+          organization_id: string
           phone: string | null
           photo_url: string | null
           updated_at: string | null
@@ -625,7 +625,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
-          organization_id?: string | null
+          organization_id: string
           phone?: string | null
           photo_url?: string | null
           updated_at?: string | null
@@ -641,7 +641,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
-          organization_id?: string | null
+          organization_id?: string
           phone?: string | null
           photo_url?: string | null
           updated_at?: string | null
