@@ -311,7 +311,7 @@ export type Database = {
           is_admin: boolean | null
           is_super: boolean | null
           name: string
-          organization_id: string
+          organization_id: string | null
           pin: string | null
         }
         Insert: {
@@ -321,7 +321,7 @@ export type Database = {
           is_admin?: boolean | null
           is_super?: boolean | null
           name: string
-          organization_id: string
+          organization_id?: string | null
           pin?: string | null
         }
         Update: {
@@ -331,7 +331,7 @@ export type Database = {
           is_admin?: boolean | null
           is_super?: boolean | null
           name?: string
-          organization_id?: string
+          organization_id?: string | null
           pin?: string | null
         }
         Relationships: [
