@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3 } from 'lucide-react';
+import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3, Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { PioneerLogo } from '@/components/PioneerLogo';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,55 @@ export const Navigation: React.FC = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Super Admin navigation
+  if (userRole === 'super_admin') {
+    return (
+      <nav className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <PioneerLogo variant="light" />
+              <div className="ml-8 flex space-x-8">
+                <Link
+                  to="/super-admin"
+                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
+                    isActive('/super-admin') 
+                      ? 'border-b-2 border-white text-white' 
+                      : 'text-purple-100 hover:text-white'
+                  }`}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  System Admin
+                </Link>
+                <Link
+                  to="/profile"
+                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
+                    isActive('/profile') 
+                      ? 'border-b-2 border-white text-white' 
+                      : 'text-purple-100 hover:text-white'
+                  }`}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
+                </Link>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleSignOut}
+                className="text-purple-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+              >
+                <LogOut className="h-4 w-4 mr-2 inline" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
+  // Worker navigation
   if (userRole === 'worker') {
     return (
       <nav className="bg-card border-b border-border shadow-sm">
@@ -130,6 +179,7 @@ export const Navigation: React.FC = () => {
     );
   }
 
+  // Manager navigation
   if (userRole === 'manager') {
     return (
       <nav className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg">

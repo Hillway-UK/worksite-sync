@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import DemoRequest from "./pages/DemoRequest";
 import Login from "./pages/Login";
+import SuperAdmin from "./pages/SuperAdmin";
 import Dashboard from "./pages/Dashboard";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
@@ -42,6 +43,16 @@ const App = () => (
           <Route path="/admin-portal" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          
+          {/* Super Admin Routes */}
+          <Route 
+            path="/super-admin" 
+            element={
+              <ProtectedRoute requireRole="super_admin">
+                <SuperAdmin />
+              </ProtectedRoute>
+            } 
+          />
             
             {/* Organization Routes - accessible by super users only */}
             <Route 

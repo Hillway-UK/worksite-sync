@@ -39,8 +39,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (requireRole && userRole !== requireRole) {
-    // Handle super user requirement
-    if (requireRole === 'super') {
+    // Handle super_admin requirement
+    if (requireRole === 'super_admin') {
+      if (userRole !== 'super_admin') {
+        return <Navigate to="/login" replace />;
+      }
+    } else if (requireRole === 'super') {
       // Check if user is a manager with super privileges
       const checkSuperUser = async () => {
         if (userRole === 'manager') {
@@ -67,20 +71,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (userRole !== 'manager') {
         return <Navigate to="/admin" replace />;
       }
+    } else if (userRole !== requireRole) {
+      // Super admins can access manager and worker routes
+      if (userRole === 'super_admin' && (requireRole === 'manager' || requireRole === 'worker')) {
+        return <>{children}</>;
+      }
+      
+      // Redirect based on user role
+      let redirectPath = '/dashboard';
+      if (userRole === 'super_admin') redirectPath = '/super-admin';
+      else if (userRole === 'manager') redirectPath = '/admin';
+      else if (userRole === 'worker') redirectPath = '/dashboard';
+      
+      return <Navigate to={redirectPath} replace />;
     }
-    
-    // Super admins can access manager and worker routes
-    if (userRole === 'super_admin' && (requireRole === 'manager' || requireRole === 'worker')) {
-      return <>{children}</>;
-    }
-    
-    // Redirect based on user role
-    let redirectPath = '/dashboard';
-    if (userRole === 'super_admin') redirectPath = '/organisation';
-    else if (userRole === 'manager') redirectPath = '/admin';
-    else if (userRole === 'worker') redirectPath = '/dashboard';
-    
-    return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;
