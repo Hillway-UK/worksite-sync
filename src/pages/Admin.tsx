@@ -38,6 +38,34 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
 
+  const [organizationName, setOrganizationName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchOrganization = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data: manager } = await supabase
+          .from('managers')
+          .select('organization_id')
+          .eq('email', user.email)
+          .single();
+        
+        if (manager?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', manager.organization_id)
+            .single();
+          
+          if (org?.name) {
+            setOrganizationName(org.name);
+          }
+        }
+      }
+    };
+    fetchOrganization();
+  }, []);
+
   useEffect(() => {
     fetchDashboardData();
   }, [user?.email]);
@@ -164,9 +192,15 @@ export default function Admin() {
             Welcome, {managerName || 'Manager'}
           </h1>
           <p className="text-muted-foreground font-body">
-            Pioneer Auto Timesheets - Manager Console
+            AutoTime - Manager Console
           </p>
         </div>
+
+        {organizationName && (
+          <div className="mb-6">
+            <h2 className="text-lg text-gray-600">Organization: <span className="font-semibold text-black">{organizationName}</span></h2>
+          </div>
+        )}
 
         {/* Statistics Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">

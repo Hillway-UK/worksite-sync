@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { PioneerLogo } from '@/components/PioneerLogo';
+import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { format } from 'date-fns';
 
 interface ClockEntry {
@@ -115,7 +115,7 @@ export default function Timesheets() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-4 shadow-lg">
         <div className="max-w-7xl mx-auto">
-          <PioneerLogo className="h-10" variant="light" />
+          <AutoTimeLogo className="h-10" variant="light" />
           <h1 className="font-heading font-extrabold text-xl mt-2">My Timesheets</h1>
         </div>
       </header>

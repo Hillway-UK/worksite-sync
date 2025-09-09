@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3, Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { PioneerLogo } from '@/components/PioneerLogo';
+import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { supabase } from '@/integrations/supabase/client';
 
 export const Navigation: React.FC = () => {
@@ -53,18 +53,18 @@ export const Navigation: React.FC = () => {
   // Super Admin navigation
   if (userRole === 'super_admin') {
     return (
-      <nav className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg">
+      <nav className="bg-black text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <PioneerLogo variant="light" />
+              <AutoTimeLogo variant="light" />
               <div className="ml-8 flex space-x-8">
                 <Link
                   to="/super-admin"
                   className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
                     isActive('/super-admin') 
                       ? 'border-b-2 border-white text-white' 
-                      : 'text-purple-100 hover:text-white'
+                      : 'text-gray-300 hover:text-white'
                   }`}
                 >
                   <Settings className="h-4 w-4 mr-2" />
@@ -75,7 +75,7 @@ export const Navigation: React.FC = () => {
                   className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
                     isActive('/profile') 
                       ? 'border-b-2 border-white text-white' 
-                      : 'text-purple-100 hover:text-white'
+                      : 'text-gray-300 hover:text-white'
                   }`}
                 >
                   <User className="h-4 w-4 mr-2" />
@@ -86,7 +86,7 @@ export const Navigation: React.FC = () => {
             <div className="flex items-center">
               <button
                 onClick={handleSignOut}
-                className="text-purple-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
               >
                 <LogOut className="h-4 w-4 mr-2 inline" />
                 Logout
@@ -107,16 +107,16 @@ export const Navigation: React.FC = () => {
             <div 
               className="flex items-center cursor-pointer" 
               onClick={() => {
-                // If logged in, go to appropriate dashboard
                 if (user) {
                   navigate('/dashboard');
                 } else {
-                  // If not logged in, go to homepage
                   navigate('/');
                 }
               }}
             >
-              <PioneerLogo className="h-8" />
+              <span className="font-bold text-xl text-black hover:text-gray-600 transition-colors">
+                AutoTime
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -182,13 +182,12 @@ export const Navigation: React.FC = () => {
   // Manager navigation
   if (userRole === 'manager') {
     return (
-      <nav className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg">
+      <nav className="bg-black text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div 
               className="flex items-center cursor-pointer" 
               onClick={() => {
-                // If logged in, go to appropriate dashboard
                 if (user) {
                   if (userRole === 'manager') {
                     navigate('/admin');
@@ -198,14 +197,15 @@ export const Navigation: React.FC = () => {
                     navigate('/');
                   }
                 } else {
-                  // If not logged in, go to homepage
                   navigate('/');
                 }
               }}
             >
-              <PioneerLogo className="h-10" variant="light" />
+              <span className="font-bold text-xl text-white hover:text-gray-200 transition-colors">
+                AutoTime
+              </span>
               {organizationName && (
-                <span className="ml-3 text-sm text-white/80 font-medium">
+                <span className="ml-3 text-sm text-gray-300 border-l border-gray-500 pl-3">
                   {organizationName}
                 </span>
               )}
@@ -218,9 +218,9 @@ export const Navigation: React.FC = () => {
                   to="/admin"
                   className={`${
                     location.pathname === '/admin' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Dashboard
                 </Link>
@@ -228,9 +228,9 @@ export const Navigation: React.FC = () => {
                   to="/admin/workers"
                   className={`${
                     location.pathname === '/admin/workers' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Workers
                 </Link>
@@ -238,9 +238,9 @@ export const Navigation: React.FC = () => {
                   to="/admin/jobs"
                   className={`${
                     location.pathname === '/admin/jobs' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Jobs
                 </Link>
@@ -248,9 +248,9 @@ export const Navigation: React.FC = () => {
                   to="/admin/amendments"
                   className={`${
                     location.pathname === '/admin/amendments' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Amendments
                 </Link>
@@ -258,9 +258,9 @@ export const Navigation: React.FC = () => {
                   to="/admin/reports"
                   className={`${
                     location.pathname === '/admin/reports' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Weekly Reports
                 </Link>
@@ -268,9 +268,9 @@ export const Navigation: React.FC = () => {
                   to="/admin/profile"
                   className={`${
                     location.pathname === '/admin/profile' 
-                      ? 'bg-[#420808]/50 text-white' 
-                      : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                  } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                      ? 'bg-gray-700 text-white' 
+                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                 >
                   Profile
                 </Link>
@@ -279,16 +279,16 @@ export const Navigation: React.FC = () => {
                     to="/organisation"
                     className={`${
                       location.pathname === '/organisation' 
-                        ? 'bg-[#420808]/50 text-white' 
-                        : 'text-white/90 hover:text-white hover:bg-[#420808]/30'
-                    } px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200`}
+                        ? 'bg-gray-700 text-white' 
+                        : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                    } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
                   >
                     Organisation
                   </Link>
                 )}
                 <button
                   onClick={handleSignOut}
-                  className="text-white/90 hover:text-white hover:bg-[#420808]/30 px-3 py-2 rounded-md text-sm font-heading font-semibold transition-all duration-200"
+                  className="text-gray-300 hover:text-white hover:bg-gray-600 px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200"
                 >
                   Logout
                 </button>
@@ -301,7 +301,7 @@ export const Navigation: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 variant="ghost"
                 size="sm"
-                className="min-h-[44px]"
+                className="min-h-[44px] text-white hover:bg-gray-600"
               >
                 <Menu className="h-6 w-6" />
               </Button>
@@ -310,45 +310,45 @@ export const Navigation: React.FC = () => {
 
           {/* Mobile Navigation Menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden py-4 space-y-2 animate-slide-in-right">
+            <div className="md:hidden py-4 space-y-2">
               <Link
                 to="/admin"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Dashboard
               </Link>
               <Link
                 to="/admin/workers"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Workers
               </Link>
               <Link
                 to="/admin/jobs"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Jobs
               </Link>
               <Link
                 to="/admin/amendments"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Amendments
               </Link>
               <Link
                 to="/admin/reports"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Weekly Reports
               </Link>
               <Link
                 to="/admin/profile"
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Profile
@@ -356,7 +356,7 @@ export const Navigation: React.FC = () => {
               {isSuper && (
                 <Link
                   to="/organisation"
-                  className="text-white/90 hover:text-white hover:bg-[#420808]/30 block px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                  className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Organisation
@@ -364,7 +364,7 @@ export const Navigation: React.FC = () => {
               )}
               <button
                 onClick={handleSignOut}
-                className="text-white/90 hover:text-white hover:bg-[#420808]/30 block w-full text-left px-3 py-2 rounded-md text-base font-heading font-semibold transition-all duration-200"
+                className="text-gray-300 hover:text-white hover:bg-gray-600 block w-full text-left px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
               >
                 Logout
               </button>

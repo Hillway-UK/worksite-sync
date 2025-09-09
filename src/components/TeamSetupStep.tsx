@@ -119,7 +119,7 @@ export const TeamSetupStep: React.FC<TeamSetupStepProps> = ({ organizationId }) 
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Users className="h-6 w-6 text-[#702D30]" />
+          <Users className="h-6 w-6 text-black" />
           Add Your Team
         </CardTitle>
         <CardDescription>
@@ -212,7 +212,7 @@ export const TeamSetupStep: React.FC<TeamSetupStepProps> = ({ organizationId }) 
           <Button
             onClick={handleCreateTeam}
             disabled={loading}
-            className="flex-1 bg-[#702D30] hover:bg-[#420808]"
+            className="flex-1 bg-black hover:bg-gray-800"
           >
             {loading ? 'Creating Team...' : 'Create Team & Finish'}
           </Button>

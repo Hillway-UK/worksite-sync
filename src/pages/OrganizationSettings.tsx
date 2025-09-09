@@ -115,7 +115,7 @@ export default function OrganizationSettings() {
     <Layout>
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center mb-8">
-          <Building className="h-16 w-16 text-[#702D30] mx-auto mb-4" />
+          <Building className="h-16 w-16 text-black mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground mb-2">Organisation Settings</h1>
           <p className="text-muted-foreground">
             Manage your organisation details and subscription
@@ -181,7 +181,7 @@ export default function OrganizationSettings() {
             <Button 
               onClick={handleSave} 
               disabled={loading} 
-              className="bg-[#702D30] hover:bg-[#420808]"
+              className="bg-black hover:bg-gray-800"
             >
               <Save className="mr-2 h-4 w-4" />
               {loading ? 'Saving...' : 'Save Company Details'}
@@ -248,7 +248,7 @@ export default function OrganizationSettings() {
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Current Monthly Cost:</span>
-                <span className="text-xl font-bold text-[#702D30]">
+                <span className="text-xl font-bold text-black">
                   £{((organization.max_managers * 25) + (organization.max_workers * 1.5)).toFixed(2)}
                 </span>
               </div>

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { PioneerLogo } from '@/components/PioneerLogo';
+import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -82,7 +82,7 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-2xl border-0">
         <CardHeader className="space-y-1 pb-6 bg-card rounded-t-lg">
           <div className="flex justify-center mb-4">
-            <PioneerLogo className="h-14" />
+            <AutoTimeLogo className="h-14" />
           </div>
           <CardTitle className="text-2xl text-center font-heading font-extrabold text-foreground">
             Manager Portal

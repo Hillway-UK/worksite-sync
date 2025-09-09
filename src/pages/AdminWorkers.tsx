@@ -425,7 +425,7 @@ export default function AdminWorkers() {
               </div>
               <Button 
                 onClick={() => handleAddWorker()}
-                className="bg-[#702D30] hover:bg-[#420808]"
+                className="bg-black hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Worker

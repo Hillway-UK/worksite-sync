@@ -60,7 +60,7 @@ export function WorkerDialog({ worker, onSave, trigger, open: controlledOpen, on
   const copyCredentialsToClipboard = async () => {
     if (!workerCredentials) return;
     
-    const credentialText = `Welcome to Pioneer Time Keeper
+    const credentialText = `Welcome to AutoTime
 
 Name: ${workerCredentials.name}
 Email: ${workerCredentials.email}

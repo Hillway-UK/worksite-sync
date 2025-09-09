@@ -88,7 +88,7 @@ export default function Pricing() {
             </div>
 
             <Button 
-              className="w-full" 
+              className="w-full bg-black hover:bg-gray-800" 
               size="lg"
               onClick={() => navigate('/demo-request')}
             >

@@ -396,10 +396,10 @@ export default function Onboarding() {
                 <p className="text-xs text-gray-600 mt-1">£1.50/month each</p>
               </div>
               
-              <div className="bg-[#702D30] bg-opacity-10 p-4 rounded-lg">
+              <div className="bg-gray-100 p-4 rounded-lg">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Monthly Total:</span>
-                  <span className="text-2xl font-bold text-[#702D30]">
+                  <span className="text-2xl font-bold text-black">
                     £{((orgData.managerCount * 25) + (orgData.workerCount * 1.5)).toFixed(2)}
                   </span>
                 </div>

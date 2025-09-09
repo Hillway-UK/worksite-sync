@@ -12,10 +12,10 @@ export default function Landing() {
       {/* Header */}
       <header className="container mx-auto px-4 py-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary">Pioneer Auto Timesheets</h1>
+          <h1 className="text-2xl font-bold text-black">AutoTime</h1>
           <div className="space-x-4">
             <Button variant="outline" onClick={() => navigate('/login')}>Login</Button>
-            <Button onClick={() => navigate('/pricing')}>View Pricing</Button>
+            <Button className="bg-black hover:bg-gray-800" onClick={() => navigate('/pricing')}>View Pricing</Button>
           </div>
         </div>
       </header>
@@ -28,6 +28,7 @@ export default function Landing() {
         </p>
         <Button 
           size="lg" 
+          className="bg-black hover:bg-gray-800"
           onClick={() => navigate('/pricing')}
         >
           View Pricing &amp; Request Demo
@@ -77,6 +78,7 @@ export default function Landing() {
             <p className="text-muted-foreground mb-6">Get started with a personalized demo</p>
             <Button 
               size="lg" 
+              className="bg-black hover:bg-gray-800"
               onClick={() => navigate('/demo-request')}
             >
               Request Your Demo

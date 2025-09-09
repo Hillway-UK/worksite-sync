@@ -8,45 +8,44 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Pioneer Auto Timesheets Color Palette */
-    --pioneer-burgundy: 355 49% 31%;     /* #702D30 */
-    --pioneer-deep-burgundy: 0 75% 15%;  /* #420808 */
-    --pioneer-charcoal: 0 0% 7%;         /* #111111 */
-    --pioneer-mid-grey: 0 0% 58%;        /* #939393 */
-    --pioneer-light-grey: 0 0% 92%;      /* #EAEAEA */
-    --pioneer-white: 0 0% 100%;          /* #FFFFFF */
-    --pioneer-success: 152 56% 50%;      /* #48BB78 */
-    --pioneer-danger: 0 71% 67%;         /* #F56565 */
-    --pioneer-warning: 26 77% 58%;       /* #ED8936 */
+    /* AutoTime Color Palette - Black/White/Grey */
+    --autotime-black: 0 0% 0%;           /* #000000 */
+    --autotime-dark-grey: 0 0% 22%;      /* #374151 */
+    --autotime-mid-grey: 0 0% 42%;       /* #6B7280 */
+    --autotime-light-grey: 0 0% 96%;     /* #F3F4F6 */
+    --autotime-white: 0 0% 100%;         /* #FFFFFF */
+    --autotime-success: 152 56% 50%;     /* #48BB78 */
+    --autotime-danger: 0 71% 67%;        /* #F56565 */
+    --autotime-warning: 26 77% 58%;      /* #ED8936 */
 
-    /* Main Design System Colors mapped to Pioneer palette */
-    --background: var(--pioneer-white);
-    --foreground: var(--pioneer-charcoal);
+    /* Main Design System Colors mapped to AutoTime palette */
+    --background: var(--autotime-white);
+    --foreground: var(--autotime-black);
 
-    --card: var(--pioneer-white);
-    --card-foreground: var(--pioneer-charcoal);
+    --card: var(--autotime-white);
+    --card-foreground: var(--autotime-black);
 
-    --popover: var(--pioneer-white);
-    --popover-foreground: var(--pioneer-charcoal);
+    --popover: var(--autotime-white);
+    --popover-foreground: var(--autotime-black);
 
-    --primary: var(--pioneer-burgundy);
-    --primary-foreground: var(--pioneer-white);
+    --primary: var(--autotime-black);
+    --primary-foreground: var(--autotime-white);
 
-    --secondary: var(--pioneer-light-grey);
-    --secondary-foreground: var(--pioneer-charcoal);
+    --secondary: var(--autotime-light-grey);
+    --secondary-foreground: var(--autotime-black);
 
-    --muted: var(--pioneer-light-grey);
-    --muted-foreground: var(--pioneer-mid-grey);
+    --muted: var(--autotime-light-grey);
+    --muted-foreground: var(--autotime-mid-grey);
 
-    --accent: var(--pioneer-light-grey);
-    --accent-foreground: var(--pioneer-burgundy);
+    --accent: var(--autotime-light-grey);
+    --accent-foreground: var(--autotime-black);
 
-    --destructive: var(--pioneer-danger);
-    --destructive-foreground: var(--pioneer-white);
+    --destructive: var(--autotime-danger);
+    --destructive-foreground: var(--autotime-white);
 
-    --border: var(--pioneer-light-grey);
-    --input: var(--pioneer-light-grey);
-    --ring: var(--pioneer-burgundy);
+    --border: var(--autotime-light-grey);
+    --input: var(--autotime-light-grey);
+    --ring: var(--autotime-black);
 
     --radius: 0.5rem;
 
@@ -68,34 +67,34 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark mode using Pioneer colors */
-    --background: var(--pioneer-charcoal);
-    --foreground: var(--pioneer-white);
+    /* Dark mode using AutoTime colors */
+    --background: var(--autotime-black);
+    --foreground: var(--autotime-white);
 
-    --card: var(--pioneer-charcoal);
-    --card-foreground: var(--pioneer-white);
+    --card: var(--autotime-black);
+    --card-foreground: var(--autotime-white);
 
-    --popover: var(--pioneer-charcoal);
-    --popover-foreground: var(--pioneer-white);
+    --popover: var(--autotime-black);
+    --popover-foreground: var(--autotime-white);
 
-    --primary: var(--pioneer-burgundy);
-    --primary-foreground: var(--pioneer-white);
+    --primary: var(--autotime-white);
+    --primary-foreground: var(--autotime-black);
 
-    --secondary: var(--pioneer-mid-grey);
-    --secondary-foreground: var(--pioneer-white);
+    --secondary: var(--autotime-dark-grey);
+    --secondary-foreground: var(--autotime-white);
 
-    --muted: var(--pioneer-mid-grey);
-    --muted-foreground: var(--pioneer-light-grey);
+    --muted: var(--autotime-dark-grey);
+    --muted-foreground: var(--autotime-light-grey);
 
-    --accent: var(--pioneer-burgundy);
-    --accent-foreground: var(--pioneer-white);
+    --accent: var(--autotime-white);
+    --accent-foreground: var(--autotime-black);
 
-    --destructive: var(--pioneer-danger);
-    --destructive-foreground: var(--pioneer-white);
+    --destructive: var(--autotime-danger);
+    --destructive-foreground: var(--autotime-white);
 
-    --border: var(--pioneer-mid-grey);
-    --input: var(--pioneer-mid-grey);
-    --ring: var(--pioneer-burgundy);
+    --border: var(--autotime-dark-grey);
+    --input: var(--autotime-dark-grey);
+    --ring: var(--autotime-white);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
