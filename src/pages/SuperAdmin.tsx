@@ -6,34 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, Edit } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface OrganizationWithCount {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  manager_count?: number;
-  [key: string]: any;
-}
-
-interface ManagerWithOrg {
-  id: string;
-  name: string;
-  email: string;
-  organization_id: string;
-  organization_name?: string;
-  [key: string]: any;
-}
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SuperAdmin() {
-  const [organizations, setOrganizations] = useState<OrganizationWithCount[]>([]);
-  const [managers, setManagers] = useState<ManagerWithOrg[]>([]);
+  const { user, userRole } = useAuth();
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
   const [showOrgDialog, setShowOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [authVerified, setAuthVerified] = useState(false);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -50,40 +34,67 @@ export default function SuperAdmin() {
   });
 
   useEffect(() => {
-    fetchOrganizations();
-    fetchManagers();
-  }, []);
+    verifyAuthentication();
+  }, [user, userRole]);
+
+  const verifyAuthentication = async () => {
+    console.log('Verifying authentication...');
+    console.log('User:', user?.email);
+    console.log('User role:', userRole);
+    
+    if (!user) {
+      toast.error('Please log in to access this page');
+      setLoading(false);
+      return;
+    }
+
+    // Check if user is in super_admins table
+    try {
+      const { data: superAdmin, error } = await supabase
+        .from('super_admins')
+        .select('*')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking super admin status:', error);
+        toast.error('Failed to verify admin status');
+        setLoading(false);
+        return;
+      }
+
+      if (!superAdmin) {
+        console.log('User not found in super_admins table');
+        toast.error('Access denied: Super admin privileges required');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Super admin verified:', superAdmin);
+      setAuthVerified(true);
+      await initializeData();
+    } catch (err: any) {
+      console.error('Authentication verification error:', err);
+      toast.error('Authentication verification failed');
+      setLoading(false);
+    }
+  };
+
+  const initializeData = async () => {
+    try {
+      await Promise.all([fetchOrganizations(), fetchManagers()]);
+      setLoading(false);
+    } catch (err) {
+      console.error('Failed to initialize data:', err);
+      setLoading(false);
+    }
+  };
 
   const fetchOrganizations = async () => {
     try {
-      console.log('Fetching organizations as super admin...');
+      console.log('Fetching organizations...');
       
-      // First verify authentication
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('No authenticated user found');
-        toast.error('Authentication required');
-        return;
-      }
-      
-      console.log('Authenticated user email:', user.email);
-      
-      // Verify super admin status
-      const { data: superAdminCheck, error: superAdminError } = await supabase
-        .from('super_admins')
-        .select('email')
-        .eq('email', user.email)
-        .single();
-        
-      if (superAdminError || !superAdminCheck) {
-        console.error('Super admin verification failed:', superAdminError);
-        toast.error('Super admin access required');
-        return;
-      }
-      
-      console.log('Super admin verified, fetching organizations...');
-      
-      // Fetch organizations with simple query first
+      // First try simple query without joins
       const { data, error } = await supabase
         .from('organizations')
         .select('*')
@@ -95,32 +106,36 @@ export default function SuperAdmin() {
         return;
       }
       
-      console.log('Organizations fetched successfully:', data?.length || 0, 'organizations');
-      setOrganizations(data || []);
+      console.log('Organizations fetched successfully:', data);
       
-      // Fetch manager counts separately to avoid join issues
-      if (data && data.length > 0) {
-        const orgsWithCounts = await Promise.all(
-          data.map(async (org) => {
+      // Get manager count separately for each organization
+      const orgsWithManagerCount = await Promise.all(
+        (data || []).map(async (org) => {
+          try {
             const { count, error: countError } = await supabase
               .from('managers')
               .select('*', { count: 'exact', head: true })
               .eq('organization_id', org.id);
-              
+            
             return {
               ...org,
-              manager_count: countError ? 0 : (count || 0)
-            } as OrganizationWithCount;
-          })
-        );
-        setOrganizations(orgsWithCounts);
-      } else {
-        setOrganizations(data.map(org => ({ ...org, manager_count: 0 })) || []);
-      }
+              managers: { count: count || 0 }
+            };
+          } catch (err) {
+            console.error('Error counting managers for org:', org.id, err);
+            return {
+              ...org,
+              managers: { count: 0 }
+            };
+          }
+        })
+      );
+      
+      setOrganizations(orgsWithManagerCount);
       
     } catch (err: any) {
       console.error('Unexpected error fetching organizations:', err);
-      toast.error('Failed to load organizations - check console for details');
+      toast.error('Failed to load organizations');
     }
   };
 
@@ -129,47 +144,55 @@ export default function SuperAdmin() {
       console.log('Fetching managers...');
       
       // First get managers
-      const { data: managersData, error: managersError } = await supabase
+      const { data: managersData, error } = await supabase
         .from('managers')
         .select('*')
         .order('name');
       
-      if (managersError) {
-        console.error('Error fetching managers:', managersError);
-        toast.error(`Failed to load managers: ${managersError.message}`);
+      if (error) {
+        console.error('Error fetching managers:', error);
+        toast.error(`Failed to load managers: ${error.message}`);
         return;
       }
       
-      console.log('Managers fetched:', managersData?.length || 0, 'managers');
+      console.log('Managers fetched successfully:', managersData);
       
-      // Then get organizations for each manager
-      if (managersData && managersData.length > 0) {
-        const enrichedManagers = await Promise.all(
-          managersData.map(async (manager): Promise<ManagerWithOrg> => {
-            if (manager.organization_id) {
-              const { data: orgData, error: orgError } = await supabase
-                .from('organizations')
-                .select('name')
-                .eq('id', manager.organization_id)
-                .single();
-                
-              return {
-                ...manager,
-                organization_name: (!orgError && orgData) ? orgData.name : 'Unknown'
-              };
-            }
-            return { ...manager, organization_name: 'Unassigned' };
-          })
-        );
-        
-        setManagers(enrichedManagers);
-      } else {
-        setManagers([]);
-      }
+      // Get organization names separately
+      const managersWithOrgs = await Promise.all(
+        (managersData || []).map(async (manager) => {
+          if (!manager.organization_id) {
+            return {
+              ...manager,
+              organizations: null
+            };
+          }
+          
+          try {
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('name')
+              .eq('id', manager.organization_id)
+              .maybeSingle();
+            
+            return {
+              ...manager,
+              organizations: orgData
+            };
+          } catch (err) {
+            console.error('Error fetching org for manager:', manager.id, err);
+            return {
+              ...manager,
+              organizations: null
+            };
+          }
+        })
+      );
+      
+      setManagers(managersWithOrgs);
       
     } catch (err: any) {
       console.error('Unexpected error fetching managers:', err);
-      toast.error('Failed to load managers - check console for details');
+      toast.error('Failed to load managers');
     }
   };
 
@@ -275,9 +298,40 @@ export default function SuperAdmin() {
     fetchManagers();
   };
 
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authVerified) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">Super admin privileges required to access this page.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Super Admin Dashboard</h1>
+      <div className="mb-4 p-3 bg-muted rounded-lg">
+        <p className="text-sm text-muted-foreground">
+          Logged in as: <span className="font-medium">{user?.email}</span> | 
+          Organizations: {organizations.length} | 
+          Managers: {managers.length}
+        </p>
+      </div>
       
       {/* Organizations Section */}
       <Card className="mb-6">
@@ -308,7 +362,7 @@ export default function SuperAdmin() {
                   <TableCell className="font-medium">{org.name}</TableCell>
                   <TableCell>{org.email || 'Not set'}</TableCell>
                   <TableCell>{org.phone || 'Not set'}</TableCell>
-                  <TableCell>{org.manager_count || 0}</TableCell>
+                  <TableCell>{org.managers?.count || 0}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -353,7 +407,7 @@ export default function SuperAdmin() {
                 <TableRow key={manager.email}>
                   <TableCell className="font-medium">{manager.name}</TableCell>
                   <TableCell>{manager.email}</TableCell>
-                  <TableCell>{manager.organization_name || 'Unassigned'}</TableCell>
+                  <TableCell>{manager.organizations?.name || 'Unassigned'}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
