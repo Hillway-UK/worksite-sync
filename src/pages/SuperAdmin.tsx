@@ -9,9 +9,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Building, Users, Trash, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface OrganizationWithCount {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  manager_count?: number;
+  [key: string]: any;
+}
+
+interface ManagerWithOrg {
+  id: string;
+  name: string;
+  email: string;
+  organization_id: string;
+  organization_name?: string;
+  [key: string]: any;
+}
+
 export default function SuperAdmin() {
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationWithCount[]>([]);
+  const [managers, setManagers] = useState<ManagerWithOrg[]>([]);
   const [showOrgDialog, setShowOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string>('');
@@ -36,37 +55,122 @@ export default function SuperAdmin() {
   }, []);
 
   const fetchOrganizations = async () => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select(`
-        *,
-        managers:managers(count)
-      `)
-      .order('name');
-    
-    if (error) {
-      toast.error('Failed to load organizations');
-      return;
+    try {
+      console.log('Fetching organizations as super admin...');
+      
+      // First verify authentication
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        toast.error('Authentication required');
+        return;
+      }
+      
+      console.log('Authenticated user email:', user.email);
+      
+      // Verify super admin status
+      const { data: superAdminCheck, error: superAdminError } = await supabase
+        .from('super_admins')
+        .select('email')
+        .eq('email', user.email)
+        .single();
+        
+      if (superAdminError || !superAdminCheck) {
+        console.error('Super admin verification failed:', superAdminError);
+        toast.error('Super admin access required');
+        return;
+      }
+      
+      console.log('Super admin verified, fetching organizations...');
+      
+      // Fetch organizations with simple query first
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching organizations:', error);
+        toast.error(`Failed to load organizations: ${error.message}`);
+        return;
+      }
+      
+      console.log('Organizations fetched successfully:', data?.length || 0, 'organizations');
+      setOrganizations(data || []);
+      
+      // Fetch manager counts separately to avoid join issues
+      if (data && data.length > 0) {
+        const orgsWithCounts = await Promise.all(
+          data.map(async (org) => {
+            const { count, error: countError } = await supabase
+              .from('managers')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', org.id);
+              
+            return {
+              ...org,
+              manager_count: countError ? 0 : (count || 0)
+            } as OrganizationWithCount;
+          })
+        );
+        setOrganizations(orgsWithCounts);
+      } else {
+        setOrganizations(data.map(org => ({ ...org, manager_count: 0 })) || []);
+      }
+      
+    } catch (err: any) {
+      console.error('Unexpected error fetching organizations:', err);
+      toast.error('Failed to load organizations - check console for details');
     }
-    
-    setOrganizations(data || []);
   };
 
   const fetchManagers = async () => {
-    const { data, error } = await supabase
-      .from('managers')
-      .select(`
-        *,
-        organizations:organization_id(name)
-      `)
-      .order('name');
-    
-    if (error) {
-      toast.error('Failed to load managers');
-      return;
+    try {
+      console.log('Fetching managers...');
+      
+      // First get managers
+      const { data: managersData, error: managersError } = await supabase
+        .from('managers')
+        .select('*')
+        .order('name');
+      
+      if (managersError) {
+        console.error('Error fetching managers:', managersError);
+        toast.error(`Failed to load managers: ${managersError.message}`);
+        return;
+      }
+      
+      console.log('Managers fetched:', managersData?.length || 0, 'managers');
+      
+      // Then get organizations for each manager
+      if (managersData && managersData.length > 0) {
+        const enrichedManagers = await Promise.all(
+          managersData.map(async (manager): Promise<ManagerWithOrg> => {
+            if (manager.organization_id) {
+              const { data: orgData, error: orgError } = await supabase
+                .from('organizations')
+                .select('name')
+                .eq('id', manager.organization_id)
+                .single();
+                
+              return {
+                ...manager,
+                organization_name: (!orgError && orgData) ? orgData.name : 'Unknown'
+              };
+            }
+            return { ...manager, organization_name: 'Unassigned' };
+          })
+        );
+        
+        setManagers(enrichedManagers);
+      } else {
+        setManagers([]);
+      }
+      
+    } catch (err: any) {
+      console.error('Unexpected error fetching managers:', err);
+      toast.error('Failed to load managers - check console for details');
     }
-    
-    setManagers(data || []);
   };
 
   const createOrganization = async () => {
@@ -204,7 +308,7 @@ export default function SuperAdmin() {
                   <TableCell className="font-medium">{org.name}</TableCell>
                   <TableCell>{org.email || 'Not set'}</TableCell>
                   <TableCell>{org.phone || 'Not set'}</TableCell>
-                  <TableCell>{org.managers?.length || 0}</TableCell>
+                  <TableCell>{org.manager_count || 0}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -249,7 +353,7 @@ export default function SuperAdmin() {
                 <TableRow key={manager.email}>
                   <TableCell className="font-medium">{manager.name}</TableCell>
                   <TableCell>{manager.email}</TableCell>
-                  <TableCell>{manager.organizations?.name || 'Unassigned'}</TableCell>
+                  <TableCell>{manager.organization_name || 'Unassigned'}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
