@@ -10,6 +10,7 @@ import Pricing from "./pages/Pricing";
 import DemoRequest from "./pages/DemoRequest";
 import Login from "./pages/Login";
 import SuperAdmin from "./pages/SuperAdmin";
+import OrganizationDetail from "./pages/OrganizationDetail";
 import Dashboard from "./pages/Dashboard";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
@@ -50,6 +51,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="super_admin">
                   <SuperAdmin />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/organization/:id" 
+              element={
+                <ProtectedRoute requireRole="super_admin">
+                  <OrganizationDetail />
                 </ProtectedRoute>
               } 
             />

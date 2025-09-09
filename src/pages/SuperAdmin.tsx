@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [showOrgDialog, setShowOrgDialog] = useState(false);
@@ -358,12 +360,18 @@ export default function SuperAdmin() {
             </TableHeader>
             <TableBody>
               {organizations.map(org => (
-                <TableRow key={org.id}>
-                  <TableCell className="font-medium">{org.name}</TableCell>
+                <TableRow 
+                  key={org.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/organization/${org.id}`)}
+                >
+                  <TableCell className="font-medium text-primary hover:underline">
+                    {org.name}
+                  </TableCell>
                   <TableCell>{org.email || 'Not set'}</TableCell>
                   <TableCell>{org.phone || 'Not set'}</TableCell>
                   <TableCell>{org.managers?.count || 0}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="sm"
