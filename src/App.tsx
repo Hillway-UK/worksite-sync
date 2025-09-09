@@ -36,24 +36,24 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/demo-request" element={<DemoRequest />} />
-          <Route path="/admin-portal" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          
-          {/* Super Admin Routes */}
-          <Route 
-            path="/super-admin" 
-            element={
-              <ProtectedRoute requireRole="super_admin">
-                <SuperAdmin />
-              </ProtectedRoute>
-            } 
-          />
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/demo-request" element={<DemoRequest />} />
+            <Route path="/admin-portal" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             
+            {/* Super Admin Routes */}
+            <Route 
+              path="/super-admin" 
+              element={
+                <ProtectedRoute requireRole="super_admin">
+                  <SuperAdmin />
+                </ProtectedRoute>
+              } 
+            />
+              
             {/* Organization Routes - accessible by super users only */}
             <Route 
               path="/organization" 
@@ -63,7 +63,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            
+              
             {/* Worker Routes */}
             <Route 
               path="/dashboard" 
@@ -155,7 +155,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            
+              
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
