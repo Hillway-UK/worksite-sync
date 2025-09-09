@@ -75,6 +75,14 @@ const App = () => (
               
             {/* Worker Routes */}
             <Route 
+              path="/clock" 
+              element={
+                <ProtectedRoute requireRole="worker">
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard" 
               element={
                 <ProtectedRoute requireRole="worker">

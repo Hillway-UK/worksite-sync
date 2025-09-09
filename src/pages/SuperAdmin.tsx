@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -326,7 +326,20 @@ export default function SuperAdmin() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Super Admin Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
+        <Button 
+          onClick={async () => {
+            await supabase.auth.signOut();
+            navigate('/login');
+          }}
+          variant="outline"
+          className="border-black hover:bg-gray-100"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
       <div className="mb-4 p-3 bg-muted rounded-lg">
         <p className="text-sm text-muted-foreground">
           Logged in as: <span className="font-medium">{user?.email}</span> | 

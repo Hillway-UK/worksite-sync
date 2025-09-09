@@ -1,379 +1,331 @@
-import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Clock, Users, Briefcase, FileText, LogOut, Menu, Calendar, User, BarChart3, Settings } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { AutoTimeLogo } from '@/components/AutoTimeLogo';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Navigation: React.FC = () => {
-  const { userRole, signOut, user } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSuper, setIsSuper] = useState(false);
+  const location = useLocation();
+  const { user, userRole } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
 
   useEffect(() => {
-    const checkSuper = async () => {
-      if (userRole === 'manager' && user?.email) {
-        // Get manager data and organization separately to avoid join issues
-        const { data: managerData } = await supabase
+    fetchOrganizationName();
+  }, [user, userRole]);
+
+  const fetchOrganizationName = async () => {
+    if (!user?.email) return;
+    
+    try {
+      if (userRole === 'manager') {
+        const { data: manager } = await supabase
           .from('managers')
-          .select('is_super, organization_id')
+          .select('organization_id')
           .eq('email', user.email)
           .single();
         
-        setIsSuper(managerData?.is_super || false);
-        
-        if (managerData?.organization_id) {
-          const { data: orgData } = await supabase
+        if (manager?.organization_id) {
+          const { data: org } = await supabase
             .from('organizations')
             .select('name')
-            .eq('id', managerData.organization_id)
+            .eq('id', manager.organization_id)
             .single();
           
-          if (orgData?.name) {
-            setOrganizationName(orgData.name);
+          if (org?.name) {
+            setOrganizationName(org.name);
+          }
+        }
+      } else if (userRole === 'worker') {
+        const { data: worker } = await supabase
+          .from('workers')
+          .select('organization_id')
+          .eq('email', user.email)
+          .single();
+        
+        if (worker?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', worker.organization_id)
+            .single();
+          
+          if (org?.name) {
+            setOrganizationName(org.name);
           }
         }
       }
-    };
-    checkSuper();
-  }, [user, userRole]);
+    } catch (error) {
+      console.error('Error fetching organization:', error);
+    }
+  };
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate('/login');
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const handleLogoClick = () => {
+    if (!user) {
+      navigate('/');
+    } else if (userRole === 'super_admin') {
+      navigate('/super-admin');
+    } else if (userRole === 'manager') {
+      navigate('/admin');
+    } else if (userRole === 'worker') {
+      navigate('/clock');
+    }
+  };
 
-  // Super Admin navigation
-  if (userRole === 'super_admin') {
-    return (
-      <nav className="bg-black text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <AutoTimeLogo variant="light" />
-              <div className="ml-8 flex space-x-8">
-                <Link
-                  to="/super-admin"
-                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                    isActive('/super-admin') 
-                      ? 'border-b-2 border-white text-white' 
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  System Admin
-                </Link>
-                <Link
-                  to="/profile"
-                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium ${
-                    isActive('/profile') 
-                      ? 'border-b-2 border-white text-white' 
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={handleSignOut}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <LogOut className="h-4 w-4 mr-2 inline" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
+  // Don't show navigation on landing/marketing pages
+  if (!user) return null;
 
-  // Worker navigation
-  if (userRole === 'worker') {
-    return (
-      <nav className="bg-card border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div 
-              className="flex items-center cursor-pointer" 
-              onClick={() => {
-                if (user) {
-                  navigate('/dashboard');
-                } else {
-                  navigate('/');
-                }
-              }}
-            >
-              <span className="font-bold text-xl text-black hover:text-gray-600 transition-colors">
-                AutoTime
+  return (
+    <nav className="bg-black shadow-lg sticky top-0 z-50">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo and Organization */}
+          <div 
+            className="flex items-center cursor-pointer" 
+            onClick={handleLogoClick}
+          >
+            <span className="font-bold text-xl text-white hover:text-gray-200">
+              AutoTime
+            </span>
+            {organizationName && (
+              <span className="ml-3 text-sm text-gray-300 border-l border-gray-500 pl-3">
+                {organizationName}
               </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/dashboard"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/dashboard')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
-                }`}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Dashboard
-              </Link>
-              <Link
-                to="/profile"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/profile')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
-                }`}
-              >
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Link>
-              <Link
-                to="/amendments"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/amendments')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
-                }`}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Amendments
-              </Link>
-              <Link
-                to="/reports"
-                className={`px-4 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-all duration-200 ease-in-out ${
-                  isActive('/reports')
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105'
-                }`}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Reports
-              </Link>
+            )}
+          </div>
+
+          {/* Desktop Navigation */}
+          {userRole === 'super_admin' && (
+            <div className="hidden md:flex items-center space-x-2">
               <Button
-                onClick={handleSignOut}
-                variant="ghost"
-                size="sm"
-                className="min-h-[44px] hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
+                variant={location.pathname === '/super-admin' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/super-admin')}
+                className="text-white hover:bg-gray-800"
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <Building className="mr-2 h-4 w-4" />
+                Organizations
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-white hover:bg-red-600"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
-
-  // Manager navigation
-  if (userRole === 'manager') {
-    return (
-      <nav className="bg-black text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div 
-              className="flex items-center cursor-pointer" 
-              onClick={() => {
-                if (user) {
-                  if (userRole === 'manager') {
-                    navigate('/admin');
-                  } else if (userRole === 'worker') {
-                    navigate('/dashboard');
-                  } else {
-                    navigate('/');
-                  }
-                } else {
-                  navigate('/');
-                }
-              }}
-            >
-              <span className="font-bold text-xl text-white hover:text-gray-200 transition-colors">
-                AutoTime
-              </span>
-              {organizationName && (
-                <span className="ml-3 text-sm text-gray-300 border-l border-gray-500 pl-3">
-                  {organizationName}
-                </span>
-              )}
-            </div>
-
-            {/* Desktop Navigation */}
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
-                <Link
-                  to="/admin"
-                  className={`${
-                    location.pathname === '/admin' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/admin/workers"
-                  className={`${
-                    location.pathname === '/admin/workers' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Workers
-                </Link>
-                <Link
-                  to="/admin/jobs"
-                  className={`${
-                    location.pathname === '/admin/jobs' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Jobs
-                </Link>
-                <Link
-                  to="/admin/amendments"
-                  className={`${
-                    location.pathname === '/admin/amendments' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Amendments
-                </Link>
-                <Link
-                  to="/admin/reports"
-                  className={`${
-                    location.pathname === '/admin/reports' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Weekly Reports
-                </Link>
-                <Link
-                  to="/admin/profile"
-                  className={`${
-                    location.pathname === '/admin/profile' 
-                      ? 'bg-gray-700 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                  } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                >
-                  Profile
-                </Link>
-                {isSuper && (
-                  <Link
-                    to="/organisation"
-                    className={`${
-                      location.pathname === '/organisation' 
-                        ? 'bg-gray-700 text-white' 
-                        : 'text-gray-300 hover:text-white hover:bg-gray-600'
-                    } px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200`}
-                  >
-                    Organisation
-                  </Link>
-                )}
-                <button
-                  onClick={handleSignOut}
-                  className="text-gray-300 hover:text-white hover:bg-gray-600 px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <Button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                variant="ghost"
-                size="sm"
-                className="min-h-[44px] text-white hover:bg-gray-600"
-              >
-                <Menu className="h-6 w-6" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Mobile Navigation Menu */}
-          {isMobileMenuOpen && (
-            <div className="md:hidden py-4 space-y-2">
-              <Link
-                to="/admin"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/admin/workers"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Workers
-              </Link>
-              <Link
-                to="/admin/jobs"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Jobs
-              </Link>
-              <Link
-                to="/admin/amendments"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Amendments
-              </Link>
-              <Link
-                to="/admin/reports"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Weekly Reports
-              </Link>
-              <Link
-                to="/admin/profile"
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Profile
-              </Link>
-              {isSuper && (
-                <Link
-                  to="/organisation"
-                  className="text-gray-300 hover:text-white hover:bg-gray-600 block px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Organisation
-                </Link>
-              )}
-              <button
-                onClick={handleSignOut}
-                className="text-gray-300 hover:text-white hover:bg-gray-600 block w-full text-left px-3 py-2 rounded-md text-base font-semibold transition-all duration-200"
-              >
-                Logout
-              </button>
             </div>
           )}
-        </div>
-      </nav>
-    );
-  }
 
-  return null;
+          {userRole === 'manager' && (
+            <div className="hidden md:flex items-center space-x-2">
+              <Button
+                variant={location.pathname === '/admin' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin')}
+                className="text-white hover:bg-gray-800"
+              >
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+              <Button
+                variant={location.pathname === '/admin/workers' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin/workers')}
+                className="text-white hover:bg-gray-800"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Workers
+              </Button>
+              <Button
+                variant={location.pathname === '/admin/jobs' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin/jobs')}
+                className="text-white hover:bg-gray-800"
+              >
+                <Briefcase className="mr-2 h-4 w-4" />
+                Jobs
+              </Button>
+              <Button
+                variant={location.pathname === '/admin/amendments' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin/amendments')}
+                className="text-white hover:bg-gray-800"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Amendments
+              </Button>
+              <Button
+                variant={location.pathname === '/admin/reports' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin/reports')}
+                className="text-white hover:bg-gray-800"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Reports
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-white hover:bg-red-600"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          )}
+
+          {userRole === 'worker' && (
+            <div className="hidden md:flex items-center space-x-2">
+              <Button
+                variant={location.pathname === '/clock' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/clock')}
+                className="text-white hover:bg-gray-800"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Clock In/Out
+              </Button>
+              <Button
+                variant={location.pathname === '/timesheets' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/timesheets')}
+                className="text-white hover:bg-gray-800"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Timesheets
+              </Button>
+              <Button
+                variant={location.pathname === '/profile' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/profile')}
+                className="text-white hover:bg-gray-800"
+              >
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="text-white hover:bg-red-600"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          )}
+
+          {/* Mobile Menu */}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon" className="text-white">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[250px]">
+              <SheetHeader>
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col space-y-2 mt-4">
+                {userRole === 'super_admin' && (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/super-admin'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Building className="mr-2 h-4 w-4" />
+                      Organizations
+                    </Button>
+                  </>
+                )}
+
+                {userRole === 'manager' && (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin/workers'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Workers
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin/jobs'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Jobs
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin/amendments'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Amendments
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin/reports'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Reports
+                    </Button>
+                  </>
+                )}
+
+                {userRole === 'worker' && (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/clock'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Clock In/Out
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/timesheets'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Timesheets
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/profile'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Button>
+                  </>
+                )}
+
+                <Button 
+                  variant="ghost" 
+                  onClick={() => { handleLogout(); setIsOpen(false); }}
+                  className="justify-start text-red-500 hover:bg-red-50"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </nav>
+  );
 };
