@@ -41,9 +41,34 @@ export default function AdminJobs() {
 
   const fetchJobs = async () => {
     try {
+      // Get manager's organization
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: manager, error: managerError } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', user.email)
+        .single();
+      
+      if (managerError || !manager?.organization_id) {
+        toast({
+          title: "Error",
+          description: "No organization found",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Fetch only jobs from this organization
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
+        .eq('organization_id', manager.organization_id)
         .order('name');
 
       if (error) throw error;
