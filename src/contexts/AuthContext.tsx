@@ -31,118 +31,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [organization, setOrganization] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isCheckingRole, setIsCheckingRole] = useState(false);
+  
 
-  const checkUserRole = async (userEmail: string): Promise<'super_admin' | 'manager' | 'worker' | null> => {
-    if (isCheckingRole) {
-      console.log('Role check already in progress, skipping');
-      return userRole;
-    }
-
-    setIsCheckingRole(true);
+  const getUserRole = async (email: string): Promise<'super_admin' | 'manager' | 'worker' | null> => {
+    console.log('Getting role for:', email);
     
-    try {
-      console.log('=== CHECKING USER ROLE ===');
-      console.log('Email to check:', userEmail);
-      
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error('Role check timeout')), 10000);
-      });
-      
-      // Check super admin role first
-      const superAdminCheck = supabase
-        .from('super_admins')
-        .select('*, organizations(*)')
-        .eq('email', userEmail)
-        .maybeSingle();
-      
-      const superAdminResult = await Promise.race([superAdminCheck, timeoutPromise]);
-      
-      if (superAdminResult && typeof superAdminResult === 'object' && 'data' in superAdminResult) {
-        const { data: superAdminData, error: superAdminError } = superAdminResult;
-        
-        console.log('Super admin query result:', { 
-          found: !!superAdminData, 
-          error: superAdminError 
-        });
-        
-        if (superAdminData && !superAdminError) {
-          console.log('✓ User is a SUPER ADMIN');
-          setUserRole('super_admin');
-          setOrganizationId(superAdminData.organization_id);
-          setOrganization(superAdminData.organizations);
-          return 'super_admin';
-        }
-      }
-      
-      // Check manager role with timeout
-      const managerCheck = supabase
-        .from('managers')
-        .select('*, organizations(*)')
-        .eq('email', userEmail)
-        .maybeSingle();
-      
-      const managerResult = await Promise.race([managerCheck, timeoutPromise]);
-      
-      if (managerResult && typeof managerResult === 'object' && 'data' in managerResult) {
-        const { data: managerData, error: managerError } = managerResult;
-        
-        console.log('Manager query result:', { 
-          found: !!managerData, 
-          error: managerError 
-        });
-        
-        if (managerData && !managerError) {
-          console.log('✓ User is a MANAGER');
-          setUserRole('manager');
-          setOrganizationId(managerData.organization_id);
-          setOrganization(managerData.organizations);
-          return 'manager';
-        }
-      }
-      
-      // Check worker role with timeout
-      const workerCheck = supabase
-        .from('workers')
-        .select('*, organizations(*)')
-        .eq('email', userEmail)
-        .maybeSingle();
-      
-      const workerResult = await Promise.race([workerCheck, timeoutPromise]);
-      
-      if (workerResult && typeof workerResult === 'object' && 'data' in workerResult) {
-        const { data: workerData, error: workerError } = workerResult;
-        
-        console.log('Worker query result:', { 
-          found: !!workerData, 
-          error: workerError 
-        });
-        
-        if (workerData && !workerError) {
-          console.log('✓ User is a WORKER');
-          setUserRole('worker');
-          setOrganizationId(workerData.organization_id);
-          setOrganization(workerData.organizations);
-          return 'worker';
-        }
-      }
-      
-      console.log('✗ User not found in any table');
-      setUserRole(null);
-      setOrganizationId(null);
-      setOrganization(null);
-      return null;
-      
-    } catch (error) {
-      console.error('Error in checkUserRole:', error);
-      setUserRole(null);
-      setOrganizationId(null);
-      setOrganization(null);
-      return null;
-    } finally {
-      setIsCheckingRole(false);
+    // Check super_admins first
+    const { data: superAdmin } = await supabase
+      .from('super_admins')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (superAdmin) {
+      console.log('Found super_admin');
+      return 'super_admin';
     }
+    
+    // Check managers
+    const { data: manager } = await supabase
+      .from('managers')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (manager) {
+      console.log('Found manager');
+      return 'manager';
+    }
+    
+    // Check workers
+    const { data: worker } = await supabase
+      .from('workers')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (worker) {
+      console.log('Found worker');
+      return 'worker';
+    }
+    
+    console.log('No role found for:', email);
+    return null;
   };
 
   useEffect(() => {
@@ -161,7 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (session?.user?.email) {
           console.log('Session found for:', session.user.email);
-          await checkUserRole(session.user.email);
+          const role = await getUserRole(session.user.email);
+          setUserRole(role);
         } else {
           console.log('No session found');
           setUserRole(null);
@@ -189,9 +121,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user?.email) {
         console.log('New session for:', session.user.email);
         // Use setTimeout to avoid blocking the auth state change
-        setTimeout(() => {
+        setTimeout(async () => {
           if (isMounted) {
-            checkUserRole(session.user.email!);
+            const role = await getUserRole(session.user.email!);
+            if (isMounted) {
+              setUserRole(role);
+            }
           }
         }, 0);
       } else {
@@ -204,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [isCheckingRole]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {

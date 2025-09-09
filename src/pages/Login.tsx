@@ -28,7 +28,10 @@ export default function Login() {
     
     if (!loading && user && userRole) {
       console.log('Navigation conditions met - userRole:', userRole);
-      if (userRole === 'manager') {
+      if (userRole === 'super_admin') {
+        console.log('Navigating to /super-admin');
+        navigate('/super-admin', { replace: true });
+      } else if (userRole === 'manager') {
         console.log('Navigating to /admin');
         navigate('/admin', { replace: true });
       } else if (userRole === 'worker') {
