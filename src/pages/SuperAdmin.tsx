@@ -239,13 +239,53 @@ export default function SuperAdmin() {
   };
 
   const createManager = async () => {
-    if (!managerForm.email || !managerForm.name || !managerForm.password || !managerForm.organization_id) {
-      toast.error('All fields are required');
-      return;
-    }
-
     try {
-      // Create manager record first
+      if (!managerForm.email || !managerForm.name || !managerForm.password || !managerForm.organization_id) {
+        toast.error('Please fill in all fields');
+        return;
+      }
+
+      // Create auth user using regular signUp
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: managerForm.email,
+        password: managerForm.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            name: managerForm.name,
+            role: 'manager'
+          }
+        }
+      });
+      
+      if (authError) {
+        // Check if user already exists
+        if (authError.message.includes('already registered')) {
+          // User exists, just create manager record
+          const { error: managerError } = await supabase
+            .from('managers')
+            .insert({
+              email: managerForm.email,
+              name: managerForm.name,
+              organization_id: managerForm.organization_id
+            });
+          
+          if (managerError) {
+            toast.error(`Manager record error: ${managerError.message}`);
+          } else {
+            toast.success('Manager linked to existing user');
+            setShowManagerDialog(false);
+            setManagerForm({ email: '', name: '', password: '', organization_id: '' });
+            await fetchManagers();
+          }
+          return;
+        }
+        
+        toast.error(`Auth error: ${authError.message}`);
+        return;
+      }
+      
+      // Create manager record
       const { error: managerError } = await supabase
         .from('managers')
         .insert({
@@ -254,14 +294,18 @@ export default function SuperAdmin() {
           organization_id: managerForm.organization_id
         });
       
-      if (managerError) throw managerError;
+      if (managerError) {
+        toast.error(`Failed to create manager record: ${managerError.message}`);
+        return;
+      }
       
-      toast.success('Manager created successfully');
+      toast.success('Manager created successfully! They can now log in.');
       setShowManagerDialog(false);
       setManagerForm({ email: '', name: '', password: '', organization_id: '' });
-      fetchManagers();
+      await fetchManagers();
       
     } catch (error: any) {
+      console.error('Create manager error:', error);
       toast.error(error.message || 'Failed to create manager');
     }
   };
