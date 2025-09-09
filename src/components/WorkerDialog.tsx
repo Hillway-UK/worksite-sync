@@ -225,6 +225,7 @@ Please change your password on first login for security.`;
       console.log('Prepared worker data:', workerData);
 
       if (worker) {
+        // Update existing worker - no auth user creation needed
         console.log('Updating existing worker with id:', worker.id);
         const { error } = await supabase
           .from('workers')
@@ -251,7 +252,43 @@ Please change your password on first login for security.`;
         reset();
         onSave();
       } else {
-        console.log('Creating new worker');
+        // Create new worker - including auth user creation
+        console.log('Creating new worker with auth account');
+        
+        // Generate secure temporary password
+        const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+        
+        // Create auth user for worker
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: data.email.trim().toLowerCase(),
+          password: tempPassword,
+          options: {
+            data: {
+              name: data.name.trim(),
+              role: 'worker'
+            }
+          }
+        });
+        
+        // Handle auth user creation
+        if (authError && !authError.message.includes('already registered')) {
+          console.error('Auth user creation error:', authError);
+          toast({
+            title: "Account Creation Failed",
+            description: `Failed to create login account: ${authError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Log auth creation result
+        if (authError?.message.includes('already registered')) {
+          console.log('User already has auth account, linking to worker record');
+        } else {
+          console.log('Auth user created successfully:', authData?.user?.id);
+        }
+
+        // Create worker database record
         const { error: workerError } = await supabase
           .from('workers')
           .insert(workerData);
@@ -266,12 +303,9 @@ Please change your password on first login for security.`;
           return;
         }
 
-        console.log('Worker created successfully');
+        console.log('Worker created successfully with mobile login enabled');
         
-        // Generate temporary password for display only
-        const tempPassword = Math.random().toString(36).slice(-8) + '!1A';
-        
-        // Store credentials for display (they'll need to sign up themselves)
+        // Store real credentials for display
         setWorkerCredentials({
           name: data.name,
           email: data.email,
@@ -281,8 +315,8 @@ Please change your password on first login for security.`;
 
         toast({
           title: "Success",
-          description: "Worker created successfully. Share the login details with them to create their account.",
-          duration: 10000,
+          description: "Worker created with mobile app login enabled!",
+          duration: 5000,
         });
       }
       
