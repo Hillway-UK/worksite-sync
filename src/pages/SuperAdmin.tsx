@@ -70,32 +70,43 @@ export default function SuperAdmin() {
   };
 
   const createOrganization = async () => {
-    if (!orgForm.name) {
-      toast.error('Organization name is required');
-      return;
-    }
+    try {
+      if (!orgForm.name || !orgForm.email) {
+        toast.error('Organization name and email are required');
+        return;
+      }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert({
-        name: orgForm.name,
-        email: orgForm.email,
-        phone: orgForm.phone,
-        address: orgForm.address,
-        subscription_status: 'active'
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      toast.error('Failed to create organization');
-      return;
+      console.log('Creating organization:', orgForm);
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .insert({
+          name: orgForm.name,
+          email: orgForm.email,
+          phone: orgForm.phone || null,
+          address: orgForm.address || null,
+          subscription_status: 'active',
+          max_workers: 50,
+          max_managers: 5
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Organization creation error:', error);
+        toast.error(`Failed to create organization: ${error.message}`);
+        return;
+      }
+      
+      console.log('Organization created successfully:', data);
+      toast.success('Organization created successfully');
+      setShowOrgDialog(false);
+      setOrgForm({ name: '', email: '', phone: '', address: '' });
+      await fetchOrganizations();
+    } catch (err: any) {
+      console.error('Unexpected error:', err);
+      toast.error('An unexpected error occurred');
     }
-    
-    toast.success('Organization created successfully');
-    setShowOrgDialog(false);
-    setOrgForm({ name: '', email: '', phone: '', address: '' });
-    fetchOrganizations();
   };
 
   const createManager = async () => {
