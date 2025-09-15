@@ -19,7 +19,8 @@ export default function DemoRequest() {
     phone: '',
     adminUsers: 1,
     workers: 5,
-    message: ''
+    message: '',
+    honeypot: '' // Hidden field for bot detection
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,6 +54,7 @@ export default function DemoRequest() {
           admin_users: formData.adminUsers,
           worker_count: formData.workers,
           message: formData.message,
+          honeypot: formData.honeypot,
           monthly_cost: (formData.adminUsers * 25 + formData.workers * 1.5).toFixed(2)
         }
       });
@@ -165,6 +167,19 @@ export default function DemoRequest() {
                   value={formData.message}
                   onChange={(e) => setFormData({...formData, message: e.target.value})}
                   placeholder="Tell us about your requirements..."
+                />
+              </div>
+
+              {/* Honeypot field - hidden from users but visible to bots */}
+              <div style={{ position: 'absolute', left: '-9999px' }}>
+                <Label htmlFor="website">Website (leave blank)</Label>
+                <Input
+                  id="website"
+                  type="text"
+                  value={formData.honeypot}
+                  onChange={(e) => setFormData({...formData, honeypot: e.target.value})}
+                  tabIndex={-1}
+                  autoComplete="off"
                 />
               </div>
 

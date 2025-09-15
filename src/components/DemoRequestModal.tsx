@@ -20,7 +20,8 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
     email: '',
     company: '',
     phone: '',
-    message: ''
+    message: '',
+    honeypot: '' // Hidden field for bot detection
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +41,7 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
       if (error) throw error;
 
       toast.success('Demo request submitted successfully! We\'ll be in touch soon.');
-      setFormData({ name: '', email: '', company: '', phone: '', message: '' });
+      setFormData({ name: '', email: '', company: '', phone: '', message: '', honeypot: '' });
       setOpen(false);
     } catch (error: any) {
       console.error('Demo request error:', error);
@@ -117,6 +118,19 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
               onChange={(e) => setFormData({ ...formData, message: e.target.value })}
               placeholder="Tell us about your needs..."
               rows={3}
+            />
+          </div>
+
+          {/* Honeypot field - hidden from users but visible to bots */}
+          <div style={{ position: 'absolute', left: '-9999px' }}>
+            <Label htmlFor="website">Website (leave blank)</Label>
+            <Input
+              id="website"
+              type="text"
+              value={formData.honeypot}
+              onChange={(e) => setFormData({ ...formData, honeypot: e.target.value })}
+              tabIndex={-1}
+              autoComplete="off"
             />
           </div>
 

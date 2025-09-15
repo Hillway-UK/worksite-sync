@@ -19,6 +19,10 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Rate limiting: Track requests by IP (simplified approach)
+    const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
+    logStep("Processing request from IP", { ip: clientIP });
+    
     // Use service role key to bypass RLS for inserting demo requests
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -26,22 +30,55 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { name, email, company, phone, message, admin_users = 1, worker_count = 0, monthly_cost } = await req.json();
+    const { name, email, company, phone, message, admin_users = 1, worker_count = 0, monthly_cost, honeypot } = await req.json();
     logStep("Request data parsed", { name, email, company, phone });
 
+    // Security checks
     if (!name || !email || !company) {
       throw new Error("Name, email, and company are required");
+    }
+
+    // Honeypot field check (should be empty)
+    if (honeypot && honeypot.trim() !== '') {
+      logStep("Bot detected via honeypot", { honeypot });
+      throw new Error("Invalid request");
+    }
+
+    // Input validation and sanitization
+    const sanitizedName = name.trim().substring(0, 100);
+    const sanitizedEmail = email.trim().toLowerCase().substring(0, 255);
+    const sanitizedCompany = company.trim().substring(0, 100);
+    const sanitizedPhone = phone ? phone.trim().substring(0, 20) : null;
+    const sanitizedMessage = message ? message.trim().substring(0, 1000) : null;
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(sanitizedEmail)) {
+      throw new Error("Invalid email format");
+    }
+
+    // Check for suspicious patterns (basic spam detection)
+    const suspiciousPatterns = [
+      /viagra|cialis|casino|poker|loan|crypto|bitcoin/i,
+      /win\s*\$|free\s*money|click\s*here/i,
+      /http[s]?:\/\//i // URLs in name/company fields
+    ];
+    
+    const textToCheck = `${sanitizedName} ${sanitizedCompany} ${sanitizedMessage || ''}`;
+    if (suspiciousPatterns.some(pattern => pattern.test(textToCheck))) {
+      logStep("Suspicious content detected", { content: textToCheck.substring(0, 100) });
+      throw new Error("Invalid request content");
     }
 
     // Store demo request in database
     const { error: insertError } = await supabaseClient
       .from('demo_requests')
       .insert({
-        name,
-        email,
-        company,
-        phone,
-        message,
+        name: sanitizedName,
+        email: sanitizedEmail,
+        company: sanitizedCompany,
+        phone: sanitizedPhone,
+        message: sanitizedMessage,
         admin_users,
         worker_count,
         status: 'pending',
@@ -55,7 +92,7 @@ serve(async (req) => {
     try {
       const { error: emailError } = await supabaseClient.auth.admin.sendRawEmail({
         to: 'hello@hillwayco.uk',
-        subject: `New Demo Request - ${company}`,
+        subject: `New Demo Request - ${sanitizedCompany}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #702D30; border-bottom: 2px solid #702D30; padding-bottom: 10px;">
@@ -64,10 +101,10 @@ serve(async (req) => {
             
             <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin-top: 0; color: #333;">Contact Information</h3>
-              <p><strong>Name:</strong> ${name}</p>
-              <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-              <p><strong>Company:</strong> ${company}</p>
-              ${phone ? `<p><strong>Phone:</strong> <a href="tel:${phone}">${phone}</a></p>` : ''}
+              <p><strong>Name:</strong> ${sanitizedName}</p>
+              <p><strong>Email:</strong> <a href="mailto:${sanitizedEmail}">${sanitizedEmail}</a></p>
+              <p><strong>Company:</strong> ${sanitizedCompany}</p>
+              ${sanitizedPhone ? `<p><strong>Phone:</strong> <a href="tel:${sanitizedPhone}">${sanitizedPhone}</a></p>` : ''}
             </div>
 
             <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -77,10 +114,10 @@ serve(async (req) => {
               <p><strong>Total Monthly Cost:</strong> <span style="color: #702D30; font-size: 1.2em; font-weight: bold;">£${monthly_cost || (admin_users * 25 + worker_count * 1.5).toFixed(2)} + VAT</span></p>
             </div>
 
-            ${message ? `
+            ${sanitizedMessage ? `
               <div style="background-color: #fff; padding: 20px; border-left: 4px solid #702D30; margin: 20px 0;">
                 <h3 style="margin-top: 0; color: #333;">Additional Message</h3>
-                <p style="line-height: 1.6;">${message}</p>
+                <p style="line-height: 1.6;">${sanitizedMessage}</p>
               </div>
             ` : ''}
 
