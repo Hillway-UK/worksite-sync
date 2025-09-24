@@ -111,22 +111,11 @@ Please change your password on first login for security.`;
   });
 
   const onSubmit = async (data: WorkerFormData) => {
-    // Enhanced validation
+    // Enhanced validation - Zod already handles email format validation
     if (!data.name?.trim() || !data.email?.trim()) {
       toast({
         title: "Validation Error",
         description: "Name and email are required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email)) {
-      toast({
-        title: "Validation Error", 
-        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
