@@ -22,24 +22,14 @@ export default function Login() {
   const from = location.state?.from?.pathname || '/';
 
   useEffect(() => {
-    console.log('Login page - userRole changed to:', userRole);
-    console.log('Login page - user:', user);
-    console.log('Login page - loading:', loading);
-    
     if (!loading && user && userRole) {
-      console.log('Navigation conditions met - userRole:', userRole);
       if (userRole === 'super_admin') {
-        console.log('Navigating to /super-admin');
         navigate('/super-admin', { replace: true });
       } else if (userRole === 'manager') {
-        console.log('Navigating to /admin');
         navigate('/admin', { replace: true });
       } else if (userRole === 'worker') {
-        console.log('Navigating to /dashboard');
         navigate('/dashboard', { replace: true });
       }
-    } else {
-      console.log('Navigation conditions not met:', { loading, user: !!user, userRole });
     }
   }, [user, userRole, loading, navigate]);
 
@@ -48,13 +38,9 @@ export default function Login() {
     setError('');
     setIsLoading(true);
     
-    console.log('=== LOGIN ATTEMPT ===');
-    console.log('Email:', email);
-    
     const { error } = await signIn(email, password);
     
     if (error) {
-      console.error('Login failed:', error);
       setError(error);
       setIsLoading(false);
       toast({
@@ -63,7 +49,6 @@ export default function Login() {
         variant: "destructive",
       });
     } else {
-      console.log('Login successful, waiting for role...');
       // The useEffect will handle navigation once userRole is set
       setIsLoading(false);
     }

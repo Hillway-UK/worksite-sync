@@ -11,13 +11,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
 
+// Enhanced validation schema with better security
 const workerSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Valid email is required'),
-  phone: z.string().optional(),
-  hourly_rate: z.number().min(0, 'Hourly rate must be positive'),
-  address: z.string().optional(),
-  emergency_contact: z.string().optional(),
+  name: z.string()
+    .trim()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be less than 100 characters')
+    .regex(/^[a-zA-Z\s'-]+$/, 'Name can only contain letters, spaces, hyphens, and apostrophes'),
+  email: z.string()
+    .trim()
+    .toLowerCase()
+    .email('Valid email is required')
+    .max(255, 'Email must be less than 255 characters'),
+  phone: z.string()
+    .trim()
+    .optional()
+    .refine(val => !val || /^[\d\s\-\+\(\)]{7,20}$/.test(val), 'Invalid phone number format'),
+  hourly_rate: z.number()
+    .min(0, 'Hourly rate must be positive')
+    .max(1000, 'Hourly rate must be reasonable'),
+  address: z.string().trim().max(500, 'Address must be less than 500 characters').optional(),
+  emergency_contact: z.string().trim().max(200, 'Emergency contact must be less than 200 characters').optional(),
   date_started: z.string().optional(),
 });
 
@@ -111,25 +125,12 @@ Please change your password on first login for security.`;
   });
 
   const onSubmit = async (data: WorkerFormData) => {
-    // Enhanced validation - Zod already handles email format validation
-    if (!data.name?.trim() || !data.email?.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name and email are required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
     
     try {
-      console.log('Starting worker save process...');
-      
       const { data: user, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user?.user?.email) {
-        console.error('Authentication error:', userError);
         toast({
           title: "Authentication Error",
           description: "You must be logged in to manage workers",
@@ -137,8 +138,6 @@ Please change your password on first login for security.`;
         });
         return;
       }
-
-      console.log('User authenticated:', user.user.email);
 
       // Get the manager's organization ID with better error handling
       const { data: managerData, error: managerError } = await supabase
@@ -148,7 +147,6 @@ Please change your password on first login for security.`;
         .maybeSingle();
 
       if (managerError) {
-        console.error('Manager query error:', managerError);
         toast({
           title: "Database Error",
           description: `Failed to fetch manager data: ${managerError.message}`,
@@ -158,7 +156,6 @@ Please change your password on first login for security.`;
       }
 
       if (!managerData?.organization_id) {
-        console.error('No organization found for manager:', user.user.email);
         toast({
           title: "Organization Error",
           description: "Could not find your organization. Please contact support.",
@@ -167,19 +164,16 @@ Please change your password on first login for security.`;
         return;
       }
 
-      console.log('Manager organization ID:', managerData.organization_id);
-
       // Check for duplicate email (only for new workers)
       if (!worker) {
         const { data: existingWorker, error: duplicateError } = await supabase
           .from('workers')
           .select('id')
-          .eq('email', data.email.trim().toLowerCase())
+          .eq('email', data.email)
           .eq('organization_id', managerData.organization_id)
           .maybeSingle();
 
         if (duplicateError) {
-          console.error('Duplicate check error:', duplicateError);
           toast({
             title: "Database Error",
             description: `Failed to check for existing worker: ${duplicateError.message}`,
@@ -198,31 +192,27 @@ Please change your password on first login for security.`;
         }
       }
 
-      // Prepare worker data with proper type conversion
+      // Prepare worker data with proper sanitization
       const workerData = {
-        name: data.name.trim(),
-        email: data.email.trim().toLowerCase(),
-        phone: data.phone?.trim() || null,
-        address: data.address?.trim() || null,
-        emergency_contact: data.emergency_contact?.trim() || null,
+        name: data.name,
+        email: data.email,
+        phone: data.phone || null,
+        address: data.address || null,
+        emergency_contact: data.emergency_contact || null,
         date_started: data.date_started || null,
         organization_id: managerData.organization_id,
-        hourly_rate: parseFloat(data.hourly_rate.toString()) || 0,
+        hourly_rate: data.hourly_rate,
         is_active: true,
       };
 
-      console.log('Prepared worker data:', workerData);
-
       if (worker) {
         // Update existing worker - no auth user creation needed
-        console.log('Updating existing worker with id:', worker.id);
         const { error } = await supabase
           .from('workers')
           .update(workerData)
           .eq('id', worker.id);
 
         if (error) {
-          console.error('Worker update error:', error);
           toast({
             title: "Update Failed",
             description: `Failed to update worker: ${error.message}`,
@@ -231,7 +221,6 @@ Please change your password on first login for security.`;
           return;
         }
 
-        console.log('Worker updated successfully');
         toast({
           title: "Success",
           description: "Worker updated successfully",
@@ -242,18 +231,19 @@ Please change your password on first login for security.`;
         onSave();
       } else {
         // Create new worker - including auth user creation
-        console.log('Creating new worker with auth account');
-        
-        // Generate secure temporary password
-        const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+        // Generate secure temporary password with better entropy
+        const tempPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
+          .map(b => 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'.charAt(b % 54))
+          .join('') + 'Aa1!';
         
         // Create auth user for worker
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: data.email.trim().toLowerCase(),
+          email: data.email,
           password: tempPassword,
           options: {
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
-              name: data.name.trim(),
+              name: data.name,
               role: 'worker'
             }
           }
@@ -261,20 +251,12 @@ Please change your password on first login for security.`;
         
         // Handle auth user creation
         if (authError && !authError.message.includes('already registered')) {
-          console.error('Auth user creation error:', authError);
           toast({
             title: "Account Creation Failed",
             description: `Failed to create login account: ${authError.message}`,
             variant: "destructive",
           });
           return;
-        }
-        
-        // Log auth creation result
-        if (authError?.message.includes('already registered')) {
-          console.log('User already has auth account, linking to worker record');
-        } else {
-          console.log('Auth user created successfully:', authData?.user?.id);
         }
 
         // Create worker database record
@@ -283,7 +265,6 @@ Please change your password on first login for security.`;
           .insert(workerData);
 
         if (workerError) {
-          console.error('Worker insert error:', workerError);
           toast({
             title: "Creation Failed", 
             description: `Failed to add worker: ${workerError.message}`,
@@ -291,10 +272,8 @@ Please change your password on first login for security.`;
           });
           return;
         }
-
-        console.log('Worker created successfully with mobile login enabled');
         
-        // Store real credentials for display
+        // Store credentials for display
         setWorkerCredentials({
           name: data.name,
           email: data.email,
@@ -310,7 +289,6 @@ Please change your password on first login for security.`;
       }
       
     } catch (error: any) {
-      console.error('Unexpected error in worker save:', error);
       toast({
         title: "Unexpected Error",
         description: `An unexpected error occurred: ${error?.message || 'Unknown error'}`,
@@ -355,6 +333,7 @@ Please change your password on first login for security.`;
                 id="name"
                 {...register('name')}
                 placeholder="Enter worker's full name"
+                maxLength={100}
               />
               {errors.name && (
                 <p className="text-sm text-destructive mt-1">{errors.name.message}</p>
@@ -371,6 +350,7 @@ Please change your password on first login for security.`;
                 {...register('email')}
                 placeholder="worker@example.com"
                 className="font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30]"
+                maxLength={255}
                 required
               />
               {errors.email && (
@@ -389,7 +369,11 @@ Please change your password on first login for security.`;
                 id="phone"
                 {...register('phone')}
                 placeholder="Enter phone number"
+                maxLength={20}
               />
+              {errors.phone && (
+                <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>
+              )}
             </div>
 
             <div>
@@ -398,6 +382,8 @@ Please change your password on first login for security.`;
                 id="hourly_rate"
                 type="number"
                 step="0.01"
+                min="0"
+                max="1000"
                 {...register('hourly_rate', { valueAsNumber: true })}
                 placeholder="25.00"
               />
@@ -412,7 +398,11 @@ Please change your password on first login for security.`;
                 id="address"
                 {...register('address')}
                 placeholder="Home address"
+                maxLength={500}
               />
+              {errors.address && (
+                <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
+              )}
             </div>
 
             <div>
@@ -421,7 +411,11 @@ Please change your password on first login for security.`;
                 id="emergency_contact"
                 {...register('emergency_contact')}
                 placeholder="Name and phone number"
+                maxLength={200}
               />
+              {errors.emergency_contact && (
+                <p className="text-sm text-destructive mt-1">{errors.emergency_contact.message}</p>
+              )}
             </div>
 
             <div>

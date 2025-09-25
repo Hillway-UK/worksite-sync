@@ -33,57 +33,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
 
+  // Optimized role detection 
   const getUserRole = async (email: string): Promise<'super_admin' | 'manager' | 'worker' | null> => {
-    console.log('Getting role for:', email);
-    
-    // Check super_admins first
-    const { data: superAdmin } = await supabase
-      .from('super_admins')
-      .select('email')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (superAdmin) {
-      console.log('Found super_admin');
-      return 'super_admin';
+    try {
+      // Check super_admins first
+      const { data: superAdmin, error: superError } = await supabase
+        .from('super_admins')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (superError) return null;
+      if (superAdmin) return 'super_admin';
+      
+      // Check managers
+      const { data: manager, error: managerError } = await supabase
+        .from('managers')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (managerError) return null;
+      if (manager) return 'manager';
+      
+      // Check workers
+      const { data: worker, error: workerError } = await supabase
+        .from('workers')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (workerError) return null;
+      if (worker) return 'worker';
+      
+      return null;
+    } catch (error) {
+      return null;
     }
-    
-    // Check managers
-    const { data: manager } = await supabase
-      .from('managers')
-      .select('email')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (manager) {
-      console.log('Found manager');
-      return 'manager';
-    }
-    
-    // Check workers
-    const { data: worker } = await supabase
-      .from('workers')
-      .select('email')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (worker) {
-      console.log('Found worker');
-      return 'worker';
-    }
-    
-    console.log('No role found for:', email);
-    return null;
   };
 
   useEffect(() => {
     let isMounted = true;
     
     const checkSession = async () => {
-      console.log('Checking session...');
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('Initial session check result:', !!session);
         
         if (!isMounted) return;
         
@@ -91,15 +85,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user || null);
         
         if (session?.user?.email) {
-          console.log('Session found for:', session.user.email);
           const role = await getUserRole(session.user.email);
           setUserRole(role);
         } else {
-          console.log('No session found');
           setUserRole(null);
         }
       } catch (error) {
-        console.error('Error checking session:', error);
         setUserRole(null);
       } finally {
         if (isMounted) {
@@ -111,15 +102,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, !!session);
-      
       if (!isMounted) return;
       
       setSession(session);
       setUser(session?.user || null);
       
       if (session?.user?.email) {
-        console.log('New session for:', session.user.email);
         // Use setTimeout to avoid blocking the auth state change
         setTimeout(async () => {
           if (isMounted) {
@@ -130,7 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }, 0);
       } else {
-        console.log('Session ended, clearing role');
         setUserRole(null);
       }
     });
@@ -196,7 +183,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (e) {
         if (!mounted) return;
-        console.error('Error loading organization:', e);
         setOrganizationId(null);
         setOrganization(null);
       }

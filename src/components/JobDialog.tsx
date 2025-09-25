@@ -126,7 +126,6 @@ const watchedPostcode = watch('postcode');
         });
       }
     } catch (error) {
-      console.error('Geocoding error:', error);
       toast({
         title: "Error",
         description: "Failed to geocode postcode",
@@ -138,9 +137,6 @@ const watchedPostcode = watch('postcode');
   };
 
   const onSubmit = async (data: JobFormData) => {
-    console.log('Form submission started', data);
-    console.log('Selected location:', selectedLocation);
-    
     if (!selectedLocation) {
       toast({
         title: "Error",
@@ -182,7 +178,7 @@ const watchedPostcode = watch('postcode');
           }
         }
       } catch (e) {
-        console.error('Org fallback lookup failed:', e);
+        // Silently handle error
       }
     }
 
@@ -251,7 +247,6 @@ const watchedPostcode = watch('postcode');
       reset();
       onSave();
     } catch (error) {
-      console.error('Error saving job:', error);
       toast({
         title: "Error",
         description: "Failed to save job",
