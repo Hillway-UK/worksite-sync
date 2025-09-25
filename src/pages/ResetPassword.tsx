@@ -33,16 +33,20 @@ const ResetPassword = () => {
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
     
+    console.log('ResetPassword tokens:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
+    
     if (!accessToken || !refreshToken) {
+      console.log('No tokens found, redirecting to forgot-password');
       toast({
         title: "Invalid Reset Link",
         description: "The reset link is invalid or has expired. Please request a new one.",
         variant: "destructive",
       });
-      navigate('/forgot-password');
+      navigate('/forgot-password', { replace: true });
       return;
     }
 
+    console.log('Tokens found, showing password reset form');
     setIsValidating(false);
   }, [searchParams, navigate]);
 
