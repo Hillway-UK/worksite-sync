@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSecureForm } from '@/hooks/useSecureForm';
 import { toast } from '@/hooks/use-toast';
-
+import { supabase } from '@/integrations/supabase/client';
 const updatePasswordSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -29,21 +29,80 @@ const UpdatePassword = () => {
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
-    // Check if we have the necessary tokens in the URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (!accessToken || !refreshToken) {
-      toast({
-        title: "Invalid Reset Link",
-        description: "The reset link is invalid or has expired. Please request a new one.",
-        variant: "destructive",
-      });
-      navigate('/reset-password');
-      return;
-    }
+    (async () => {
+      try {
+        // 1) New PKCE-style links use ?code=...
+        const code = searchParams.get('code');
+        if (code) {
+          console.log('UpdatePassword: verifying recovery code');
+          const email = searchParams.get('email') || undefined;
+          if (email) {
+            const { error } = await supabase.auth.verifyOtp({
+              type: 'recovery',
+              token: code,
+              email,
+            });
+            if (error) throw error;
+            setIsValidating(false);
+            return;
+          }
+          console.log('No email param; attempting code exchange');
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          setIsValidating(false);
+          return;
+        }
 
-    setIsValidating(false);
+        // 2) Hash tokens (?type=recovery#access_token=...&refresh_token=...)
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+        const accessFromHash = hashParams.get('access_token');
+        const refreshFromHash = hashParams.get('refresh_token');
+
+        // 3) Query tokens (?access_token=...&refresh_token=...)
+        const accessFromQuery = searchParams.get('access_token');
+        const refreshFromQuery = searchParams.get('refresh_token');
+
+        const accessToken = accessFromQuery || accessFromHash;
+        const refreshToken = refreshFromQuery || refreshFromHash;
+
+        if (accessToken && refreshToken) {
+          const { data: current } = await supabase.auth.getSession();
+          if (!current.session) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (setErr) throw setErr;
+          }
+          setIsValidating(false);
+          return;
+        }
+
+        // 4) As a fallback, check if a session already exists
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setIsValidating(false);
+          return;
+        }
+
+        // Otherwise, invalid link
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
+      } catch (err) {
+        console.error('UpdatePassword: token handling failed', err);
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
+      }
+    })();
   }, [searchParams, navigate]);
 
   const {
