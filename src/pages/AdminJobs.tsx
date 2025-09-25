@@ -296,13 +296,17 @@ export default function AdminJobs() {
                             <p className="text-muted-foreground text-lg font-medium mb-4">
                               Add your first job to get started
                             </p>
-                            <Button 
-                              className="hover:bg-primary/90"
-                              onClick={() => {/* This will open the JobDialog when clicked */}}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Job
-                            </Button>
+                            <JobDialog 
+                              onSave={fetchJobs}
+                              trigger={
+                                <Button 
+                                  className="hover:bg-primary/90"
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Job
+                                </Button>
+                              }
+                            />
                           </div>
                         )}
                       </TableCell>

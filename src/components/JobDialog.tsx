@@ -97,7 +97,7 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
     },
   });
 
-const { organizationId } = useAuth();
+const { organizationId, user } = useAuth();
 
 // Watch postcode field
 const watchedPostcode = watch('postcode');
@@ -150,7 +150,43 @@ const watchedPostcode = watch('postcode');
       return;
     }
 
-    if (!organizationId) {
+    // Ensure we have an organization ID (fallback lookup if context not ready)
+    let orgId = organizationId;
+    if (!orgId) {
+      try {
+        const email = user?.email ?? null;
+        if (email) {
+          const { data: m } = await supabase
+            .from('managers')
+            .select('organization_id')
+            .eq('email', email)
+            .maybeSingle();
+          orgId = (m as any)?.organization_id ?? null;
+
+          if (!orgId) {
+            const { data: sa } = await supabase
+              .from('super_admins')
+              .select('organization_id')
+              .eq('email', email)
+              .maybeSingle();
+            orgId = (sa as any)?.organization_id ?? null;
+          }
+
+          if (!orgId) {
+            const { data: w } = await supabase
+              .from('workers')
+              .select('organization_id')
+              .eq('email', email)
+              .maybeSingle();
+            orgId = (w as any)?.organization_id ?? null;
+          }
+        }
+      } catch (e) {
+        console.error('Org fallback lookup failed:', e);
+      }
+    }
+
+    if (!orgId) {
       toast({
         title: "Error",
         description: "No organization found for your account.",
@@ -201,7 +237,7 @@ const watchedPostcode = watch('postcode');
         // Create new job
         const { error } = await supabase
           .from('jobs')
-          .insert({ ...jobData, organization_id: organizationId });
+          .insert({ ...jobData, organization_id: orgId });
 
         if (error) throw error;
 
