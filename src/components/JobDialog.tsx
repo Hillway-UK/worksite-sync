@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, MapPin } from 'lucide-react';
 import { LeafletMap } from './LeafletMap';
 import { validatePostcode, geocodePostcode, formatLegacyAddress, formatPostcode } from '@/lib/postcode-utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const jobSchema = z.object({
   code: z.string().min(1, 'Job code is required'),
@@ -96,8 +97,10 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
     },
   });
 
-  // Watch postcode field
-  const watchedPostcode = watch('postcode');
+const { organizationId } = useAuth();
+
+// Watch postcode field
+const watchedPostcode = watch('postcode');
 
   const handleManualGeocode = async () => {
     if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding) return;
@@ -147,6 +150,15 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
       return;
     }
 
+    if (!organizationId) {
+      toast({
+        title: "Error",
+        description: "No organization found for your account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Create legacy address field from structured data
@@ -189,7 +201,7 @@ export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
         // Create new job
         const { error } = await supabase
           .from('jobs')
-          .insert(jobData);
+          .insert({ ...jobData, organization_id: organizationId });
 
         if (error) throw error;
 
