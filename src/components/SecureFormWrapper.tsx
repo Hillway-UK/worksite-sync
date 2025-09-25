@@ -31,7 +31,11 @@ interface SecureFormWrapperProps<T extends Record<string, any>> {
   // UI configuration
   title?: string;
   description?: string;
-  children: ReactNode;
+  children: ((props: {
+    register: any;
+    formState: { errors: any; isSubmitting: any; };
+    reset?: any;
+  }) => ReactNode);
   className?: string;
   
   // Callback props
@@ -207,7 +211,11 @@ export function SecureFormWrapper<T extends Record<string, any>>({
             )}
             
             {/* Form Content */}
-            {children}
+            {children({
+              register: form.register,
+              formState: { errors: form.formState.errors, isSubmitting: form.formState.isSubmitting },
+              reset: form.reset
+            })}
           </form>
         </FormProvider>
         

@@ -88,65 +88,14 @@ serve(async (req) => {
     if (insertError) throw insertError;
     logStep("Demo request stored in database");
 
-    // Send email notification using Supabase's email service
-    try {
-      const { error: emailError } = await supabaseClient.auth.admin.sendRawEmail({
-        to: 'hello@hillwayco.uk',
-        subject: `New Demo Request - ${sanitizedCompany}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #702D30; border-bottom: 2px solid #702D30; padding-bottom: 10px;">
-              New Demo Request Received
-            </h2>
-            
-            <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="margin-top: 0; color: #333;">Contact Information</h3>
-              <p><strong>Name:</strong> ${sanitizedName}</p>
-              <p><strong>Email:</strong> <a href="mailto:${sanitizedEmail}">${sanitizedEmail}</a></p>
-              <p><strong>Company:</strong> ${sanitizedCompany}</p>
-              ${sanitizedPhone ? `<p><strong>Phone:</strong> <a href="tel:${sanitizedPhone}">${sanitizedPhone}</a></p>` : ''}
-            </div>
-
-            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="margin-top: 0; color: #333;">Requirements & Pricing</h3>
-              <p><strong>Admin Users:</strong> ${admin_users} (£${admin_users * 25}/month)</p>
-              <p><strong>Workers:</strong> ${worker_count} (£${(worker_count * 1.5).toFixed(2)}/month)</p>
-              <p><strong>Total Monthly Cost:</strong> <span style="color: #702D30; font-size: 1.2em; font-weight: bold;">£${monthly_cost || (admin_users * 25 + worker_count * 1.5).toFixed(2)} + VAT</span></p>
-            </div>
-
-            ${sanitizedMessage ? `
-              <div style="background-color: #fff; padding: 20px; border-left: 4px solid #702D30; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #333;">Additional Message</h3>
-                <p style="line-height: 1.6;">${sanitizedMessage}</p>
-              </div>
-            ` : ''}
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
-              <p>This email was automatically generated from the Pioneer Auto Timesheets demo request form.</p>
-              <p><strong>Action Required:</strong> Please follow up with this prospect within 24 hours.</p>
-            </div>
-          </div>
-        `
-      });
-
-      if (emailError) {
-        logStep("Email sending failed", { error: emailError.message });
-        // Don't throw here - we still want to return success since the demo request was saved
-        console.error("Failed to send email notification:", emailError);
-      } else {
-        logStep("Email sent successfully to hello@hillwayco.uk");
-      }
-    } catch (emailError) {
-      logStep("Email service error", { error: emailError });
-      // Continue - email failure shouldn't fail the whole request
-    }
+    // Log successful demo request submission
+    logStep("Demo request processed successfully (email notification disabled)");
 
     return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Demo request submitted successfully" 
+      message: 'Demo request received successfully!' 
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
 
   } catch (error) {
