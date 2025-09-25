@@ -9,6 +9,8 @@ import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import DemoRequest from "./pages/DemoRequest";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 import SuperAdmin from "./pages/SuperAdmin";
 import OrganizationDetail from "./pages/OrganizationDetail";
 import Dashboard from "./pages/Dashboard";
@@ -43,6 +45,8 @@ const App = () => (
             <Route path="/demo-request" element={<DemoRequest />} />
             <Route path="/admin-portal" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Super Admin Routes */}

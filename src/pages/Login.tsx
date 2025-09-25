@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,6 +120,12 @@ export default function Login() {
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
+
+            <div className="text-center">
+              <Link to="/reset-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Forgot your password?
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
