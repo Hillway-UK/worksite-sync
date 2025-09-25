@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,18 +8,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSecureForm } from '@/hooks/useSecureForm';
-import { emailSchema } from '@/lib/validation';
 import { toast } from '@/hooks/use-toast';
 
 const resetPasswordSchema = z.object({
-  email: emailSchema,
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
 const ResetPassword = () => {
-  const [isSuccess, setIsSuccess] = useState(false);
-  const { requestPasswordReset } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { updatePassword } = useAuth();
+  const [isValidating, setIsValidating] = useState(true);
+
+  useEffect(() => {
+    // Check if we have the necessary tokens in the URL
+    const accessToken = searchParams.get('access_token');
+    const refreshToken = searchParams.get('refresh_token');
+    
+    if (!accessToken || !refreshToken) {
+      toast({
+        title: "Invalid Reset Link",
+        description: "The reset link is invalid or has expired. Please request a new one.",
+        variant: "destructive",
+      });
+      navigate('/forgot-password');
+      return;
+    }
+
+    setIsValidating(false);
+  }, [searchParams, navigate]);
 
   const {
     register,
@@ -28,53 +53,40 @@ const ResetPassword = () => {
   } = useSecureForm<ResetPasswordForm>({
     schema: resetPasswordSchema,
     rateLimit: {
-      key: 'password_reset',
-      maxRequests: 3,
+      key: 'password_update',
+      maxRequests: 5,
       windowMs: 300000, // 5 minutes
     },
     onSubmit: async (data) => {
-      const { error } = await requestPasswordReset(data.email);
+      const { error } = await updatePassword(data.password);
       
       if (error) {
         toast({
-          title: "Reset Failed",
-          description: "An error occurred. Please try again.",
+          title: "Update Failed",
+          description: error.message || "Failed to update password. Please try again.",
           variant: "destructive",
         });
         return;
       }
 
-      setIsSuccess(true);
       toast({
-        title: "Reset Email Sent",
-        description: "If an account with that email exists, we've sent you a reset link.",
+        title: "Password Updated",
+        description: "Your password has been successfully updated. You can now log in with your new password.",
       });
+
+      // Redirect to login page
+      navigate('/login');
     },
   });
 
-  if (isSuccess) {
+  if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <AutoTimeLogo className="mx-auto mb-4" />
-            <CardTitle>Check Your Email</CardTitle>
-            <CardDescription>
-              We've sent a password reset link to your email address if an account exists.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">
-                Didn't receive the email? Check your spam folder or wait a few minutes before trying again.
-              </p>
-              <div className="text-center">
-                <Link to="/login">
-                  <Button variant="outline" className="w-full">
-                    Back to Login
-                  </Button>
-                </Link>
-              </div>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Validating reset link...</p>
             </div>
           </CardContent>
         </Card>
@@ -89,22 +101,36 @@ const ResetPassword = () => {
           <AutoTimeLogo className="mx-auto mb-4" />
           <CardTitle>Reset Password</CardTitle>
           <CardDescription>
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your new password below.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSecureSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="password">New Password</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                {...register('email')}
+                id="password"
+                type="password"
+                placeholder="Enter new password"
+                {...register('password')}
                 className="w-full"
               />
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm new password"
+                {...register('confirmPassword')}
+                className="w-full"
+              />
+              {errors.confirmPassword && (
+                <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
               )}
             </div>
 
@@ -113,7 +139,7 @@ const ResetPassword = () => {
               className="w-full" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Sending...' : 'Send Reset Link'}
+              {isSubmitting ? 'Updating...' : 'Confirm Reset'}
             </Button>
 
             <div className="text-center">

@@ -122,7 +122,7 @@ export default function Login() {
             </Button>
 
             <div className="text-center">
-              <Link to="/reset-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Forgot your password?
               </Link>
             </div>

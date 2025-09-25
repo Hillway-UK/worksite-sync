@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import DemoRequest from "./pages/DemoRequest";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import SuperAdmin from "./pages/SuperAdmin";
@@ -44,9 +45,10 @@ const App = () => (
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/demo-request" element={<DemoRequest />} />
             <Route path="/admin-portal" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/update-password" element={<UpdatePassword />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Super Admin Routes */}
