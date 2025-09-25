@@ -27,6 +27,7 @@ const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const { updatePassword } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
     // Check if we have the necessary tokens in the URL
@@ -37,6 +38,7 @@ const ResetPassword = () => {
     
     if (!accessToken || !refreshToken) {
       console.log('No tokens found, redirecting to forgot-password');
+      setShouldRedirect(true);
       toast({
         title: "Invalid Reset Link",
         description: "The reset link is invalid or has expired. Please request a new one.",
@@ -49,6 +51,11 @@ const ResetPassword = () => {
     console.log('Tokens found, showing password reset form');
     setIsValidating(false);
   }, [searchParams, navigate]);
+
+  // Don't render anything if we're redirecting
+  if (shouldRedirect) {
+    return null;
+  }
 
   const {
     register,
