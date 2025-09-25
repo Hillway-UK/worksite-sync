@@ -1,7 +1,5 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
 
 interface PhotoModalProps {
   isOpen: boolean;
@@ -24,12 +22,7 @@ export function PhotoModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Clock Entry Photo</span>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
+          <DialogTitle>Clock Entry Photo</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
