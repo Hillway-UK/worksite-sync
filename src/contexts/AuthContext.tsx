@@ -141,6 +141,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // Load organization and organizationId based on the user's role
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOrg = async () => {
+      try {
+        if (!user?.email || !userRole) {
+          if (mounted) {
+            setOrganizationId(null);
+            setOrganization(null);
+          }
+          return;
+        }
+
+        let orgId: string | null = null;
+
+        if (userRole === 'super_admin') {
+          const { data } = await supabase
+            .from('super_admins')
+            .select('organization_id')
+            .eq('email', user.email)
+            .maybeSingle();
+          orgId = (data as any)?.organization_id ?? null;
+        } else if (userRole === 'manager') {
+          const { data } = await supabase
+            .from('managers')
+            .select('organization_id')
+            .eq('email', user.email)
+            .maybeSingle();
+          orgId = (data as any)?.organization_id ?? null;
+        } else if (userRole === 'worker') {
+          const { data } = await supabase
+            .from('workers')
+            .select('organization_id')
+            .eq('email', user.email)
+            .maybeSingle();
+          orgId = (data as any)?.organization_id ?? null;
+        }
+
+        if (!mounted) return;
+        setOrganizationId(orgId);
+
+        if (orgId) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('*')
+            .eq('id', orgId)
+            .maybeSingle();
+          if (!mounted) return;
+          setOrganization(org || null);
+        } else {
+          setOrganization(null);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        console.error('Error loading organization:', e);
+        setOrganizationId(null);
+        setOrganization(null);
+      }
+    };
+
+    loadOrg();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.email, userRole]);
+
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
