@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
+import { generateSecurePassword } from '@/lib/validation';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -232,9 +233,7 @@ Please change your password on first login for security.`;
       } else {
         // Create new worker - including auth user creation
         // Generate secure temporary password with better entropy
-        const tempPassword = Array.from(crypto.getRandomValues(new Uint8Array(12)))
-          .map(b => 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'.charAt(b % 54))
-          .join('') + 'Aa1!';
+        const tempPassword = generateSecurePassword(12);
         
         // Create auth user for worker
         const { data: authData, error: authError } = await supabase.auth.signUp({

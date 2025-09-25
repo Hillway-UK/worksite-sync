@@ -33,40 +33,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
 
-  // Optimized role detection 
+  // Optimized role detection using the new database function
   const getUserRole = async (email: string): Promise<'super_admin' | 'manager' | 'worker' | null> => {
     try {
-      // Check super_admins first
-      const { data: superAdmin, error: superError } = await supabase
-        .from('super_admins')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_user_role_and_org', { user_email: email });
       
-      if (superError) return null;
-      if (superAdmin) return 'super_admin';
+      if (error) {
+        // Fallback to original approach if function fails
+        const { data: superAdmin } = await supabase
+          .from('super_admins')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
+        
+        if (superAdmin) return 'super_admin';
+        
+        const { data: manager } = await supabase
+          .from('managers')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
+        
+        if (manager) return 'manager';
+        
+        const { data: worker } = await supabase
+          .from('workers')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
+        
+        if (worker) return 'worker';
+        
+        return null;
+      }
       
-      // Check managers
-      const { data: manager, error: managerError } = await supabase
-        .from('managers')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle();
-      
-      if (managerError) return null;
-      if (manager) return 'manager';
-      
-      // Check workers
-      const { data: worker, error: workerError } = await supabase
-        .from('workers')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle();
-      
-      if (workerError) return null;
-      if (worker) return 'worker';
-      
-      return null;
+      return (data?.[0]?.role as 'super_admin' | 'manager' | 'worker') || null;
     } catch (error) {
       return null;
     }

@@ -711,6 +711,13 @@ export type Database = {
         Args: { user_email: string }
         Returns: string
       }
+      get_user_role_and_org: {
+        Args: { user_email: string }
+        Returns: {
+          organization_id: string
+          role: string
+        }[]
+      }
       get_worker_weekly_hours: {
         Args: { week_start: string; worker_uuid: string }
         Returns: number

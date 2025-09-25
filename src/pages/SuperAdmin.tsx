@@ -40,10 +40,6 @@ export default function SuperAdmin() {
   }, [user, userRole]);
 
   const verifyAuthentication = async () => {
-    console.log('Verifying authentication...');
-    console.log('User:', user?.email);
-    console.log('User role:', userRole);
-    
     if (!user) {
       toast.error('Please log in to access this page');
       setLoading(false);
@@ -59,24 +55,20 @@ export default function SuperAdmin() {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking super admin status:', error);
         toast.error('Failed to verify admin status');
         setLoading(false);
         return;
       }
 
       if (!superAdmin) {
-        console.log('User not found in super_admins table');
         toast.error('Access denied: Super admin privileges required');
         setLoading(false);
         return;
       }
 
-      console.log('Super admin verified:', superAdmin);
       setAuthVerified(true);
       await initializeData();
     } catch (err: any) {
-      console.error('Authentication verification error:', err);
       toast.error('Authentication verification failed');
       setLoading(false);
     }
@@ -87,15 +79,12 @@ export default function SuperAdmin() {
       await Promise.all([fetchOrganizations(), fetchManagers()]);
       setLoading(false);
     } catch (err) {
-      console.error('Failed to initialize data:', err);
       setLoading(false);
     }
   };
 
   const fetchOrganizations = async () => {
     try {
-      console.log('Fetching organizations...');
-      
       // First try simple query without joins
       const { data, error } = await supabase
         .from('organizations')
@@ -103,12 +92,9 @@ export default function SuperAdmin() {
         .order('name');
       
       if (error) {
-        console.error('Error fetching organizations:', error);
         toast.error(`Failed to load organizations: ${error.message}`);
         return;
       }
-      
-      console.log('Organizations fetched successfully:', data);
       
       // Get manager count separately for each organization
       const orgsWithManagerCount = await Promise.all(
@@ -124,7 +110,6 @@ export default function SuperAdmin() {
               managers: { count: count || 0 }
             };
           } catch (err) {
-            console.error('Error counting managers for org:', org.id, err);
             return {
               ...org,
               managers: { count: 0 }
@@ -136,15 +121,12 @@ export default function SuperAdmin() {
       setOrganizations(orgsWithManagerCount);
       
     } catch (err: any) {
-      console.error('Unexpected error fetching organizations:', err);
       toast.error('Failed to load organizations');
     }
   };
 
   const fetchManagers = async () => {
     try {
-      console.log('Fetching managers...');
-      
       // First get managers
       const { data: managersData, error } = await supabase
         .from('managers')
@@ -152,12 +134,9 @@ export default function SuperAdmin() {
         .order('name');
       
       if (error) {
-        console.error('Error fetching managers:', error);
         toast.error(`Failed to load managers: ${error.message}`);
         return;
       }
-      
-      console.log('Managers fetched successfully:', managersData);
       
       // Get organization names separately
       const managersWithOrgs = await Promise.all(
@@ -181,7 +160,6 @@ export default function SuperAdmin() {
               organizations: orgData
             };
           } catch (err) {
-            console.error('Error fetching org for manager:', manager.id, err);
             return {
               ...manager,
               organizations: null
@@ -193,7 +171,6 @@ export default function SuperAdmin() {
       setManagers(managersWithOrgs);
       
     } catch (err: any) {
-      console.error('Unexpected error fetching managers:', err);
       toast.error('Failed to load managers');
     }
   };
@@ -204,8 +181,6 @@ export default function SuperAdmin() {
         toast.error('Organization name and email are required');
         return;
       }
-
-      console.log('Creating organization:', orgForm);
 
       const { data, error } = await supabase
         .from('organizations')
@@ -222,18 +197,15 @@ export default function SuperAdmin() {
         .single();
       
       if (error) {
-        console.error('Organization creation error:', error);
         toast.error(`Failed to create organization: ${error.message}`);
         return;
       }
       
-      console.log('Organization created successfully:', data);
       toast.success('Organization created successfully');
       setShowOrgDialog(false);
       setOrgForm({ name: '', email: '', phone: '', address: '' });
       await fetchOrganizations();
     } catch (err: any) {
-      console.error('Unexpected error:', err);
       toast.error('An unexpected error occurred');
     }
   };
@@ -305,7 +277,6 @@ export default function SuperAdmin() {
       await fetchManagers();
       
     } catch (error: any) {
-      console.error('Create manager error:', error);
       toast.error(error.message || 'Failed to create manager');
     }
   };
