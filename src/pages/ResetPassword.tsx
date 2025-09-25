@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSecureForm } from '@/hooks/useSecureForm';
 import { toast } from '@/hooks/use-toast';
-
+import { supabase } from '@/integrations/supabase/client';
 const resetPasswordSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -30,26 +30,56 @@ const ResetPassword = () => {
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
-    // Check if we have the necessary tokens in the URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    console.log('ResetPassword tokens:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
-    
-    if (!accessToken || !refreshToken) {
-      console.log('No tokens found, redirecting to forgot-password');
-      setShouldRedirect(true);
-      toast({
-        title: "Invalid Reset Link",
-        description: "The reset link is invalid or has expired. Please request a new one.",
-        variant: "destructive",
-      });
-      navigate('/forgot-password', { replace: true });
-      return;
-    }
+    // Support both `code` (PKCE) and hash/query tokens
+    const code = searchParams.get('code');
 
-    console.log('Tokens found, showing password reset form');
-    setIsValidating(false);
+    const qsAccess = searchParams.get('access_token');
+    const qsRefresh = searchParams.get('refresh_token');
+
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+    const hashAccess = hashParams.get('access_token');
+    const hashRefresh = hashParams.get('refresh_token');
+
+    const accessToken = qsAccess || hashAccess;
+    const refreshToken = qsRefresh || hashRefresh;
+
+    (async () => {
+      try {
+        if (code) {
+          console.log('Exchanging code for session...');
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          console.log('Session established, showing password form');
+          setIsValidating(false);
+          return;
+        }
+
+        if (accessToken && refreshToken) {
+          console.log('Tokens found in URL, showing password form');
+          setIsValidating(false);
+          return;
+        }
+
+        console.log('No tokens or code found, redirecting to forgot-password');
+        setShouldRedirect(true);
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
+      } catch (err) {
+        console.error('Password reset code exchange failed', err);
+        setShouldRedirect(true);
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
+      }
+    })();
   }, [searchParams, navigate]);
 
   // Don't render anything if we're redirecting
