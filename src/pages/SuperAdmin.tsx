@@ -86,10 +86,13 @@ export default function SuperAdmin() {
 
   const fetchOrganizations = async () => {
     try {
-      // First try simple query without joins
+      // Use a single query with LEFT JOIN to get manager counts
       const { data, error } = await supabase
         .from('organizations')
-        .select('*')
+        .select(`
+          *,
+          managers(count)
+        `)
         .order('name');
       
       if (error) {
@@ -97,29 +100,13 @@ export default function SuperAdmin() {
         return;
       }
       
-      // Get manager count separately for each organization
-      const orgsWithManagerCount = await Promise.all(
-        (data || []).map(async (org) => {
-          try {
-            const { count, error: countError } = await supabase
-              .from('managers')
-              .select('*', { count: 'exact', head: true })
-              .eq('organization_id', org.id);
-            
-            return {
-              ...org,
-              managers: { count: count || 0 }
-            };
-          } catch (err) {
-            return {
-              ...org,
-              managers: { count: 0 }
-            };
-          }
-        })
-      );
+      // Transform the data to match expected format
+      const transformedOrgs = (data || []).map(org => ({
+        ...org,
+        managers: { count: org.managers?.length || 0 }
+      }));
       
-      setOrganizations(orgsWithManagerCount);
+      setOrganizations(transformedOrgs);
       
     } catch (err: any) {
       toast.error('Failed to load organizations');
@@ -128,10 +115,13 @@ export default function SuperAdmin() {
 
   const fetchManagers = async () => {
     try {
-      // First get managers
+      // Use a single query with LEFT JOIN to get organization names
       const { data: managersData, error } = await supabase
         .from('managers')
-        .select('*')
+        .select(`
+          *,
+          organizations(name)
+        `)
         .order('name');
       
       if (error) {
@@ -139,37 +129,7 @@ export default function SuperAdmin() {
         return;
       }
       
-      // Get organization names separately
-      const managersWithOrgs = await Promise.all(
-        (managersData || []).map(async (manager) => {
-          if (!manager.organization_id) {
-            return {
-              ...manager,
-              organizations: null
-            };
-          }
-          
-          try {
-            const { data: orgData, error: orgError } = await supabase
-              .from('organizations')
-              .select('name')
-              .eq('id', manager.organization_id)
-              .maybeSingle();
-            
-            return {
-              ...manager,
-              organizations: orgData
-            };
-          } catch (err) {
-            return {
-              ...manager,
-              organizations: null
-            };
-          }
-        })
-      );
-      
-      setManagers(managersWithOrgs);
+      setManagers(managersData || []);
       
     } catch (err: any) {
       toast.error('Failed to load managers');

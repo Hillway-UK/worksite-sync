@@ -40,30 +40,28 @@ export default function OrganizationDashboard() {
     if (!organizationId) return;
 
     try {
-      // Get worker count
-      const { count: workerCount } = await supabase
-        .from('workers')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
-
-      // Get manager count  
-      const { count: managerCount } = await supabase
-        .from('managers')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId);
-
-      // Get active jobs count
-      const { count: jobCount } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
+      // Execute all count queries in parallel instead of sequentially
+      const [workerResult, managerResult, jobResult] = await Promise.all([
+        supabase
+          .from('workers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('is_active', true),
+        supabase
+          .from('managers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        supabase
+          .from('jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+      ]);
 
       setStats({
-        totalWorkers: workerCount || 0,
-        totalManagers: managerCount || 0,
-        activeJobs: jobCount || 0,
+        totalWorkers: workerResult.count || 0,
+        totalManagers: managerResult.count || 0,
+        activeJobs: jobResult.count || 0,
         subscriptionStatus: organization?.subscription_status || 'trial',
         trialEndsAt: organization?.trial_ends_at
       });
