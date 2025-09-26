@@ -212,62 +212,77 @@ export default function SuperAdmin() {
   };
 
   const createManager = async () => {
+    const email = managerForm.email?.trim().toLowerCase();
+    const name = managerForm.name?.trim();
+    const password = managerForm.password;
+    const organization_id = managerForm.organization_id;
+
     try {
-      if (!managerForm.email || !managerForm.name || !managerForm.password || !managerForm.organization_id) {
+      if (!email || !name || !password || !organization_id) {
         toast.error('Please fill in all fields');
         return;
       }
 
       setCreatingManager(true);
 
-      // Create auth user using regular signUp
+      // 1) Try to create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: managerForm.email,
-        password: managerForm.password,
+        email,
+        password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
-          data: {
-            name: managerForm.name,
-            role: 'manager'
-          }
+          data: { name, role: 'manager' }
         }
       });
-      
-      if (authError) {
-        // Show specific error message for existing users
-        if (authError.message.includes('already registered') || authError.message.includes('User already registered')) {
-          toast.error('This email is already registered. Please use a different email address.');
+
+      // Some tenants return an error, others return identities=[] for existing users.
+      const alreadyRegistered =
+        !!authError &&
+        (authError.message.toLowerCase().includes('already registered') ||
+         authError.message.toLowerCase().includes('user already registered')) ||
+        (authData?.user && Array.isArray(authData.user.identities) && authData.user.identities.length === 0);
+
+      if (authError && !alreadyRegistered) {
+        toast.error(`Failed to create user: ${authError.message}`);
+        setCreatingManager(false);
+        return;
+      }
+
+      // 2) Upsert the manager row (works whether user is new or already existed)
+      const { data: managerRow, error: managerError } = await supabase
+        .from('managers')
+        .upsert(
+          { email, name, organization_id },
+          { onConflict: 'email' } // Make sure managers.email is UNIQUE in your DB
+        )
+        .select()
+        .single();
+
+      if (managerError) {
+        // 23505 = unique_violation (if the onConflict target doesn't match the unique index you might hit this)
+        if ((managerError as any).code === '23505') {
+          toast.error('A manager with this email already exists.');
         } else {
-          toast.error(`Failed to create user: ${authError.message}`);
+          toast.error(`Failed to create manager record: ${managerError.message}`);
         }
         setCreatingManager(false);
         return;
       }
-      
-      // Create manager record for new user - use upsert to handle edge cases
-      const { error: managerError } = await supabase
-        .from('managers')
-        .upsert({
-          email: managerForm.email,
-          name: managerForm.name,
-          organization_id: managerForm.organization_id
-        }, {
-          onConflict: 'email'
-        });
-      
-      if (managerError) {
-        toast.error(`Failed to create manager record: ${managerError.message}`);
-        setCreatingManager(false);
-        return;
+
+      if (alreadyRegistered) {
+        toast.success('This email already had an account. Manager record was created/updated.');
+        // Optional: send a password reset link if needed
+        // await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+      } else {
+        toast.success('Manager created successfully! They should check their email to finish sign-up.');
       }
-      
-      toast.success('Manager created successfully! They can now log in.');
+
       setShowManagerDialog(false);
       setManagerForm({ email: '', name: '', password: '', organization_id: '' });
       await fetchManagers();
-      
+
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create manager');
+      toast.error(error?.message || 'Failed to create manager');
     } finally {
       setCreatingManager(false);
     }
