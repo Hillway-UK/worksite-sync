@@ -86,27 +86,33 @@ export default function SuperAdmin() {
 
   const fetchOrganizations = async () => {
     try {
-      // Use a single query with LEFT JOIN to get manager counts
-      const { data, error } = await supabase
+      // First get organizations
+      const { data: orgsData, error: orgsError } = await supabase
         .from('organizations')
-        .select(`
-          *,
-          managers(count)
-        `)
+        .select('*')
         .order('name');
       
-      if (error) {
-        toast.error(`Failed to load organizations: ${error.message}`);
+      if (orgsError) {
+        toast.error(`Failed to load organizations: ${orgsError.message}`);
         return;
       }
       
-      // Transform the data to match expected format
-      const transformedOrgs = (data || []).map(org => ({
-        ...org,
-        managers: { count: org.managers?.length || 0 }
-      }));
+      // Then get manager counts for each organization
+      const orgsWithCounts = await Promise.all(
+        (orgsData || []).map(async (org) => {
+          const { count, error: countError } = await supabase
+            .from('managers')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', org.id);
+          
+          return {
+            ...org,
+            managers: { count: count || 0 }
+          };
+        })
+      );
       
-      setOrganizations(transformedOrgs);
+      setOrganizations(orgsWithCounts);
       
     } catch (err: any) {
       toast.error('Failed to load organizations');
@@ -115,21 +121,38 @@ export default function SuperAdmin() {
 
   const fetchManagers = async () => {
     try {
-      // Use a single query with LEFT JOIN to get organization names
-      const { data: managersData, error } = await supabase
+      // First get managers
+      const { data: managersData, error: managersError } = await supabase
         .from('managers')
-        .select(`
-          *,
-          organizations(name)
-        `)
+        .select('*')
         .order('name');
       
-      if (error) {
-        toast.error(`Failed to load managers: ${error.message}`);
+      if (managersError) {
+        toast.error(`Failed to load managers: ${managersError.message}`);
         return;
       }
       
-      setManagers(managersData || []);
+      // Then get organization names for each manager
+      const managersWithOrgs = await Promise.all(
+        (managersData || []).map(async (manager) => {
+          if (!manager.organization_id) {
+            return { ...manager, organizations: null };
+          }
+          
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', manager.organization_id)
+            .maybeSingle();
+          
+          return {
+            ...manager,
+            organizations: orgData
+          };
+        })
+      );
+      
+      setManagers(managersWithOrgs);
       
     } catch (err: any) {
       toast.error('Failed to load managers');
