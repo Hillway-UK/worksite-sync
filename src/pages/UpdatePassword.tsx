@@ -31,32 +31,29 @@ const UpdatePassword = () => {
   useEffect(() => {
     (async () => {
       try {
-        // 1) PKCE or OTP-style links: ?code=...
+        // 1) ?code=... — handle as recovery (works cross-device)
         const code = searchParams.get('code');
         if (code) {
-          console.log('UpdatePassword: handling code param');
           const email = searchParams.get('email');
-          
+
           if (email) {
-            // Use verifyOtp when email is provided (OTP-style)
             const { error } = await supabase.auth.verifyOtp({
               type: 'recovery',
               token: code,
               email,
             });
             if (error) throw error;
+
+            // Clean the URL
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            setIsValidating(false);
+            return;
           } else {
-            // Fallback to PKCE exchange when no email is present
-            const { error } = await supabase.auth.exchangeCodeForSession(code);
-            if (error) throw error;
+            // Recovery codes should include email parameter
+            throw new Error('Recovery code missing required email parameter');
           }
-          
-          // Clean the URL of sensitive params after successful handling
-          if (typeof window !== 'undefined') {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-          setIsValidating(false);
-          return;
         }
 
         // 2) Hash tokens (?type=recovery#access_token=...&refresh_token=...)
