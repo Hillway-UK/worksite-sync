@@ -43,17 +43,18 @@ const UpdatePassword = () => {
               email,
             });
             if (error) throw error;
-
-            // Clean the URL
-            if (typeof window !== 'undefined') {
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-            setIsValidating(false);
-            return;
           } else {
-            // Recovery codes should include email parameter
-            throw new Error('Recovery code missing required email parameter');
+            // For recovery codes without email, use exchangeCodeForSession as fallback
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) throw error;
           }
+
+          // Clean the URL
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setIsValidating(false);
+          return;
         }
 
         // 2) Hash tokens (?type=recovery#access_token=...&refresh_token=...)
@@ -136,7 +137,8 @@ const UpdatePassword = () => {
         description: "Your password has been successfully updated. You can now log in with your new password.",
       });
 
-      // Redirect to login page
+      // Sign out to force fresh login with new password
+      await supabase.auth.signOut();
       navigate('/login');
     },
   });
