@@ -236,7 +236,20 @@ export default function SuperAdmin() {
       if (authError) {
         // Check if user already exists
         if (authError.message.includes('already registered')) {
-          // User exists, just create manager record
+          // User exists, check if manager record already exists
+          const { data: existingManager } = await supabase
+            .from('managers')
+            .select('id')
+            .eq('email', managerForm.email)
+            .maybeSingle();
+          
+          if (existingManager) {
+            toast.error('Manager with this email already exists');
+            setCreatingManager(false);
+            return;
+          }
+          
+          // Create manager record for existing user
           const { error: managerError } = await supabase
             .from('managers')
             .insert({
