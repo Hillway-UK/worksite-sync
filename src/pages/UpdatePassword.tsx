@@ -36,18 +36,12 @@ const UpdatePassword = () => {
         if (code) {
           const email = searchParams.get('email');
 
-          if (email) {
-            const { error } = await supabase.auth.verifyOtp({
-              type: 'recovery',
-              token: code,
-              email,
-            });
-            if (error) throw error;
-          } else {
-            // For recovery codes without email, use exchangeCodeForSession as fallback
-            const { error } = await supabase.auth.exchangeCodeForSession(code);
-            if (error) throw error;
-          }
+          const { error } = await supabase.auth.verifyOtp({
+            type: 'recovery',
+            token: code,
+            email: email || '', // Provide empty string if no email
+          });
+          if (error) throw error;
 
           // Clean the URL
           if (typeof window !== 'undefined') {
