@@ -48,6 +48,8 @@ export default function Amendments() {
   const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const [workerId, setWorkerId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -56,6 +58,7 @@ export default function Amendments() {
     if (!user?.email) return;
 
     try {
+      // Get worker data with both clock entries and amendments in parallel
       const { data: worker } = await supabase
         .from('workers')
         .select('id')
@@ -64,26 +67,27 @@ export default function Amendments() {
 
       if (!worker) return;
 
-      // Fetch clock entries
-      const { data: entries } = await supabase
-        .from('clock_entries')
-        .select(`
-          *,
-          jobs:job_id(name, code)
-        `)
-        .eq('worker_id', worker.id)
-        .order('clock_in', { ascending: false })
-        .limit(50);
+      setWorkerId(worker.id);
 
-      // Fetch amendments
-      const { data: amendmentData } = await supabase
-        .from('time_amendments')
-        .select('*')
-        .eq('worker_id', worker.id)
-        .order('created_at', { ascending: false });
+      const [entriesResult, amendmentResult] = await Promise.all([
+        supabase
+          .from('clock_entries')
+          .select(`
+            *,
+            jobs:job_id(name, code)
+          `)
+          .eq('worker_id', worker.id)
+          .order('clock_in', { ascending: false })
+          .limit(50),
+        supabase
+          .from('time_amendments')
+          .select('*')
+          .eq('worker_id', worker.id)
+          .order('created_at', { ascending: false })
+      ]);
 
-      setClockEntries(entries || []);
-      setAmendments(amendmentData || []);
+      setClockEntries(entriesResult.data || []);
+      setAmendments(amendmentResult.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -92,23 +96,15 @@ export default function Amendments() {
   };
 
   const handleRequestAmendment = async () => {
-    if (!selectedEntry || !user?.email) return;
+    if (!selectedEntry || !user?.email || !workerId) return;
 
     setSubmitting(true);
     try {
-      const { data: worker } = await supabase
-        .from('workers')
-        .select('id')
-        .eq('email', user.email)
-        .single();
-
-      if (!worker) throw new Error('Worker not found');
-
       const { error } = await supabase
         .from('time_amendments')
         .insert({
           clock_entry_id: selectedEntry.id,
-          worker_id: worker.id,
+          worker_id: workerId,
           requested_clock_in: requestedClockIn || null,
           requested_clock_out: requestedClockOut || null,
           reason

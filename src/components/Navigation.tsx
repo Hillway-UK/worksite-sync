@@ -21,41 +21,32 @@ export const Navigation: React.FC = () => {
     if (!user?.email) return;
     
     try {
+      let organizationQuery;
+      
       if (userRole === 'manager') {
-        const { data: manager } = await supabase
+        organizationQuery = supabase
           .from('managers')
-          .select('organization_id')
+          .select(`
+            organization_id,
+            organizations!managers_organization_id_fkey(name)
+          `)
           .eq('email', user.email)
           .single();
-        
-        if (manager?.organization_id) {
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', manager.organization_id)
-            .single();
-          
-          if (org?.name) {
-            setOrganizationName(org.name);
-          }
-        }
       } else if (userRole === 'worker') {
-        const { data: worker } = await supabase
+        organizationQuery = supabase
           .from('workers')
-          .select('organization_id')
+          .select(`
+            organization_id,
+            organizations!workers_organization_id_fkey(name)
+          `)
           .eq('email', user.email)
           .single();
-        
-        if (worker?.organization_id) {
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', worker.organization_id)
-            .single();
-          
-          if (org?.name) {
-            setOrganizationName(org.name);
-          }
+      }
+
+      if (organizationQuery) {
+        const { data } = await organizationQuery;
+        if (data?.organizations?.name) {
+          setOrganizationName(data.organizations.name);
         }
       }
     } catch (error) {

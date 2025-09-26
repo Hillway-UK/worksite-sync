@@ -41,32 +41,6 @@ export default function Admin() {
   const [organizationName, setOrganizationName] = useState<string>('');
 
   useEffect(() => {
-    const fetchOrganization = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        const { data: manager } = await supabase
-          .from('managers')
-          .select('organization_id')
-          .eq('email', user.email)
-          .single();
-        
-        if (manager?.organization_id) {
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', manager.organization_id)
-            .single();
-          
-          if (org?.name) {
-            setOrganizationName(org.name);
-          }
-        }
-      }
-    };
-    fetchOrganization();
-  }, []);
-
-  useEffect(() => {
     fetchDashboardData();
   }, [user?.email]);
 
@@ -74,55 +48,48 @@ export default function Admin() {
     if (!user?.email) return;
 
     try {
-      // Fetch manager name
+      // Fetch manager data and organization in a single query with JOIN
       const { data: manager } = await supabase
         .from('managers')
-        .select('name')
+        .select(`
+          name,
+          organization_id,
+          organizations!managers_organization_id_fkey(name)
+        `)
         .eq('email', user.email)
         .single();
 
       if (manager) {
         setManagerName(manager.name);
+        setOrganizationName(manager.organizations?.name || '');
       }
 
-      // Fetch clocked in workers
-      const { data: clockedIn, error: clockedInError } = await supabase
-        .rpc('get_clocked_in_workers');
+      // Execute all other queries in parallel
+      const [
+        clockedInResult,
+        hoursTodayResult,
+        amendmentsResult,
+        workersResult,
+        activityResult
+      ] = await Promise.all([
+        supabase.rpc('get_clocked_in_workers'),
+        supabase.rpc('get_total_hours_today'),
+        supabase
+          .from('time_amendments')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+        supabase
+          .from('workers')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true),
+        supabase.rpc('get_recent_activity')
+      ]);
 
-      if (clockedInError) throw clockedInError;
-      setClockedInWorkers(clockedIn || []);
-
-      // Fetch total hours today
-      const { data: hoursToday, error: hoursTodayError } = await supabase
-        .rpc('get_total_hours_today');
-
-      if (hoursTodayError) throw hoursTodayError;
-      setTotalHoursToday(hoursToday || 0);
-
-      // Fetch pending amendments count
-      const { count: amendmentsCount, error: amendmentsError } = await supabase
-        .from('time_amendments')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      if (amendmentsError) throw amendmentsError;
-      setPendingAmendments(amendmentsCount || 0);
-
-      // Fetch active workers count
-      const { count: workersCount, error: workersError } = await supabase
-        .from('workers')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-      if (workersError) throw workersError;
-      setActiveWorkers(workersCount || 0);
-
-      // Fetch recent activity
-      const { data: activity, error: activityError } = await supabase
-        .rpc('get_recent_activity');
-
-      if (activityError) throw activityError;
-      setRecentActivity(activity || []);
+      setClockedInWorkers(clockedInResult.data || []);
+      setTotalHoursToday(hoursTodayResult.data || 0);
+      setPendingAmendments(amendmentsResult.count || 0);
+      setActiveWorkers(workersResult.count || 0);
+      setRecentActivity(activityResult.data || []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
