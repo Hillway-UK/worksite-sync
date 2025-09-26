@@ -31,14 +31,14 @@ const UpdatePassword = () => {
   useEffect(() => {
     (async () => {
       try {
-        // 1) Recovery codes from password reset emails
+        // 1) PKCE or OTP-style links: ?code=...
         const code = searchParams.get('code');
         if (code) {
-          console.log('UpdatePassword: verifying recovery code');
+          console.log('UpdatePassword: handling code param');
           const email = searchParams.get('email');
           
           if (email) {
-            // Use verifyOtp when email is provided
+            // Use verifyOtp when email is provided (OTP-style)
             const { error } = await supabase.auth.verifyOtp({
               type: 'recovery',
               token: code,
@@ -46,11 +46,15 @@ const UpdatePassword = () => {
             });
             if (error) throw error;
           } else {
-            // For password reset, we should have an email parameter
-            // If not, this might be an invalid link
-            throw new Error('Email parameter required for password reset');
+            // Fallback to PKCE exchange when no email is present
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) throw error;
           }
           
+          // Clean the URL of sensitive params after successful handling
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
           setIsValidating(false);
           return;
         }
