@@ -232,7 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const requestPasswordReset = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password?email=${encodeURIComponent(email)}`,
+        redirectTo: `${window.location.origin}/update-password`,
       });
       return { error };
     } catch (error) {

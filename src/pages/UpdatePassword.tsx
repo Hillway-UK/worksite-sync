@@ -27,38 +27,6 @@ const UpdatePassword = () => {
   const [searchParams] = useSearchParams();
   const { updatePassword, user } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
-  const [needsEmail, setNeedsEmail] = useState(false);
-  const [emailForRecovery, setEmailForRecovery] = useState('');
-
-  // Helper to verify when user provides email manually
-  const verifyWithEmail = async () => {
-    try {
-      const code = searchParams.get('code')!;
-      const { error } = await supabase.auth.verifyOtp({
-        type: 'recovery',
-        token: code,
-        email: emailForRecovery.trim(),
-      });
-      if (error) throw error;
-
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      toast({ 
-        title: 'Link verified', 
-        description: 'You can now set a new password.' 
-      });
-      setNeedsEmail(false);
-      setIsValidating(false);
-    } catch (err: any) {
-      console.error('verifyWithEmail failed', err);
-      toast({
-        title: 'Verification failed',
-        description: err?.message || 'Check the email matches the account that requested the reset.',
-        variant: 'destructive',
-      });
-    }
-  };
 
   useEffect(() => {
     (async () => {
@@ -99,32 +67,19 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 1) ?code=... — handle as recovery (works cross-device)
+        // 1) ?code=... — handle as PKCE recovery flow
         const code = searchParams.get('code');
         if (code) {
-          console.log('UpdatePassword: Found code parameter', { code: code.substring(0, 10) + '...' });
-          const email = searchParams.get('email');
-          if (!email) {
-            console.log('UpdatePassword: No email parameter, asking user for email');
-            // We can't call verifyOtp without the email — ask user for it
-            setNeedsEmail(true);
-            setIsValidating(false);
-            return;
-          }
-
-          console.log('UpdatePassword: Attempting verifyOtp with email', { email });
-          const { error } = await supabase.auth.verifyOtp({
-            type: 'recovery',
-            token: code,
-            email, // <-- only pass when present
-          });
+          console.log('UpdatePassword: Found code parameter, using PKCE flow', { code: code.substring(0, 10) + '...' });
+          
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
           
           if (error) {
-            console.error('UpdatePassword: verifyOtp failed', error);
+            console.error('UpdatePassword: exchangeCodeForSession failed', error);
             throw error;
           }
 
-          console.log('UpdatePassword: verifyOtp successful');
+          console.log('UpdatePassword: PKCE exchange successful');
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -237,36 +192,6 @@ const UpdatePassword = () => {
     );
   }
 
-  if (needsEmail) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <AutoTimeLogo className="mx-auto mb-4" />
-            <CardTitle>Confirm your email</CardTitle>
-            <CardDescription>Enter the email for the account you're resetting.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recoveryEmail">Email</Label>
-                <Input
-                  id="recoveryEmail"
-                  type="email"
-                  value={emailForRecovery}
-                  onChange={(e) => setEmailForRecovery(e.target.value)}
-                  placeholder="name@example.com"
-                />
-              </div>
-              <Button className="w-full" onClick={verifyWithEmail}>
-                Continue
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
