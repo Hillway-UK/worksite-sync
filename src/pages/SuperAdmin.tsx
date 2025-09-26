@@ -234,32 +234,12 @@ export default function SuperAdmin() {
       });
       
       if (authError) {
-        // Check if user already exists
-        if (authError.message.includes('already registered')) {
-          // User exists, use upsert to handle potential duplicates gracefully
-          const { error: managerError } = await supabase
-            .from('managers')
-            .upsert({
-              email: managerForm.email,
-              name: managerForm.name,
-              organization_id: managerForm.organization_id
-            }, {
-              onConflict: 'email'
-            });
-          
-          if (managerError) {
-            toast.error(`Manager record error: ${managerError.message}`);
-          } else {
-            toast.success('Manager linked to existing user successfully!');
-            setShowManagerDialog(false);
-            setManagerForm({ email: '', name: '', password: '', organization_id: '' });
-            await fetchManagers();
-          }
-          setCreatingManager(false);
-          return;
+        // Show specific error message for existing users
+        if (authError.message.includes('already registered') || authError.message.includes('User already registered')) {
+          toast.error('This email is already registered. Please use a different email address.');
+        } else {
+          toast.error(`Failed to create user: ${authError.message}`);
         }
-        
-        toast.error(`Auth error: ${authError.message}`);
         setCreatingManager(false);
         return;
       }
