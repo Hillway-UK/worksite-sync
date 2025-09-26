@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { queryKeys } from '@/lib/query-client';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -29,27 +31,15 @@ interface RecentActivity {
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [managerName, setManagerName] = useState('');
-  const [clockedInWorkers, setClockedInWorkers] = useState<CllockedInWorker[]>([]);
-  const [totalHoursToday, setTotalHoursToday] = useState(0);
-  const [pendingAmendments, setPendingAmendments] = useState(0);
-  const [activeWorkers, setActiveWorkers] = useState(0);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  const [organizationName, setOrganizationName] = useState<string>('');
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [user?.email]);
-
-  const fetchDashboardData = async () => {
-    if (!user?.email) return;
-
-    try {
-      // Fetch manager data and organization in a single query with JOIN
-      const { data: manager } = await supabase
+  // Fetch manager and organization data
+  const { data: managerData } = useQuery({
+    queryKey: queryKeys.users.detail(user?.email || ''),
+    queryFn: async () => {
+      if (!user?.email) throw new Error('No user email');
+      
+      const { data: manager, error } = await supabase
         .from('managers')
         .select(`
           name,
@@ -59,12 +49,17 @@ export default function Admin() {
         .eq('email', user.email)
         .single();
 
-      if (manager) {
-        setManagerName(manager.name);
-        setOrganizationName(manager.organizations?.name || '');
-      }
+      if (error) throw error;
+      return manager;
+    },
+    enabled: !!user?.email,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 
-      // Execute all other queries in parallel
+  // Fetch dashboard statistics
+  const { data: dashboardStats, isLoading } = useQuery({
+    queryKey: queryKeys.dashboard.stats('current'),
+    queryFn: async () => {
       const [
         clockedInResult,
         hoursTodayResult,
@@ -85,18 +80,28 @@ export default function Admin() {
         supabase.rpc('get_recent_activity')
       ]);
 
-      setClockedInWorkers(clockedInResult.data || []);
-      setTotalHoursToday(hoursTodayResult.data || 0);
-      setPendingAmendments(amendmentsResult.count || 0);
-      setActiveWorkers(workersResult.count || 0);
-      setRecentActivity(activityResult.data || []);
+      return {
+        clockedInWorkers: clockedInResult.data || [],
+        totalHoursToday: hoursTodayResult.data || 0,
+        pendingAmendments: amendmentsResult.count || 0,
+        activeWorkers: workersResult.count || 0,
+        recentActivity: activityResult.data || []
+      };
+    },
+    enabled: !!user?.email,
+    staleTime: 1 * 60 * 1000, // 1 minute for dashboard data
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
+  });
 
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const managerName = managerData?.name || '';
+  const organizationName = managerData?.organizations?.name || '';
+  const clockedInWorkers = dashboardStats?.clockedInWorkers || [];
+  const totalHoursToday = dashboardStats?.totalHoursToday || 0;
+  const pendingAmendments = dashboardStats?.pendingAmendments || 0;
+  const activeWorkers = dashboardStats?.activeWorkers || 0;
+  const recentActivity = dashboardStats?.recentActivity || [];
+
+  const loading = isLoading;
 
   if (loading) {
     return (

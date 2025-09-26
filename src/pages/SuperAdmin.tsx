@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,15 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { queryKeys } from '@/lib/query-client';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
+  const queryClient = useQueryClient();
   const [showOrgDialog, setShowOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
   const [creatingManager, setCreatingManager] = useState(false);
   
@@ -36,71 +36,53 @@ export default function SuperAdmin() {
     organization_id: ''
   });
 
-  useEffect(() => {
-    verifyAuthentication();
-  }, [user, userRole]);
-
-  const verifyAuthentication = async () => {
-    if (!user) {
-      toast.error('Please log in to access this page');
-      setLoading(false);
-      return;
-    }
-
-    // Check if user is in super_admins table
-    try {
+  // Authentication verification
+  const { data: authData, isLoading: authLoading, error: authError } = useQuery({
+    queryKey: ['superAdminAuth', user?.email],
+    queryFn: async () => {
+      if (!user?.email) throw new Error('No user');
+      
       const { data: superAdmin, error } = await supabase
         .from('super_admins')
         .select('*')
         .eq('email', user.email)
         .maybeSingle();
 
-      if (error) {
-        toast.error('Failed to verify admin status');
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
+      if (!superAdmin) throw new Error('Access denied: Super admin privileges required');
+      
+      return superAdmin;
+    },
+    enabled: !!user?.email,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 
-      if (!superAdmin) {
-        toast.error('Access denied: Super admin privileges required');
-        setLoading(false);
-        return;
-      }
-
+  // Set auth verified when data is available
+  React.useEffect(() => {
+    if (authData) {
       setAuthVerified(true);
-      await initializeData();
-    } catch (err: any) {
-      toast.error('Authentication verification failed');
-      setLoading(false);
+    } else if (authError) {
+      toast.error(authError.message || 'Authentication verification failed');
+      setAuthVerified(false);
     }
-  };
+  }, [authData, authError]);
 
-  const initializeData = async () => {
-    try {
-      await Promise.all([fetchOrganizations(), fetchManagers()]);
-      setLoading(false);
-    } catch (err) {
-      setLoading(false);
-    }
-  };
-
-  const fetchOrganizations = async () => {
-    try {
+  // Organizations query with manager counts
+  const { data: organizations = [], isLoading: orgsLoading, error: orgsError } = useQuery({
+    queryKey: queryKeys.organizations.withCounts(),
+    queryFn: async (): Promise<any[]> => {
       // First get organizations
       const { data: orgsData, error: orgsError } = await supabase
         .from('organizations')
         .select('*')
         .order('name');
       
-      if (orgsError) {
-        toast.error(`Failed to load organizations: ${orgsError.message}`);
-        return;
-      }
+      if (orgsError) throw orgsError;
       
       // Then get manager counts for each organization
       const orgsWithCounts = await Promise.all(
         (orgsData || []).map(async (org) => {
-          const { count, error: countError } = await supabase
+          const { count } = await supabase
             .from('managers')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', org.id);
@@ -112,25 +94,30 @@ export default function SuperAdmin() {
         })
       );
       
-      setOrganizations(orgsWithCounts);
-      
-    } catch (err: any) {
-      toast.error('Failed to load organizations');
-    }
-  };
+      return orgsWithCounts;
+    },
+    enabled: authVerified,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
-  const fetchManagers = async () => {
-    try {
+  // Show organizations error
+  React.useEffect(() => {
+    if (orgsError) {
+      toast.error(`Failed to load organizations: ${orgsError.message}`);
+    }
+  }, [orgsError]);
+
+  // Managers query with organization names
+  const { data: managers = [], isLoading: managersLoading, error: managersError } = useQuery({
+    queryKey: queryKeys.managers.withOrganizations(),
+    queryFn: async (): Promise<any[]> => {
       // First get managers
       const { data: managersData, error: managersError } = await supabase
         .from('managers')
         .select('*')
         .order('name');
       
-      if (managersError) {
-        toast.error(`Failed to load managers: ${managersError.message}`);
-        return;
-      }
+      if (managersError) throw managersError;
       
       // Then get organization names for each manager
       const managersWithOrgs = await Promise.all(
@@ -139,7 +126,7 @@ export default function SuperAdmin() {
             return { ...manager, organizations: null };
           }
           
-          const { data: orgData, error: orgError } = await supabase
+          const { data: orgData } = await supabase
             .from('organizations')
             .select('name')
             .eq('id', manager.organization_id)
@@ -152,27 +139,35 @@ export default function SuperAdmin() {
         })
       );
       
-      setManagers(managersWithOrgs);
-      
-    } catch (err: any) {
-      toast.error('Failed to load managers');
-    }
-  };
+      return managersWithOrgs;
+    },
+    enabled: authVerified,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
-  const createOrganization = async () => {
-    try {
-      if (!orgForm.name || !orgForm.email) {
-        toast.error('Organization name and email are required');
-        return;
+  // Show managers error
+  React.useEffect(() => {
+    if (managersError) {
+      toast.error(`Failed to load managers: ${managersError.message}`);
+    }
+  }, [managersError]);
+
+  const loading = authLoading || orgsLoading || managersLoading;
+
+  // Create organization mutation
+  const createOrgMutation = useMutation({
+    mutationFn: async (formData: typeof orgForm) => {
+      if (!formData.name || !formData.email) {
+        throw new Error('Organization name and email are required');
       }
 
       const { data, error } = await supabase
         .from('organizations')
         .insert({
-          name: orgForm.name,
-          email: orgForm.email,
-          phone: orgForm.phone || null,
-          address: orgForm.address || null,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || null,
+          address: formData.address || null,
           subscription_status: 'active',
           max_workers: 50,
           max_managers: 5
@@ -180,33 +175,35 @@ export default function SuperAdmin() {
         .select()
         .single();
       
-      if (error) {
-        toast.error(`Failed to create organization: ${error.message}`);
-        return;
-      }
-      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
       toast.success('Organization created successfully');
       setShowOrgDialog(false);
       setOrgForm({ name: '', email: '', phone: '', address: '' });
-      await fetchOrganizations();
-    } catch (err: any) {
-      toast.error('An unexpected error occurred');
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.withCounts() });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to create organization: ${error.message}`);
     }
+  });
+
+  const createOrganization = () => {
+    createOrgMutation.mutate(orgForm);
   };
 
-  const createManager = async () => {
-    const email = managerForm.email?.trim().toLowerCase();
-    const name = managerForm.name?.trim();
-    const password = managerForm.password;
-    const organization_id = managerForm.organization_id;
+  // Create manager mutation
+  const createManagerMutation = useMutation({
+    mutationFn: async (formData: typeof managerForm) => {
+      const email = formData.email?.trim().toLowerCase();
+      const name = formData.name?.trim();
+      const password = formData.password;
+      const organization_id = formData.organization_id;
 
-    try {
       if (!email || !name || !password || !organization_id) {
-        toast.error('Please fill in all fields');
-        return;
+        throw new Error('Please fill in all fields');
       }
-
-      setCreatingManager(true);
 
       // 1) Try to create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -226,9 +223,7 @@ export default function SuperAdmin() {
         (authData?.user && Array.isArray(authData.user.identities) && authData.user.identities.length === 0);
 
       if (authError && !alreadyRegistered) {
-        toast.error(`Failed to create user: ${authError.message}`);
-        setCreatingManager(false);
-        return;
+        throw new Error(`Failed to create user: ${authError.message}`);
       }
 
       // 2) Upsert the manager row (works whether user is new or already existed)
@@ -236,73 +231,93 @@ export default function SuperAdmin() {
         .from('managers')
         .upsert(
           { email, name, organization_id },
-          { onConflict: 'email' } // Make sure managers.email is UNIQUE in your DB
+          { onConflict: 'email' }
         )
         .select()
         .single();
 
       if (managerError) {
-        // 23505 = unique_violation (if the onConflict target doesn't match the unique index you might hit this)
         if ((managerError as any).code === '23505') {
-          toast.error('A manager with this email already exists.');
+          throw new Error('A manager with this email already exists.');
         } else {
-          toast.error(`Failed to create manager record: ${managerError.message}`);
+          throw new Error(`Failed to create manager record: ${managerError.message}`);
         }
-        setCreatingManager(false);
-        return;
       }
 
+      return { managerRow, alreadyRegistered };
+    },
+    onMutate: () => {
+      setCreatingManager(true);
+    },
+    onSuccess: ({ alreadyRegistered }) => {
       if (alreadyRegistered) {
         toast.success('This email already had an account. Manager record was created/updated.');
-        // Optional: send a password reset link if needed
-        // await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
       } else {
         toast.success('Manager created successfully! They should check their email to finish sign-up.');
       }
 
       setShowManagerDialog(false);
       setManagerForm({ email: '', name: '', password: '', organization_id: '' });
-      await fetchManagers();
-
-    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.managers.withOrganizations() });
+    },
+    onError: (error: any) => {
       toast.error(error?.message || 'Failed to create manager');
-    } finally {
+    },
+    onSettled: () => {
       setCreatingManager(false);
     }
+  });
+
+  const createManager = () => {
+    createManagerMutation.mutate(managerForm);
   };
 
-  const deleteOrganization = async (id: string) => {
-    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
-    
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
+  // Delete organization mutation
+  const deleteOrgMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Organization deleted');
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.withCounts() });
+    },
+    onError: () => {
       toast.error('Failed to delete organization');
-      return;
     }
-    
-    toast.success('Organization deleted');
-    fetchOrganizations();
+  });
+
+  // Delete manager mutation
+  const deleteManagerMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase
+        .from('managers')
+        .delete()
+        .eq('email', email);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Manager removed');
+      queryClient.invalidateQueries({ queryKey: queryKeys.managers.withOrganizations() });
+    },
+    onError: () => {
+      toast.error('Failed to delete manager');
+    }
+  });
+
+  const deleteOrganization = (id: string) => {
+    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
+    deleteOrgMutation.mutate(id);
   };
 
-  const deleteManager = async (email: string) => {
+  const deleteManager = (email: string) => {
     if (!confirm('Remove this manager? This action cannot be undone.')) return;
-    
-    const { error } = await supabase
-      .from('managers')
-      .delete()
-      .eq('email', email);
-    
-    if (error) {
-      toast.error('Failed to delete manager');
-      return;
-    }
-    
-    toast.success('Manager removed');
-    fetchManagers();
+    deleteManagerMutation.mutate(email);
   };
 
   if (loading) {

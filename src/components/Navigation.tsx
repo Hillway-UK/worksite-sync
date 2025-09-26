@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { queryKeys } from '@/lib/query-client';
 
 export const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [organizationName, setOrganizationName] = useState<string>('');
 
-  useEffect(() => {
-    fetchOrganizationName();
-  }, [user, userRole]);
-
-  const fetchOrganizationName = async () => {
-    if (!user?.email) return;
-    
-    try {
+  // Fetch organization name with React Query
+  const { data: organizationData } = useQuery({
+    queryKey: queryKeys.organizations.name(user?.email || ''),
+    queryFn: async () => {
+      if (!user?.email) throw new Error('No user email');
+      
       let organizationQuery;
       
       if (userRole === 'manager') {
@@ -44,15 +43,18 @@ export const Navigation: React.FC = () => {
       }
 
       if (organizationQuery) {
-        const { data } = await organizationQuery;
-        if (data?.organizations?.name) {
-          setOrganizationName(data.organizations.name);
-        }
+        const { data, error } = await organizationQuery;
+        if (error) throw error;
+        return data?.organizations?.name || '';
       }
-    } catch (error) {
-      console.error('Error fetching organization:', error);
-    }
-  };
+      
+      return '';
+    },
+    enabled: !!user?.email && !!userRole && (userRole === 'manager' || userRole === 'worker'),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  const organizationName = organizationData || '';
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
