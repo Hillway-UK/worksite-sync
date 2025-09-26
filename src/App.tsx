@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { PublicRoute } from "@/components/PublicRoute";
 import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import DemoRequest from "./pages/DemoRequest";
@@ -41,15 +42,15 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/demo-request" element={<DemoRequest />} />
-            <Route path="/admin-portal" element={<Index />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/update-password" element={<UpdatePassword />} />
-            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+            <Route path="/pricing" element={<PublicRoute><Pricing /></PublicRoute>} />
+            <Route path="/demo-request" element={<PublicRoute><DemoRequest /></PublicRoute>} />
+            <Route path="/admin-portal" element={<PublicRoute><Index /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        <Route path="/update-password" element={<PublicRoute><UpdatePassword /></PublicRoute>} />
+            <Route path="/onboarding" element={<PublicRoute><Onboarding /></PublicRoute>} />
             
             {/* Super Admin Routes */}
             <Route 
