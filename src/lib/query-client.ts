@@ -73,6 +73,7 @@ export const queryKeys = {
   auth: {
     session: () => ['auth', 'session'] as const,
     user: () => ['auth', 'user'] as const,
+    userRole: (userEmail: string) => ['auth', 'userRole', userEmail] as const,
   },
   
   // User management queries
