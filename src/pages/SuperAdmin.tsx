@@ -236,26 +236,15 @@ export default function SuperAdmin() {
       if (authError) {
         // Check if user already exists
         if (authError.message.includes('already registered')) {
-          // User exists, check if manager record already exists
-          const { data: existingManager } = await supabase
-            .from('managers')
-            .select('id')
-            .eq('email', managerForm.email)
-            .maybeSingle();
-          
-          if (existingManager) {
-            toast.error('Manager with this email already exists');
-            setCreatingManager(false);
-            return;
-          }
-          
-          // Create manager record for existing user
+          // User exists, use upsert to handle potential duplicates gracefully
           const { error: managerError } = await supabase
             .from('managers')
-            .insert({
+            .upsert({
               email: managerForm.email,
               name: managerForm.name,
               organization_id: managerForm.organization_id
+            }, {
+              onConflict: 'email'
             });
           
           if (managerError) {
@@ -275,13 +264,15 @@ export default function SuperAdmin() {
         return;
       }
       
-      // Create manager record
+      // Create manager record for new user - use upsert to handle edge cases
       const { error: managerError } = await supabase
         .from('managers')
-        .insert({
+        .upsert({
           email: managerForm.email,
           name: managerForm.name,
           organization_id: managerForm.organization_id
+        }, {
+          onConflict: 'email'
         });
       
       if (managerError) {
