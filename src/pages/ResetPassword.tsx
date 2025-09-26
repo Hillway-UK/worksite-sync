@@ -30,38 +30,56 @@ const ResetPassword = () => {
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
-    // Support both `code` (PKCE) and hash/query tokens
-    const code = searchParams.get('code');
-
-    const qsAccess = searchParams.get('access_token');
-    const qsRefresh = searchParams.get('refresh_token');
-
-    const hash = typeof window !== 'undefined' ? window.location.hash : '';
-    const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
-    const hashAccess = hashParams.get('access_token');
-    const hashRefresh = hashParams.get('refresh_token');
-
-    const accessToken = qsAccess || hashAccess;
-    const refreshToken = qsRefresh || hashRefresh;
-
     (async () => {
       try {
+        // 1. Check for PKCE code first
+        const code = searchParams.get('code');
         if (code) {
-          console.log('Exchanging code for session...');
+          console.log('ResetPassword: Exchanging code for session...');
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-          console.log('Session established, showing password form');
+          
+          // Clear URL after successful exchange
+          window.history.replaceState({}, document.title, window.location.pathname);
           setIsValidating(false);
           return;
         }
 
-        if (accessToken && refreshToken) {
-          console.log('Tokens found in URL, showing password form');
+        // 2. Extract tokens from hash and query parameters
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+        
+        const accessToken = searchParams.get('access_token') || hashParams.get('access_token');
+        const refreshToken = searchParams.get('refresh_token') || hashParams.get('refresh_token');
+        const type = searchParams.get('type') || hashParams.get('type');
+
+        // 3. If we have tokens and it's a recovery link, establish session
+        if (accessToken && refreshToken && type === 'recovery') {
+          console.log('ResetPassword: Setting session with recovery tokens...');
+          
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (error) throw error;
+          
+          // Clear URL tokens after successful session establishment
+          window.history.replaceState({}, document.title, window.location.pathname);
           setIsValidating(false);
           return;
         }
 
-        console.log('No tokens or code found, redirecting to forgot-password');
+        // 4. Check if we already have a valid session
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          console.log('ResetPassword: Valid session found');
+          setIsValidating(false);
+          return;
+        }
+
+        // 5. No valid tokens or session found
+        console.log('ResetPassword: No valid tokens found, redirecting...');
         setShouldRedirect(true);
         toast({
           title: 'Invalid Reset Link',
@@ -69,8 +87,9 @@ const ResetPassword = () => {
           variant: 'destructive',
         });
         navigate('/forgot-password', { replace: true });
+        
       } catch (err) {
-        console.error('Password reset code exchange failed', err);
+        console.error('ResetPassword: Session establishment failed', err);
         setShouldRedirect(true);
         toast({
           title: 'Invalid Reset Link',
@@ -115,7 +134,8 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated. You can now log in with your new password.",
       });
 
-      // Redirect to login page
+      // Sign out user and redirect to login for fresh authentication
+      await supabase.auth.signOut();
       navigate('/login');
     },
   });
