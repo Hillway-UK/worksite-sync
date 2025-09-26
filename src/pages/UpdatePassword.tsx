@@ -63,24 +63,68 @@ const UpdatePassword = () => {
   useEffect(() => {
     (async () => {
       try {
+        // Check for error parameters in URL first (hash and query)
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+        
+        const errorFromHash = hashParams.get('error');
+        const errorDescriptionFromHash = hashParams.get('error_description');
+        const errorFromQuery = searchParams.get('error');
+        const errorDescriptionFromQuery = searchParams.get('error_description');
+        
+        const error = errorFromHash || errorFromQuery;
+        const errorDescription = errorDescriptionFromHash || errorDescriptionFromQuery;
+        
+        console.log('UpdatePassword: URL parameters check', {
+          hash,
+          error,
+          errorDescription,
+          searchParams: Object.fromEntries(searchParams.entries())
+        });
+
+        if (error) {
+          console.error('UpdatePassword: Error in URL parameters', { error, errorDescription });
+          let message = 'The reset link is invalid or has expired.';
+          
+          if (error === 'access_denied' || errorDescription) {
+            message = errorDescription || 'Access denied. The reset link may have expired.';
+          }
+          
+          toast({
+            title: 'Invalid Reset Link',
+            description: message,
+            variant: 'destructive',
+          });
+          navigate('/forgot-password', { replace: true });
+          return;
+        }
+
         // 1) ?code=... — handle as recovery (works cross-device)
         const code = searchParams.get('code');
         if (code) {
+          console.log('UpdatePassword: Found code parameter', { code: code.substring(0, 10) + '...' });
           const email = searchParams.get('email');
           if (!email) {
+            console.log('UpdatePassword: No email parameter, asking user for email');
             // We can't call verifyOtp without the email — ask user for it
             setNeedsEmail(true);
             setIsValidating(false);
             return;
           }
 
+          console.log('UpdatePassword: Attempting verifyOtp with email', { email });
           const { error } = await supabase.auth.verifyOtp({
             type: 'recovery',
             token: code,
             email, // <-- only pass when present
           });
-          if (error) throw error;
+          
+          if (error) {
+            console.error('UpdatePassword: verifyOtp failed', error);
+            throw error;
+          }
 
+          console.log('UpdatePassword: verifyOtp successful');
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -89,8 +133,6 @@ const UpdatePassword = () => {
         }
 
         // 2) Hash tokens (?type=recovery#access_token=...&refresh_token=...)
-        const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
         const accessFromHash = hashParams.get('access_token');
         const refreshFromHash = hashParams.get('refresh_token');
 
@@ -102,13 +144,17 @@ const UpdatePassword = () => {
         const refreshToken = refreshFromQuery || refreshFromHash;
 
         if (accessToken && refreshToken) {
+          console.log('UpdatePassword: Found access/refresh tokens, setting session');
           const { data: current } = await supabase.auth.getSession();
           if (!current.session) {
             const { error: setErr } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
-            if (setErr) throw setErr;
+            if (setErr) {
+              console.error('UpdatePassword: setSession failed', setErr);
+              throw setErr;
+            }
           }
           setIsValidating(false);
           return;
@@ -117,11 +163,13 @@ const UpdatePassword = () => {
         // 4) As a fallback, check if a session already exists
         const { data } = await supabase.auth.getSession();
         if (data.session) {
+          console.log('UpdatePassword: Found existing session');
           setIsValidating(false);
           return;
         }
 
         // Otherwise, invalid link
+        console.log('UpdatePassword: No valid tokens found, redirecting to forgot password');
         toast({
           title: 'Invalid Reset Link',
           description: 'The reset link is invalid or has expired. Please request a new one.',
