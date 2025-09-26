@@ -67,39 +67,49 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 1) ?code=... — handle as PKCE recovery flow
-        const code = searchParams.get('code');
-        if (code) {
-          console.log('UpdatePassword: Found code parameter, using PKCE flow', { code: code.substring(0, 10) + '...' });
+        // 1) Check for password reset hash tokens (#access_token=...&refresh_token=...&type=recovery)
+        const typeParam = hashParams.get('type') || searchParams.get('type');
+        
+        if (typeParam === 'recovery') {
+          console.log('UpdatePassword: Found recovery type, processing password reset flow');
           
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
           
-          if (error) {
-            console.error('UpdatePassword: exchangeCodeForSession failed', error);
-            throw error;
+          if (accessToken && refreshToken) {
+            console.log('UpdatePassword: Found recovery tokens, setting session');
+            const { data: current } = await supabase.auth.getSession();
+            if (!current.session) {
+              const { error: setErr } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              if (setErr) {
+                console.error('UpdatePassword: setSession failed for recovery', setErr);
+                throw setErr;
+              }
+            }
+            
+            console.log('UpdatePassword: Password reset session established');
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            setIsValidating(false);
+            return;
           }
-
-          console.log('UpdatePassword: PKCE exchange successful');
-          if (typeof window !== 'undefined') {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-          setIsValidating(false);
-          return;
         }
 
-        // 2) Hash tokens (?type=recovery#access_token=...&refresh_token=...)
+        // 2) Fallback: Check for any access/refresh tokens without recovery type
         const accessFromHash = hashParams.get('access_token');
         const refreshFromHash = hashParams.get('refresh_token');
-
-        // 3) Query tokens (?access_token=...&refresh_token=...)
         const accessFromQuery = searchParams.get('access_token');
         const refreshFromQuery = searchParams.get('refresh_token');
 
         const accessToken = accessFromQuery || accessFromHash;
         const refreshToken = refreshFromQuery || refreshFromHash;
 
-        if (accessToken && refreshToken) {
-          console.log('UpdatePassword: Found access/refresh tokens, setting session');
+        if (accessToken && refreshToken && typeParam !== 'recovery') {
+          console.log('UpdatePassword: Found general access/refresh tokens, setting session');
           const { data: current } = await supabase.auth.getSession();
           if (!current.session) {
             const { error: setErr } = await supabase.auth.setSession({
@@ -115,7 +125,7 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 4) As a fallback, check if a session already exists
+        // 3) As a fallback, check if a session already exists
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           console.log('UpdatePassword: Found existing session');
