@@ -227,6 +227,14 @@ const UpdatePassword = () => {
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Password requirements:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>At least 8 characters long</li>
+                  <li>Contains uppercase and lowercase letters</li>
+                  <li>Contains at least one number</li>
+                </ul>
+              </div>
             </div>
 
             <div className="space-y-2">
