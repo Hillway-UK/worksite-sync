@@ -31,24 +31,26 @@ const UpdatePassword = () => {
   useEffect(() => {
     (async () => {
       try {
-        // 1) New PKCE-style links use ?code=...
+        // 1) Recovery codes from password reset emails
         const code = searchParams.get('code');
         if (code) {
           console.log('UpdatePassword: verifying recovery code');
-          const email = searchParams.get('email') || undefined;
+          const email = searchParams.get('email');
+          
           if (email) {
+            // Use verifyOtp when email is provided
             const { error } = await supabase.auth.verifyOtp({
               type: 'recovery',
               token: code,
               email,
             });
             if (error) throw error;
-            setIsValidating(false);
-            return;
+          } else {
+            // For password reset, we should have an email parameter
+            // If not, this might be an invalid link
+            throw new Error('Email parameter required for password reset');
           }
-          console.log('No email param; attempting code exchange');
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+          
           setIsValidating(false);
           return;
         }
