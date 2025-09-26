@@ -27,6 +27,38 @@ const UpdatePassword = () => {
   const [searchParams] = useSearchParams();
   const { updatePassword, user } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [emailForRecovery, setEmailForRecovery] = useState('');
+
+  // Helper to verify when user provides email manually
+  const verifyWithEmail = async () => {
+    try {
+      const code = searchParams.get('code')!;
+      const { error } = await supabase.auth.verifyOtp({
+        type: 'recovery',
+        token: code,
+        email: emailForRecovery.trim(),
+      });
+      if (error) throw error;
+
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      toast({ 
+        title: 'Link verified', 
+        description: 'You can now set a new password.' 
+      });
+      setNeedsEmail(false);
+      setIsValidating(false);
+    } catch (err: any) {
+      console.error('verifyWithEmail failed', err);
+      toast({
+        title: 'Verification failed',
+        description: err?.message || 'Check the email matches the account that requested the reset.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -35,15 +67,20 @@ const UpdatePassword = () => {
         const code = searchParams.get('code');
         if (code) {
           const email = searchParams.get('email');
+          if (!email) {
+            // We can't call verifyOtp without the email — ask user for it
+            setNeedsEmail(true);
+            setIsValidating(false);
+            return;
+          }
 
           const { error } = await supabase.auth.verifyOtp({
             type: 'recovery',
             token: code,
-            email: email || '', // Provide empty string if no email
+            email, // <-- only pass when present
           });
           if (error) throw error;
 
-          // Clean the URL
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
@@ -145,6 +182,37 @@ const UpdatePassword = () => {
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p>Validating reset link...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (needsEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <AutoTimeLogo className="mx-auto mb-4" />
+            <CardTitle>Confirm your email</CardTitle>
+            <CardDescription>Enter the email for the account you're resetting.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recoveryEmail">Email</Label>
+                <Input
+                  id="recoveryEmail"
+                  type="email"
+                  value={emailForRecovery}
+                  onChange={(e) => setEmailForRecovery(e.target.value)}
+                  placeholder="name@example.com"
+                />
+              </div>
+              <Button className="w-full" onClick={verifyWithEmail}>
+                Continue
+              </Button>
             </div>
           </CardContent>
         </Card>
