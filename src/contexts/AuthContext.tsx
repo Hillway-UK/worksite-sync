@@ -37,12 +37,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { data: userRoleData, isLoading: roleLoading } = useQuery({
     queryKey: queryKeys.auth.userRole(user?.email || ''),
     queryFn: async () => {
-      if (!user?.email) return null;
+      if (!user?.email) {
+        console.log('AuthContext: No user email available for role query');
+        return null;
+      }
+      
+      console.log('AuthContext: Fetching role for user:', user.email);
       
       try {
         const { data, error } = await supabase.rpc('get_user_role_and_org', { user_email: user.email });
         
         if (error) {
+          console.log('AuthContext: RPC function failed, using fallback approach:', error.message);
           // Fallback to original approach if function fails
           const { data: superAdmin } = await supabase
             .from('super_admins')
@@ -50,7 +56,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('email', user.email)
             .maybeSingle();
           
-          if (superAdmin) return { role: 'super_admin', organization_id: superAdmin.organization_id };
+          if (superAdmin) {
+            console.log('AuthContext: Found super_admin role');
+            return { role: 'super_admin', organization_id: superAdmin.organization_id };
+          }
           
           const { data: manager } = await supabase
             .from('managers')
@@ -58,7 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('email', user.email)
             .maybeSingle();
           
-          if (manager) return { role: 'manager', organization_id: manager.organization_id };
+          if (manager) {
+            console.log('AuthContext: Found manager role');
+            return { role: 'manager', organization_id: manager.organization_id };
+          }
           
           const { data: worker } = await supabase
             .from('workers')
@@ -66,17 +78,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq('email', user.email)
             .maybeSingle();
           
-          if (worker) return { role: 'worker', organization_id: worker.organization_id };
+          if (worker) {
+            console.log('AuthContext: Found worker role');
+            return { role: 'worker', organization_id: worker.organization_id };
+          }
           
+          console.log('AuthContext: No role found for user');
           return null;
         }
         
         const roleData = data?.[0];
-        return roleData ? {
-          role: roleData.role as 'super_admin' | 'manager' | 'worker',
-          organization_id: roleData.organization_id
-        } : null;
+        if (roleData) {
+          console.log('AuthContext: RPC returned role:', roleData.role);
+          return {
+            role: roleData.role as 'super_admin' | 'manager' | 'worker',
+            organization_id: roleData.organization_id
+          };
+        } else {
+          console.log('AuthContext: RPC returned no role data');
+          return null;
+        }
       } catch (error) {
+        console.error('AuthContext: Role query failed:', error);
         return null;
       }
     },
@@ -155,17 +178,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      console.log('AuthContext: Starting signIn for:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('AuthContext: signIn error:', error.message);
         return { error: error.message };
       }
 
+      console.log('AuthContext: signIn successful');
       return {};
     } catch (error) {
+      console.error('AuthContext: signIn unexpected error:', error);
       return { error: 'An unexpected error occurred' };
     } finally {
       setLoading(false);

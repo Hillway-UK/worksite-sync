@@ -38,9 +38,11 @@ export default function Login() {
     setError('');
     setIsLoading(true);
     
+    console.log('Login attempt starting for:', email);
     const { error } = await signIn(email, password);
     
     if (error) {
+      console.error('Login failed with error:', error);
       setError(error);
       setIsLoading(false);
       toast({
@@ -49,6 +51,7 @@ export default function Login() {
         variant: "destructive",
       });
     } else {
+      console.log('Login successful, waiting for user role...');
       // The useEffect will handle navigation once userRole is set
       setIsLoading(false);
     }
