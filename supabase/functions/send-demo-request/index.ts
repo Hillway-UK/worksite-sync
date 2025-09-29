@@ -88,8 +88,44 @@ serve(async (req) => {
     if (insertError) throw insertError;
     logStep("Demo request stored in database");
 
-    // Log successful demo request submission
-    logStep("Demo request processed successfully (email notification disabled)");
+    // Send email notification to hello@hillwayco.uk
+    try {
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Demo Requests <noreply@hillwayco.uk>',
+          to: ['hello@hillwayco.uk'],
+          subject: `New Demo Request from ${sanitizedCompany}`,
+          html: `
+            <h2>New Demo Request Received</h2>
+            <p><strong>Company:</strong> ${sanitizedCompany}</p>
+            <p><strong>Contact Name:</strong> ${sanitizedName}</p>
+            <p><strong>Email:</strong> ${sanitizedEmail}</p>
+            <p><strong>Phone:</strong> ${sanitizedPhone || 'Not provided'}</p>
+            <p><strong>Admin Users:</strong> ${admin_users}</p>
+            <p><strong>Worker Count:</strong> ${worker_count}</p>
+            <p><strong>Estimated Monthly Cost:</strong> ${monthly_cost ? `£${monthly_cost}` : 'Not calculated'}</p>
+            ${sanitizedMessage ? `<p><strong>Message:</strong><br>${sanitizedMessage}</p>` : ''}
+            <p><em>Request received at: ${new Date().toLocaleString()}</em></p>
+          `,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        logStep("Email sending failed", { status: emailResponse.status, error: errorText });
+      } else {
+        logStep("Email notification sent successfully");
+      }
+    } catch (emailError) {
+      const errorMessage = emailError instanceof Error ? emailError.message : String(emailError);
+      logStep("Email sending error", { error: errorMessage });
+      // Don't fail the request if email fails
+    }
 
     return new Response(JSON.stringify({ 
       message: 'Demo request received successfully!' 
