@@ -8,12 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle, LogOut, CheckCircle, Copy } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { queryKeys } from '@/lib/query-client';
-import { generateSecurePassword } from '@/lib/validation';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
@@ -21,14 +19,8 @@ export default function SuperAdmin() {
   const queryClient = useQueryClient();
   const [showOrgDialog, setShowOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
-  const [showManagerSuccessModal, setShowManagerSuccessModal] = useState(false);
   const [authVerified, setAuthVerified] = useState(false);
   const [creatingManager, setCreatingManager] = useState(false);
-  const [managerCredentials, setManagerCredentials] = useState<{
-    name: string;
-    email: string;
-    password: string;
-  } | null>(null);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -40,6 +32,7 @@ export default function SuperAdmin() {
   const [managerForm, setManagerForm] = useState({
     email: '',
     name: '',
+    password: '',
     organization_id: ''
   });
 
@@ -200,47 +193,24 @@ export default function SuperAdmin() {
     createOrgMutation.mutate(orgForm);
   };
 
-  // Copy manager credentials to clipboard
-  const copyManagerCredentials = async () => {
-    if (!managerCredentials) return;
-    
-    const credentialText = `Welcome to AutoTime
-    
-Name: ${managerCredentials.name}
-Email: ${managerCredentials.email}
-Temporary Password: ${managerCredentials.password}
-App URL: ${window.location.origin}
-
-Please change your password on first login for security.`;
-
-    try {
-      await navigator.clipboard.writeText(credentialText);
-      toast.success('Login credentials copied to clipboard');
-    } catch (error) {
-      toast.error('Failed to copy credentials');
-    }
-  };
-
   // Create manager mutation
   const createManagerMutation = useMutation({
     mutationFn: async (formData: typeof managerForm) => {
       const email = formData.email?.trim().toLowerCase();
       const name = formData.name?.trim();
+      const password = formData.password;
       const organization_id = formData.organization_id;
 
-      if (!email || !name || !organization_id) {
+      if (!email || !name || !password || !organization_id) {
         throw new Error('Please fill in all fields');
       }
-
-      // Generate secure temporary password
-      const password = generateSecurePassword(12);
 
       // 1) Try to create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/login`,
           data: { name, role: 'manager' }
         }
       });
@@ -274,27 +244,20 @@ Please change your password on first login for security.`;
         }
       }
 
-      return { managerRow, alreadyRegistered, password };
+      return { managerRow, alreadyRegistered };
     },
     onMutate: () => {
       setCreatingManager(true);
     },
-    onSuccess: ({ alreadyRegistered, password }) => {
+    onSuccess: ({ alreadyRegistered }) => {
       if (alreadyRegistered) {
         toast.success('This email already had an account. Manager record was created/updated.');
-        setShowManagerDialog(false);
-        setManagerForm({ email: '', name: '', organization_id: '' });
       } else {
-        // Store credentials for display in success modal
-        setManagerCredentials({
-          name: managerForm.name,
-          email: managerForm.email,
-          password: password,
-        });
-        setShowManagerSuccessModal(true);
-        toast.success('Manager created successfully with mobile app login enabled!');
+        toast.success('Manager created successfully! They should check their email to finish sign-up.');
       }
 
+      setShowManagerDialog(false);
+      setManagerForm({ email: '', name: '', password: '', organization_id: '' });
       queryClient.invalidateQueries({ queryKey: queryKeys.managers.withOrganizations() });
     },
     onError: (error: any) => {
@@ -594,6 +557,16 @@ Please change your password on first login for security.`;
                 placeholder="Enter email address"
               />
             </div>
+            <div>
+              <Label htmlFor="manager-password">Password *</Label>
+              <Input
+                id="manager-password"
+                type="password"
+                value={managerForm.password}
+                onChange={(e) => setManagerForm({...managerForm, password: e.target.value})}
+                placeholder="Enter password"
+              />
+            </div>
             <Button 
               onClick={createManager} 
               className="w-full"
@@ -604,61 +577,6 @@ Please change your password on first login for security.`;
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Manager Success Modal */}
-      <AlertDialog open={showManagerSuccessModal} onOpenChange={setShowManagerSuccessModal}>
-        <AlertDialogContent className="sm:max-w-[500px]">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-              <AlertDialogTitle className="text-xl">Manager Created Successfully!</AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="text-base space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-                <div>
-                  <span className="font-medium text-green-800">Manager Name:</span>
-                  <p className="text-green-700 font-mono">{managerCredentials?.name}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Email:</span>
-                  <p className="text-green-700 font-mono">{managerCredentials?.email}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Temporary Password:</span>
-                  <p className="text-green-700 font-mono text-lg bg-green-100 p-2 rounded border">
-                    {managerCredentials?.password}
-                  </p>
-                </div>
-              </div>
-              <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm">
-                  <strong>Important:</strong> Please share these credentials securely with the manager. 
-                  They must change their password on first login.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={copyManagerCredentials}
-              className="flex items-center gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              Copy Login Details
-            </Button>
-            <AlertDialogAction onClick={() => {
-              setShowManagerSuccessModal(false);
-              setManagerCredentials(null);
-              setShowManagerDialog(false);
-              setManagerForm({ email: '', name: '', organization_id: '' });
-            }}>
-              Done
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
