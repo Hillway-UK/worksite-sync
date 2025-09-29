@@ -37,66 +37,44 @@ const UpdatePassword = () => {
     hasHandledAuthCode.current = true;
     (async () => {
       try {
-        // Check for error parameters in URL first (hash and query)
-        const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+        console.log('UpdatePassword: Starting PKCE-only password reset validation');
         
-        const errorFromHash = hashParams.get('error');
-        const errorDescriptionFromHash = hashParams.get('error_description');
+        // Check for error parameters in URL first
         const errorFromQuery = searchParams.get('error');
         const errorDescriptionFromQuery = searchParams.get('error_description');
         
-        const error = errorFromHash || errorFromQuery;
-        const errorDescription = errorDescriptionFromHash || errorDescriptionFromQuery;
-        
-        console.log('UpdatePassword: URL parameters check', {
-          hash,
-          error,
-          errorDescription,
-          searchParams: Object.fromEntries(searchParams.entries())
-        });
-
-        if (error) {
-          console.error('UpdatePassword: Error in URL parameters', { error, errorDescription });
-          let message = 'The reset link is invalid or has expired.';
-          
-          if (error === 'access_denied' || errorDescription) {
-            message = errorDescription || 'Access denied. The reset link may have expired.';
-          }
-          
+        if (errorFromQuery) {
+          console.error('UpdatePassword: Error in URL parameters', { 
+            error: errorFromQuery, 
+            errorDescription: errorDescriptionFromQuery 
+          });
           toast({
             title: 'Invalid Reset Link',
-            description: message,
+            description: errorDescriptionFromQuery || 'The reset link is invalid or has expired.',
             variant: 'destructive',
           });
           navigate('/forgot-password', { replace: true });
           return;
         }
 
-        // 0) New flow: handle `code` param (Supabase auth v2 email links)
+        // PKCE-only flow: handle `code` param
         const codeParam = searchParams.get('code');
         if (codeParam) {
-          console.log('UpdatePassword: Found code param, exchanging for session');
-          try {
-            const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
-            if (exchangeErr) throw exchangeErr;
-          } catch (ex) {
-            console.warn('UpdatePassword: exchangeCodeForSession failed, trying verifyOtp(token_hash)', ex);
-            const { error: verifyErr } = await supabase.auth.verifyOtp({
-              type: 'recovery',
-              token_hash: codeParam
-            } as any);
-            if (verifyErr) {
-              console.error('UpdatePassword: verifyOtp(token_hash) also failed', verifyErr);
-              toast({
-                title: 'Invalid Reset Link',
-                description: 'The reset link is invalid or has expired. Please request a new one.',
-                variant: 'destructive',
-              });
-              navigate('/forgot-password', { replace: true });
-              return;
-            }
+          console.log('UpdatePassword: Found PKCE code, exchanging for session');
+          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
+          
+          if (exchangeErr) {
+            console.error('UpdatePassword: PKCE exchangeCodeForSession failed', exchangeErr);
+            toast({
+              title: 'Invalid Reset Link',
+              description: 'This reset link must be opened on the same device/browser that requested it. Please request a new link and open it in the same browser.',
+              variant: 'destructive',
+            });
+            navigate('/forgot-password', { replace: true });
+            return;
           }
+          
+          console.log('UpdatePassword: PKCE session established successfully');
           // Clean URL (remove the code param)
           if (typeof window !== 'undefined') {
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -105,74 +83,8 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 1) Check for password reset hash tokens (#access_token=...&refresh_token=...&type=recovery)
-        const typeParam = hashParams.get('type') || searchParams.get('type');
-        
-        if (typeParam === 'recovery') {
-          console.log('UpdatePassword: Found recovery type, processing password reset flow');
-          
-          const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
-          
-          if (accessToken && refreshToken) {
-            console.log('UpdatePassword: Found recovery tokens, setting session');
-            const { data: current } = await supabase.auth.getSession();
-            if (!current.session) {
-              const { error: setErr } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (setErr) {
-                console.error('UpdatePassword: setSession failed for recovery', setErr);
-                throw setErr;
-              }
-            }
-            
-            console.log('UpdatePassword: Password reset session established');
-            if (typeof window !== 'undefined') {
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-            setIsValidating(false);
-            return;
-          }
-        }
-
-        // 2) Fallback: Check for any access/refresh tokens without recovery type
-        const accessFromHash = hashParams.get('access_token');
-        const refreshFromHash = hashParams.get('refresh_token');
-        const accessFromQuery = searchParams.get('access_token');
-        const refreshFromQuery = searchParams.get('refresh_token');
-
-        const accessToken = accessFromQuery || accessFromHash;
-        const refreshToken = refreshFromQuery || refreshFromHash;
-
-        if (accessToken && refreshToken && typeParam !== 'recovery') {
-          console.log('UpdatePassword: Found general access/refresh tokens, setting session');
-          const { data: current } = await supabase.auth.getSession();
-          if (!current.session) {
-            const { error: setErr } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            if (setErr) {
-              console.error('UpdatePassword: setSession failed', setErr);
-              throw setErr;
-            }
-          }
-          setIsValidating(false);
-          return;
-        }
-
-        // 3) As a fallback, check if a session already exists (allow password reset regardless)
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          console.log('UpdatePassword: Found existing session, allowing password reset');
-          setIsValidating(false);
-          return;
-        }
-
-        // Otherwise, invalid link
-        console.log('UpdatePassword: No valid tokens found, redirecting to forgot password');
+        // No PKCE code found - invalid link
+        console.log('UpdatePassword: No PKCE code found, redirecting to forgot password');
         toast({
           title: 'Invalid Reset Link',
           description: 'The reset link is invalid or has expired. Please request a new one.',
@@ -180,7 +92,7 @@ const UpdatePassword = () => {
         });
         navigate('/forgot-password', { replace: true });
       } catch (err) {
-        console.error('UpdatePassword: token handling failed', err);
+        console.error('UpdatePassword: PKCE validation failed', err);
         toast({
           title: 'Invalid Reset Link',
           description: 'The reset link is invalid or has expired. Please request a new one.',
