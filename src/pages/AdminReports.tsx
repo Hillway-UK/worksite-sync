@@ -125,12 +125,11 @@ export default function AdminReports() {
         // Get clock entries for this worker during the week
         const { data: clockEntries, error: clockError } = await supabase
           .from('clock_entries')
-          .select('job_id, total_hours')
+          .select('job_id, total_hours, clock_in, clock_out')
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
           .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
-          .not('clock_out', 'is', null)
-          .not('total_hours', 'is', null);
+          .not('clock_out', 'is', null);
 
         if (clockError) {
           console.error('Error fetching clock entries for worker', worker.name, ':', clockError);
@@ -158,23 +157,31 @@ export default function AdminReports() {
           }
         }
 
-        // Aggregate job data with proper job names
+        // Aggregate job data with proper job names and computed hours
         const jobsMap = new Map();
-        clockEntries?.forEach(entry => {
+        clockEntries?.forEach((entry: any) => {
           if (entry.job_id) {
             const jobDetails = jobDetailsMap.get(entry.job_id);
+            const hours = entry.total_hours != null
+              ? Number(entry.total_hours)
+              : (entry.clock_in && entry.clock_out
+                  ? (new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime()) / 36e5
+                  : 0);
+
             if (jobsMap.has(entry.job_id)) {
-              jobsMap.get(entry.job_id).hours += entry.total_hours || 0;
+              jobsMap.get(entry.job_id).hours += hours;
             } else {
               jobsMap.set(entry.job_id, {
                 job_id: entry.job_id,
                 job_name: jobDetails?.name || 'Unknown Job',
                 job_address: jobDetails?.address || '',
-                hours: entry.total_hours || 0,
+                hours,
               });
             }
           }
         });
+
+        console.log(`Aggregated jobs for ${worker.name}:`, Array.from(jobsMap.values()));
 
         const jobs = Array.from(jobsMap.values());
 
