@@ -77,16 +77,25 @@ const UpdatePassword = () => {
         const codeParam = searchParams.get('code');
         if (codeParam) {
           console.log('UpdatePassword: Found code param, exchanging for session');
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
-          if (exchangeErr) {
-            console.error('UpdatePassword: exchangeCodeForSession failed', exchangeErr);
-            toast({
-              title: 'Invalid Reset Link',
-              description: 'The reset link is invalid or has expired. Please request a new one.',
-              variant: 'destructive',
-            });
-            navigate('/forgot-password', { replace: true });
-            return;
+          try {
+            const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
+            if (exchangeErr) throw exchangeErr;
+          } catch (ex) {
+            console.warn('UpdatePassword: exchangeCodeForSession failed, trying verifyOtp(token_hash)', ex);
+            const { error: verifyErr } = await supabase.auth.verifyOtp({
+              type: 'recovery',
+              token_hash: codeParam
+            } as any);
+            if (verifyErr) {
+              console.error('UpdatePassword: verifyOtp(token_hash) also failed', verifyErr);
+              toast({
+                title: 'Invalid Reset Link',
+                description: 'The reset link is invalid or has expired. Please request a new one.',
+                variant: 'destructive',
+              });
+              navigate('/forgot-password', { replace: true });
+              return;
+            }
           }
           // Clean URL (remove the code param)
           if (typeof window !== 'undefined') {
