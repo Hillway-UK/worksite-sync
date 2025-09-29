@@ -187,6 +187,11 @@ export default function AdminReports() {
       const weekStart = new Date(selectedWeek);
       const weekEnd = addDays(weekStart, 6);
 
+      console.log('Detailed Report - Week range:', {
+        weekStart: format(weekStart, 'yyyy-MM-dd'),
+        weekEnd: format(weekEnd, 'yyyy-MM-dd')
+      });
+
       // Fetch all entries and worker photos in parallel
       const [entriesResult, photosResult] = await Promise.all([
         supabase
@@ -197,7 +202,7 @@ export default function AdminReports() {
             jobs(name)
           `)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-          .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
+          .lte('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
           .not('clock_out', 'is', null)
           .order('worker_id')
           .order('clock_in'),
@@ -210,7 +215,12 @@ export default function AdminReports() {
           .order('clock_in', { ascending: true })
       ]);
 
-      if (entriesResult.error) throw entriesResult.error;
+      if (entriesResult.error) {
+        console.error('Detailed Report - Entries query error:', entriesResult.error);
+        throw entriesResult.error;
+      }
+
+      console.log('Detailed Report - Entries found:', entriesResult.data?.length || 0);
 
       // Build photo map (first photo per worker)
       const workerPhotos: Record<string, string> = {};
@@ -235,9 +245,15 @@ export default function AdminReports() {
         profile_photo: workerPhotos[entry.worker_id] || undefined,
       })) || [];
 
+      console.log('Detailed Report - Processed entries:', detailedEntries.length);
       setDetailedData(detailedEntries);
     } catch (error) {
       console.error('Error generating detailed report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate detailed report",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
