@@ -1,7 +1,7 @@
 // UK postcode validation and geocoding utilities
 
-// UK postcode regex pattern
-export const UK_POSTCODE_REGEX = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
+// UK postcode regex pattern - supports all valid UK postcode formats
+export const UK_POSTCODE_REGEX = /^([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})$/i;
 
 // Validate UK postcode format
 export function validatePostcode(postcode: string): boolean {
@@ -68,36 +68,65 @@ export async function geocodePostcode(postcode: string): Promise<{
   latitude: number;
   longitude: number;
   formatted_postcode: string;
+  error?: string;
 } | null> {
+  const trimmedPostcode = postcode.trim();
+  console.log('Geocoding postcode:', trimmedPostcode);
+  
   try {
-    if (!validatePostcode(postcode)) {
-      throw new Error('Invalid postcode format');
+    if (!validatePostcode(trimmedPostcode)) {
+      const error = `Invalid postcode format: "${trimmedPostcode}". Please use format like SW1A 1AA, M1 1AA, or B33 8TH`;
+      console.error(error);
+      throw new Error(error);
     }
 
-    const formattedPostcode = formatPostcode(postcode);
-    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`);
+    const formattedPostcode = formatPostcode(trimmedPostcode);
+    console.log('Formatted postcode:', formattedPostcode);
+    
+    const url = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`;
+    console.log('Fetching from URL:', url);
+    
+    const response = await fetch(url);
+    console.log('API Response status:', response.status);
     
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error('Postcode not found');
+        const error = `Postcode "${formattedPostcode}" not found in database. Please check the postcode and try again.`;
+        console.error(error);
+        throw new Error(error);
       }
-      throw new Error('Failed to geocode postcode');
+      if (response.status === 429) {
+        const error = 'Too many requests. Please wait a moment and try again.';
+        console.error(error);
+        throw new Error(error);
+      }
+      const error = `API error (${response.status}): ${response.statusText}`;
+      console.error(error);
+      throw new Error(error);
     }
 
     const data: PostcodeApiResponse = await response.json();
+    console.log('API Response data:', data);
     
     if (data.status === 200 && data.result) {
-      return {
+      const result = {
         latitude: data.result.latitude,
         longitude: data.result.longitude,
         formatted_postcode: data.result.postcode,
       };
+      console.log('Geocoding successful:', result);
+      return result;
     }
 
-    throw new Error('Invalid response from postcode service');
+    const error = 'Invalid response from postcode service';
+    console.error(error, data);
+    throw new Error(error);
   } catch (error) {
     console.error('Error geocoding postcode:', error);
-    return null;
+    if (error instanceof Error) {
+      return { latitude: 0, longitude: 0, formatted_postcode: trimmedPostcode, error: error.message };
+    }
+    return { latitude: 0, longitude: 0, formatted_postcode: trimmedPostcode, error: 'Unknown error occurred' };
   }
 }
 

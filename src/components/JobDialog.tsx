@@ -103,12 +103,12 @@ const { organizationId, user } = useAuth();
 const watchedPostcode = watch('postcode');
 
   const handleManualGeocode = async () => {
-    if (!watchedPostcode || !validatePostcode(watchedPostcode) || geocoding) return;
+    if (!watchedPostcode || geocoding) return;
     
     setGeocoding(true);
     try {
       const result = await geocodePostcode(watchedPostcode);
-      if (result) {
+      if (result && result.latitude !== 0 && result.longitude !== 0) {
         setSelectedLocation([result.latitude, result.longitude]);
         setValue('latitude', result.latitude);
         setValue('longitude', result.longitude);
@@ -119,16 +119,18 @@ const watchedPostcode = watch('postcode');
           description: "Location found and updated on map",
         });
       } else {
+        const errorMessage = result?.error || "Could not find location for this postcode. Please check the format (e.g., SW1A 1AA) and try again.";
         toast({
-          title: "Warning",
-          description: "Could not find location for this postcode",
+          title: "Location Not Found",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error('Geocoding error:', error);
       toast({
         title: "Error",
-        description: "Failed to geocode postcode",
+        description: "Failed to geocode postcode. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
