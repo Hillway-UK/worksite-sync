@@ -33,64 +33,102 @@ const UpdatePassword = () => {
   const hasHandledAuthCode = useRef(false);
 
   useEffect(() => {
+    // Guard against React Strict Mode double-mount by using sessionStorage lock
     if (hasHandledAuthCode.current) return;
     hasHandledAuthCode.current = true;
+
     (async () => {
       try {
         console.log('UpdatePassword: Starting PKCE-only password reset validation');
-        
-        // Check for error parameters in URL first
-        const errorFromQuery = searchParams.get('error');
-        const errorDescriptionFromQuery = searchParams.get('error_description');
-        
-        if (errorFromQuery) {
-          console.error('UpdatePassword: Error in URL parameters', { 
-            error: errorFromQuery, 
-            errorDescription: errorDescriptionFromQuery 
-          });
+
+        const codeParam = searchParams.get('code');
+
+        // Helper: proceed if we already have a valid session (e.g., exchange already succeeded)
+        const allowIfSessionExists = async () => {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            console.log('UpdatePassword: Valid session found, allowing password reset UI');
+            setIsValidating(false);
+            return true;
+          }
+          return false;
+        };
+
+        if (!codeParam) {
+          // If no code is present, we might already have an established session
+          if (await allowIfSessionExists()) return;
+
+          console.log('UpdatePassword: No PKCE code found and no session, redirecting to forgot password');
           toast({
             title: 'Invalid Reset Link',
-            description: errorDescriptionFromQuery || 'The reset link is invalid or has expired.',
+            description: 'The reset link is invalid or has expired. Please request a new one.',
             variant: 'destructive',
           });
           navigate('/forgot-password', { replace: true });
           return;
         }
 
-        // PKCE-only flow: handle `code` param
-        const codeParam = searchParams.get('code');
-        if (codeParam) {
-          console.log('UpdatePassword: Found PKCE code, exchanging for session');
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
-          
-          if (exchangeErr) {
-            console.error('UpdatePassword: PKCE exchangeCodeForSession failed', exchangeErr);
-            toast({
-              title: 'Invalid Reset Link',
-              description: 'This reset link must be opened on the same device/browser that requested it. Please request a new link and open it in the same browser.',
-              variant: 'destructive',
-            });
-            navigate('/forgot-password', { replace: true });
+        const lockKey = `pkce_code_exchanged_${codeParam}`;
+        const lockVal = typeof window !== 'undefined' ? window.sessionStorage.getItem(lockKey) : null;
+
+        if (lockVal === 'done' || lockVal === 'attempted') {
+          console.log('UpdatePassword: PKCE exchange already attempted, checking session');
+          if (await allowIfSessionExists()) {
+            // Clean URL if needed
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
             return;
           }
-          
-          console.log('UpdatePassword: PKCE session established successfully');
-          // Clean URL (remove the code param)
-          if (typeof window !== 'undefined') {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-          setIsValidating(false);
+          // If no session despite prior attempt, treat as invalid
+          toast({
+            title: 'Invalid Reset Link',
+            description: 'The reset link is invalid or has expired. Please request a new one.',
+            variant: 'destructive',
+          });
+          navigate('/forgot-password', { replace: true });
           return;
         }
 
-        // No PKCE code found - invalid link
-        console.log('UpdatePassword: No PKCE code found, redirecting to forgot password');
-        toast({
-          title: 'Invalid Reset Link',
-          description: 'The reset link is invalid or has expired. Please request a new one.',
-          variant: 'destructive',
-        });
-        navigate('/forgot-password', { replace: true });
+        // Mark as attempted BEFORE calling exchange to survive remounts
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(lockKey, 'attempted');
+        }
+
+        console.log('UpdatePassword: Found PKCE code, exchanging for session');
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
+
+        if (exchangeErr) {
+          console.error('UpdatePassword: PKCE exchangeCodeForSession failed', exchangeErr);
+          // If the exchange failed but a session is present (e.g., first attempt succeeded), allow
+          if (await allowIfSessionExists()) {
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            return;
+          }
+
+          toast({
+            title: 'Invalid Reset Link',
+            description: 'This reset link is invalid or has expired. Please request a new one and open it in the same browser.',
+            variant: 'destructive',
+          });
+          navigate('/forgot-password', { replace: true });
+          return;
+        }
+
+        // Mark as done
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(lockKey, 'done');
+        }
+
+        console.log('UpdatePassword: PKCE session established successfully');
+        // Clean URL (remove the code param)
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        setIsValidating(false);
+        return;
       } catch (err) {
         console.error('UpdatePassword: PKCE validation failed', err);
         toast({
