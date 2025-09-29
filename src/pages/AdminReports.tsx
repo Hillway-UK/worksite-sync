@@ -192,53 +192,10 @@ export default function AdminReports() {
         weekEnd: format(weekEnd, 'yyyy-MM-dd')
       });
 
-      // Step 1: Get current user's organization and allowed worker IDs
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        throw new Error('User not authenticated');
-      }
-
-      // Get user's organization ID
-      const { data: orgData, error: orgError } = await supabase
-        .rpc('get_user_role_and_org', { user_email: user.email });
-
-      if (orgError) {
-        console.error('Error getting user organization:', orgError);
-        throw orgError;
-      }
-
-      const orgId = orgData?.[0]?.organization_id;
-      console.log('User organization ID:', orgId);
-
-      if (!orgId) {
-        throw new Error('User organization not found');
-      }
-
-      // Get all workers in the user's organization
-      const { data: orgWorkers, error: workersError } = await supabase
-        .from('workers')
-        .select('id, name')
-        .eq('organization_id', orgId);
-
-      if (workersError) {
-        console.error('Error fetching organization workers:', workersError);
-        throw workersError;
-      }
-
-      const allowedWorkerIds = orgWorkers?.map(w => w.id) || [];
-      console.log('Allowed worker IDs in organization:', allowedWorkerIds.length);
-
-      if (allowedWorkerIds.length === 0) {
-        console.log('No workers found in organization');
-        setDetailedData([]);
-        return;
-      }
-
-      // Step 2: Fetch clock entries filtered by organization workers
+      // Step 1: Fetch clock entries first
       const entriesResult = await supabase
         .from('clock_entries')
         .select('*')
-        .in('worker_id', allowedWorkerIds)
         .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
         .lte('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
         .not('clock_out', 'is', null)
@@ -250,21 +207,26 @@ export default function AdminReports() {
         throw entriesResult.error;
       }
 
-      console.log('Detailed Report - Filtered entries found:', entriesResult.data?.length || 0);
+      console.log('Detailed Report - Entries found:', entriesResult.data?.length || 0);
 
       if (!entriesResult.data || entriesResult.data.length === 0) {
-        console.log('No clock entries found for the selected week in organization');
+        console.log('No clock entries found for the selected week');
         setDetailedData([]);
         return;
       }
 
-      // Step 3: Get unique job IDs from the filtered entries
+      // Step 2: Get unique worker and job IDs
+      const workerIds = [...new Set(entriesResult.data.map(entry => entry.worker_id))];
       const jobIds = [...new Set(entriesResult.data.map(entry => entry.job_id))];
 
-      console.log('Fetching data for workers:', orgWorkers.length, 'jobs:', jobIds.length);
+      console.log('Fetching data for workers:', workerIds.length, 'jobs:', jobIds.length);
 
-      // Step 4: Fetch jobs and photos in parallel (workers already fetched)
-      const [jobsResult, photosResult] = await Promise.all([
+      // Step 3: Fetch workers, jobs, and photos in parallel
+      const [workersResult, jobsResult, photosResult] = await Promise.all([
+        supabase
+          .from('workers')
+          .select('id, name')
+          .in('id', workerIds),
         supabase
           .from('jobs')
           .select('id, name')
@@ -272,22 +234,24 @@ export default function AdminReports() {
         supabase
           .from('clock_entries')
           .select('worker_id, clock_in_photo')
-          .in('worker_id', allowedWorkerIds)
           .not('clock_in_photo', 'is', null)
           .order('worker_id')
           .order('clock_in', { ascending: true })
       ]);
 
+      if (workersResult.error) {
+        console.error('Workers query error:', workersResult.error);
+      }
       if (jobsResult.error) {
         console.error('Jobs query error:', jobsResult.error);
       }
 
-      console.log('Workers from organization:', orgWorkers?.length || 0);
+      console.log('Workers fetched:', workersResult.data?.length || 0);
       console.log('Jobs fetched:', jobsResult.data?.length || 0);
 
-      // Step 5: Build lookup maps
+      // Step 4: Build lookup maps
       const workersMap: Record<string, string> = {};
-      orgWorkers?.forEach(worker => {
+      workersResult.data?.forEach(worker => {
         workersMap[worker.id] = worker.name;
       });
 
