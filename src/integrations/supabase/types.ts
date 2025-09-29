@@ -692,14 +692,6 @@ export type Database = {
           worker_name: string
         }[]
       }
-      get_current_user_permissions: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          is_manager: boolean
-          is_super_admin: boolean
-          organization_id: string
-        }[]
-      }
       get_recent_activity: {
         Args: Record<PropertyKey, never>
         Returns: {

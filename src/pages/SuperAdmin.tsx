@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,27 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle, LogOut, CheckCircle, Copy } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { queryKeys } from '@/lib/query-client';
-import { generateSecurePassword } from '@/lib/validation';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
   const [showOrgDialog, setShowOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
-  const [showManagerSuccessModal, setShowManagerSuccessModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
-  const [creatingManager, setCreatingManager] = useState(false);
-  const [managerCredentials, setManagerCredentials] = useState<{
-    name: string;
-    email: string;
-    password: string;
-  } | null>(null);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -40,141 +31,164 @@ export default function SuperAdmin() {
   const [managerForm, setManagerForm] = useState({
     email: '',
     name: '',
+    password: '',
     organization_id: ''
   });
 
-  // Authentication verification
-  const { data: authData, isLoading: authLoading, error: authError } = useQuery({
-    queryKey: ['superAdminAuth', user?.email],
-    queryFn: async () => {
-      if (!user?.email) throw new Error('No user');
-      
+  useEffect(() => {
+    verifyAuthentication();
+  }, [user, userRole]);
+
+  const verifyAuthentication = async () => {
+    if (!user) {
+      toast.error('Please log in to access this page');
+      setLoading(false);
+      return;
+    }
+
+    // Check if user is in super_admins table
+    try {
       const { data: superAdmin, error } = await supabase
         .from('super_admins')
         .select('*')
         .eq('email', user.email)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!superAdmin) throw new Error('Access denied: Super admin privileges required');
-      
-      return superAdmin;
-    },
-    enabled: !!user?.email,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+      if (error) {
+        toast.error('Failed to verify admin status');
+        setLoading(false);
+        return;
+      }
 
-  // Set auth verified when data is available
-  React.useEffect(() => {
-    if (authData) {
+      if (!superAdmin) {
+        toast.error('Access denied: Super admin privileges required');
+        setLoading(false);
+        return;
+      }
+
       setAuthVerified(true);
-    } else if (authError) {
-      toast.error(authError.message || 'Authentication verification failed');
-      setAuthVerified(false);
+      await initializeData();
+    } catch (err: any) {
+      toast.error('Authentication verification failed');
+      setLoading(false);
     }
-  }, [authData, authError]);
+  };
 
-  // Organizations query with manager counts
-  const { data: organizations = [], isLoading: orgsLoading, error: orgsError } = useQuery({
-    queryKey: queryKeys.organizations.withCounts(),
-    queryFn: async (): Promise<any[]> => {
-      // First get organizations
-      const { data: orgsData, error: orgsError } = await supabase
+  const initializeData = async () => {
+    try {
+      await Promise.all([fetchOrganizations(), fetchManagers()]);
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+    }
+  };
+
+  const fetchOrganizations = async () => {
+    try {
+      // First try simple query without joins
+      const { data, error } = await supabase
         .from('organizations')
         .select('*')
         .order('name');
       
-      if (orgsError) throw orgsError;
+      if (error) {
+        toast.error(`Failed to load organizations: ${error.message}`);
+        return;
+      }
       
-      // Then get manager counts for each organization
-      const orgsWithCounts = await Promise.all(
-        (orgsData || []).map(async (org) => {
-          const { count } = await supabase
-            .from('managers')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.id);
-          
-          return {
-            ...org,
-            managers: { count: count || 0 }
-          };
+      // Get manager count separately for each organization
+      const orgsWithManagerCount = await Promise.all(
+        (data || []).map(async (org) => {
+          try {
+            const { count, error: countError } = await supabase
+              .from('managers')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', org.id);
+            
+            return {
+              ...org,
+              managers: { count: count || 0 }
+            };
+          } catch (err) {
+            return {
+              ...org,
+              managers: { count: 0 }
+            };
+          }
         })
       );
       
-      return orgsWithCounts;
-    },
-    enabled: authVerified,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-
-  // Show organizations error
-  React.useEffect(() => {
-    if (orgsError) {
-      toast.error(`Failed to load organizations: ${orgsError.message}`);
+      setOrganizations(orgsWithManagerCount);
+      
+    } catch (err: any) {
+      toast.error('Failed to load organizations');
     }
-  }, [orgsError]);
+  };
 
-  // Managers query with organization names
-  const { data: managers = [], isLoading: managersLoading, error: managersError } = useQuery({
-    queryKey: queryKeys.managers.withOrganizations(),
-    queryFn: async (): Promise<any[]> => {
+  const fetchManagers = async () => {
+    try {
       // First get managers
-      const { data: managersData, error: managersError } = await supabase
+      const { data: managersData, error } = await supabase
         .from('managers')
         .select('*')
         .order('name');
       
-      if (managersError) throw managersError;
+      if (error) {
+        toast.error(`Failed to load managers: ${error.message}`);
+        return;
+      }
       
-      // Then get organization names for each manager
+      // Get organization names separately
       const managersWithOrgs = await Promise.all(
         (managersData || []).map(async (manager) => {
           if (!manager.organization_id) {
-            return { ...manager, organizations: null };
+            return {
+              ...manager,
+              organizations: null
+            };
           }
           
-          const { data: orgData } = await supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', manager.organization_id)
-            .maybeSingle();
-          
-          return {
-            ...manager,
-            organizations: orgData
-          };
+          try {
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('name')
+              .eq('id', manager.organization_id)
+              .maybeSingle();
+            
+            return {
+              ...manager,
+              organizations: orgData
+            };
+          } catch (err) {
+            return {
+              ...manager,
+              organizations: null
+            };
+          }
         })
       );
       
-      return managersWithOrgs;
-    },
-    enabled: authVerified,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-
-  // Show managers error
-  React.useEffect(() => {
-    if (managersError) {
-      toast.error(`Failed to load managers: ${managersError.message}`);
+      setManagers(managersWithOrgs);
+      
+    } catch (err: any) {
+      toast.error('Failed to load managers');
     }
-  }, [managersError]);
+  };
 
-  const loading = authLoading || orgsLoading || managersLoading;
-
-  // Create organization mutation
-  const createOrgMutation = useMutation({
-    mutationFn: async (formData: typeof orgForm) => {
-      if (!formData.name || !formData.email) {
-        throw new Error('Organization name and email are required');
+  const createOrganization = async () => {
+    try {
+      if (!orgForm.name || !orgForm.email) {
+        toast.error('Organization name and email are required');
+        return;
       }
 
       const { data, error } = await supabase
         .from('organizations')
         .insert({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || null,
-          address: formData.address || null,
+          name: orgForm.name,
+          email: orgForm.email,
+          phone: orgForm.phone || null,
+          address: orgForm.address || null,
           subscription_status: 'active',
           max_workers: 50,
           max_managers: 5
@@ -182,179 +196,123 @@ export default function SuperAdmin() {
         .select()
         .single();
       
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
+      if (error) {
+        toast.error(`Failed to create organization: ${error.message}`);
+        return;
+      }
+      
       toast.success('Organization created successfully');
       setShowOrgDialog(false);
       setOrgForm({ name: '', email: '', phone: '', address: '' });
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.withCounts() });
-    },
-    onError: (error: any) => {
-      toast.error(`Failed to create organization: ${error.message}`);
+      await fetchOrganizations();
+    } catch (err: any) {
+      toast.error('An unexpected error occurred');
     }
-  });
-
-  const createOrganization = () => {
-    createOrgMutation.mutate(orgForm);
   };
 
-  // Copy manager credentials to clipboard
-  const copyManagerCredentials = async () => {
-    if (!managerCredentials) return;
-    
-    const credentialText = `Welcome to AutoTime
-    
-Name: ${managerCredentials.name}
-Email: ${managerCredentials.email}
-Temporary Password: ${managerCredentials.password}
-App URL: ${window.location.origin}
-
-Please change your password on first login for security.`;
-
+  const createManager = async () => {
     try {
-      await navigator.clipboard.writeText(credentialText);
-      toast.success('Login credentials copied to clipboard');
-    } catch (error) {
-      toast.error('Failed to copy credentials');
-    }
-  };
-
-  // Create manager mutation
-  const createManagerMutation = useMutation({
-    mutationFn: async (formData: typeof managerForm) => {
-      const email = formData.email?.trim().toLowerCase();
-      const name = formData.name?.trim();
-      const organization_id = formData.organization_id;
-
-      if (!email || !name || !organization_id) {
-        throw new Error('Please fill in all fields');
+      if (!managerForm.email || !managerForm.name || !managerForm.password || !managerForm.organization_id) {
+        toast.error('Please fill in all fields');
+        return;
       }
 
-      // Generate secure temporary password
-      const password = generateSecurePassword(12);
-
-      // 1) Try to create auth user
+      // Create auth user using regular signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
+        email: managerForm.email,
+        password: managerForm.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { name, role: 'manager' }
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            name: managerForm.name,
+            role: 'manager'
+          }
         }
       });
-
-      // Some tenants return an error, others return identities=[] for existing users.
-      const alreadyRegistered =
-        !!authError &&
-        (authError.message.toLowerCase().includes('already registered') ||
-         authError.message.toLowerCase().includes('user already registered')) ||
-        (authData?.user && Array.isArray(authData.user.identities) && authData.user.identities.length === 0);
-
-      if (authError && !alreadyRegistered) {
-        throw new Error(`Failed to create user: ${authError.message}`);
-      }
-
-      // 2) Upsert the manager row (works whether user is new or already existed)
-      const { data: managerRow, error: managerError } = await supabase
-        .from('managers')
-        .upsert(
-          { email, name, organization_id },
-          { onConflict: 'email' }
-        )
-        .select()
-        .single();
-
-      if (managerError) {
-        if ((managerError as any).code === '23505') {
-          throw new Error('A manager with this email already exists.');
-        } else {
-          throw new Error(`Failed to create manager record: ${managerError.message}`);
+      
+      if (authError) {
+        // Check if user already exists
+        if (authError.message.includes('already registered')) {
+          // User exists, just create manager record
+          const { error: managerError } = await supabase
+            .from('managers')
+            .insert({
+              email: managerForm.email,
+              name: managerForm.name,
+              organization_id: managerForm.organization_id
+            });
+          
+          if (managerError) {
+            toast.error(`Manager record error: ${managerError.message}`);
+          } else {
+            toast.success('Manager linked to existing user');
+            setShowManagerDialog(false);
+            setManagerForm({ email: '', name: '', password: '', organization_id: '' });
+            await fetchManagers();
+          }
+          return;
         }
+        
+        toast.error(`Auth error: ${authError.message}`);
+        return;
       }
-
-      return { managerRow, alreadyRegistered, password };
-    },
-    onMutate: () => {
-      setCreatingManager(true);
-    },
-    onSuccess: ({ alreadyRegistered, password }) => {
-      if (alreadyRegistered) {
-        toast.success('This email already had an account. Manager record was created/updated.');
-        setShowManagerDialog(false);
-        setManagerForm({ email: '', name: '', organization_id: '' });
-      } else {
-        // Store credentials for display in success modal
-        setManagerCredentials({
-          name: managerForm.name,
-          email: managerForm.email,
-          password: password,
-        });
-        setShowManagerSuccessModal(true);
-        toast.success('Manager created successfully with mobile app login enabled!');
-      }
-
-      queryClient.invalidateQueries({ queryKey: queryKeys.managers.withOrganizations() });
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || 'Failed to create manager');
-    },
-    onSettled: () => {
-      setCreatingManager(false);
-    }
-  });
-
-  const createManager = () => {
-    createManagerMutation.mutate(managerForm);
-  };
-
-  // Delete organization mutation
-  const deleteOrgMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('organizations')
-        .delete()
-        .eq('id', id);
       
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Organization deleted');
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.withCounts() });
-    },
-    onError: () => {
-      toast.error('Failed to delete organization');
-    }
-  });
-
-  // Delete manager mutation
-  const deleteManagerMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const { error } = await supabase
+      // Create manager record
+      const { error: managerError } = await supabase
         .from('managers')
-        .delete()
-        .eq('email', email);
+        .insert({
+          email: managerForm.email,
+          name: managerForm.name,
+          organization_id: managerForm.organization_id
+        });
       
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Manager removed');
-      queryClient.invalidateQueries({ queryKey: queryKeys.managers.withOrganizations() });
-    },
-    onError: () => {
-      toast.error('Failed to delete manager');
+      if (managerError) {
+        toast.error(`Failed to create manager record: ${managerError.message}`);
+        return;
+      }
+      
+      toast.success('Manager created successfully! They can now log in.');
+      setShowManagerDialog(false);
+      setManagerForm({ email: '', name: '', password: '', organization_id: '' });
+      await fetchManagers();
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create manager');
     }
-  });
-
-  const deleteOrganization = (id: string) => {
-    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
-    deleteOrgMutation.mutate(id);
   };
 
-  const deleteManager = (email: string) => {
+  const deleteOrganization = async (id: string) => {
+    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
+    
+    const { error } = await supabase
+      .from('organizations')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      toast.error('Failed to delete organization');
+      return;
+    }
+    
+    toast.success('Organization deleted');
+    fetchOrganizations();
+  };
+
+  const deleteManager = async (email: string) => {
     if (!confirm('Remove this manager? This action cannot be undone.')) return;
-    deleteManagerMutation.mutate(email);
+    
+    const { error } = await supabase
+      .from('managers')
+      .delete()
+      .eq('email', email);
+    
+    if (error) {
+      toast.error('Failed to delete manager');
+      return;
+    }
+    
+    toast.success('Manager removed');
+    fetchManagers();
   };
 
   if (loading) {
@@ -594,71 +552,22 @@ Please change your password on first login for security.`;
                 placeholder="Enter email address"
               />
             </div>
-            <Button 
-              onClick={createManager} 
-              className="w-full"
-              disabled={creatingManager}
-            >
-              {creatingManager ? 'Creating Manager...' : 'Create Manager'}
+            <div>
+              <Label htmlFor="manager-password">Password *</Label>
+              <Input
+                id="manager-password"
+                type="password"
+                value={managerForm.password}
+                onChange={(e) => setManagerForm({...managerForm, password: e.target.value})}
+                placeholder="Enter password"
+              />
+            </div>
+            <Button onClick={createManager} className="w-full">
+              Create Manager
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Manager Success Modal */}
-      <AlertDialog open={showManagerSuccessModal} onOpenChange={setShowManagerSuccessModal}>
-        <AlertDialogContent className="sm:max-w-[500px]">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-              <AlertDialogTitle className="text-xl">Manager Created Successfully!</AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="text-base space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-                <div>
-                  <span className="font-medium text-green-800">Manager Name:</span>
-                  <p className="text-green-700 font-mono">{managerCredentials?.name}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Email:</span>
-                  <p className="text-green-700 font-mono">{managerCredentials?.email}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Temporary Password:</span>
-                  <p className="text-green-700 font-mono text-lg bg-green-100 p-2 rounded border">
-                    {managerCredentials?.password}
-                  </p>
-                </div>
-              </div>
-              <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm">
-                  <strong>Important:</strong> Please share these credentials securely with the manager. 
-                  They must change their password on first login.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={copyManagerCredentials}
-              className="flex items-center gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              Copy Login Details
-            </Button>
-            <AlertDialogAction onClick={() => {
-              setShowManagerSuccessModal(false);
-              setManagerCredentials(null);
-              setShowManagerDialog(false);
-              setManagerForm({ email: '', name: '', organization_id: '' });
-            }}>
-              Done
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

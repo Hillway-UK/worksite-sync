@@ -73,7 +73,6 @@ export const queryKeys = {
   auth: {
     session: () => ['auth', 'session'] as const,
     user: () => ['auth', 'user'] as const,
-    userRole: (userEmail: string) => ['auth', 'userRole', userEmail] as const,
   },
   
   // User management queries
@@ -87,32 +86,8 @@ export const queryKeys = {
   // Organization queries
   organizations: {
     all: () => ['organizations'] as const,
-    withCounts: () => ['organizations', 'withCounts'] as const,
     detail: (id: string) => ['organizations', 'detail', id] as const,
     settings: (id: string) => ['organizations', 'settings', id] as const,
-    name: (userEmail: string) => ['organizations', 'name', userEmail] as const,
-  },
-
-  // Manager queries
-  managers: {
-    all: () => ['managers'] as const,
-    withOrganizations: () => ['managers', 'withOrganizations'] as const,
-    byOrganization: (orgId: string) => ['managers', 'organization', orgId] as const,
-  },
-
-  // Worker queries
-  workers: {
-    all: () => ['workers'] as const,
-    active: () => ['workers', 'active'] as const,
-    clockedIn: () => ['workers', 'clockedIn'] as const,
-    byOrganization: (orgId: string) => ['workers', 'organization', orgId] as const,
-  },
-
-  // Amendment queries
-  amendments: {
-    all: () => ['amendments'] as const,
-    pending: () => ['amendments', 'pending'] as const,
-    byWorker: (workerId: string) => ['amendments', 'worker', workerId] as const,
   },
   
   // Time tracking queries

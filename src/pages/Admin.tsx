@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { queryKeys } from '@/lib/query-client';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -31,77 +29,107 @@ interface RecentActivity {
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [managerName, setManagerName] = useState('');
+  const [clockedInWorkers, setClockedInWorkers] = useState<CllockedInWorker[]>([]);
+  const [totalHoursToday, setTotalHoursToday] = useState(0);
+  const [pendingAmendments, setPendingAmendments] = useState(0);
+  const [activeWorkers, setActiveWorkers] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Fetch manager and organization data
-  const { data: managerData } = useQuery({
-    queryKey: queryKeys.users.detail(user?.email || ''),
-    queryFn: async () => {
-      if (!user?.email) throw new Error('No user email');
-      
-      const { data: manager, error } = await supabase
+  const [organizationName, setOrganizationName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchOrganization = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data: manager } = await supabase
+          .from('managers')
+          .select('organization_id')
+          .eq('email', user.email)
+          .single();
+        
+        if (manager?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', manager.organization_id)
+            .single();
+          
+          if (org?.name) {
+            setOrganizationName(org.name);
+          }
+        }
+      }
+    };
+    fetchOrganization();
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user?.email]);
+
+  const fetchDashboardData = async () => {
+    if (!user?.email) return;
+
+    try {
+      // Fetch manager name
+      const { data: manager } = await supabase
         .from('managers')
-        .select(`
-          name,
-          organization_id,
-          organizations!managers_organization_id_fkey(name)
-        `)
+        .select('name')
         .eq('email', user.email)
         .single();
 
-      if (error) throw error;
-      return manager;
-    },
-    enabled: !!user?.email,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
+      if (manager) {
+        setManagerName(manager.name);
+      }
 
-  // Fetch dashboard statistics
-  const { data: dashboardStats, isLoading } = useQuery({
-    queryKey: queryKeys.dashboard.stats('current'),
-    queryFn: async () => {
-      const [
-        clockedInResult,
-        hoursTodayResult,
-        amendmentsResult,
-        workersResult,
-        activityResult
-      ] = await Promise.all([
-        supabase.rpc('get_clocked_in_workers'),
-        supabase.rpc('get_total_hours_today'),
-        supabase
-          .from('time_amendments')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending'),
-        supabase
-          .from('workers')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_active', true),
-        supabase.rpc('get_recent_activity')
-      ]);
+      // Fetch clocked in workers
+      const { data: clockedIn, error: clockedInError } = await supabase
+        .rpc('get_clocked_in_workers');
 
-      return {
-        clockedInWorkers: clockedInResult.data || [],
-        totalHoursToday: hoursTodayResult.data || 0,
-        pendingAmendments: amendmentsResult.count || 0,
-        activeWorkers: workersResult.count || 0,
-        recentActivity: activityResult.data || []
-      };
-    },
-    enabled: !!user?.email,
-    staleTime: 1 * 60 * 1000, // 1 minute for dashboard data
-    refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
-  });
+      if (clockedInError) throw clockedInError;
+      setClockedInWorkers(clockedIn || []);
 
-  const managerName = managerData?.name || '';
-  const organizationName = managerData?.organizations?.name || '';
-  const clockedInWorkers = dashboardStats?.clockedInWorkers || [];
-  const totalHoursToday = dashboardStats?.totalHoursToday || 0;
-  const pendingAmendments = dashboardStats?.pendingAmendments || 0;
-  const activeWorkers = dashboardStats?.activeWorkers || 0;
-  const recentActivity = dashboardStats?.recentActivity || [];
+      // Fetch total hours today
+      const { data: hoursToday, error: hoursTodayError } = await supabase
+        .rpc('get_total_hours_today');
 
-  const loading = isLoading;
+      if (hoursTodayError) throw hoursTodayError;
+      setTotalHoursToday(hoursToday || 0);
+
+      // Fetch pending amendments count
+      const { count: amendmentsCount, error: amendmentsError } = await supabase
+        .from('time_amendments')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      if (amendmentsError) throw amendmentsError;
+      setPendingAmendments(amendmentsCount || 0);
+
+      // Fetch active workers count
+      const { count: workersCount, error: workersError } = await supabase
+        .from('workers')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      if (workersError) throw workersError;
+      setActiveWorkers(workersCount || 0);
+
+      // Fetch recent activity
+      const { data: activity, error: activityError } = await supabase
+        .rpc('get_recent_activity');
+
+      if (activityError) throw activityError;
+      setRecentActivity(activity || []);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (

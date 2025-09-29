@@ -102,71 +102,56 @@ export default function AdminReports() {
       const weekStart = new Date(selectedWeek);
       const weekEnd = addDays(weekStart, 6);
 
-      // Fetch all workers and their data in a single efficient query
+      // Fetch workers and their data
       const { data: workers, error: workersError } = await supabase
         .from('workers')
-        .select('id, name, hourly_rate')
+        .select('*')
         .eq('is_active', true);
 
       if (workersError) throw workersError;
 
-      if (!workers || workers.length === 0) {
-        setWeeklyData([]);
-        return;
-      }
+      const reportData: WeeklyData[] = [];
 
-      const workerIds = workers.map(w => w.id);
-
-      // Fetch all data in parallel for better performance
-      const [hoursResults, costsResults, photosResults] = await Promise.all([
-        // Get weekly hours for all workers at once using RPC calls in parallel
-        Promise.all(workers.map(worker => 
-          supabase.rpc('get_worker_weekly_hours', {
+      for (const worker of workers || []) {
+        // Get total hours for the week
+        const { data: hoursData } = await supabase
+          .rpc('get_worker_weekly_hours', {
             worker_uuid: worker.id,
             week_start: format(weekStart, 'yyyy-MM-dd'),
-          })
-        )),
-        // Get all additional costs for the week
-        supabase
+          });
+
+        const totalHours = hoursData || 0;
+
+        // Get additional costs
+        const { data: costs } = await supabase
           .from('additional_costs')
-          .select('worker_id, amount')
-          .in('worker_id', workerIds)
+          .select('amount')
+          .eq('worker_id', worker.id)
           .gte('date', format(weekStart, 'yyyy-MM-dd'))
-          .lte('date', format(weekEnd, 'yyyy-MM-dd')),
-        // Get profile photos for all workers (first photo for each worker)
-        supabase
+          .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+
+        const additionalCosts = costs?.reduce((sum, cost) => sum + Number(cost.amount), 0) || 0;
+
+        // Get profile photo
+        const { data: photoData } = await supabase
           .from('clock_entries')
-          .select('worker_id, clock_in_photo')
-          .in('worker_id', workerIds)
+          .select('clock_in_photo')
+          .eq('worker_id', worker.id)
           .not('clock_in_photo', 'is', null)
           .order('clock_in', { ascending: true })
-      ]);
+          .limit(1);
 
-      // Process the results
-      const costsMap = new Map<string, number>();
-      costsResults.data?.forEach(cost => {
-        const current = costsMap.get(cost.worker_id) || 0;
-        costsMap.set(cost.worker_id, current + Number(cost.amount));
-      });
-
-      const photosMap = new Map<string, string>();
-      photosResults.data?.forEach(photo => {
-        if (!photosMap.has(photo.worker_id)) {
-          photosMap.set(photo.worker_id, photo.clock_in_photo);
-        }
-      });
-
-      // Build report data
-      const reportData: WeeklyData[] = workers.map((worker, index) => ({
-        worker_id: worker.id,
-        worker_name: worker.name,
-        total_hours: hoursResults[index]?.data || 0,
-        hourly_rate: worker.hourly_rate,
-        jobs: [], // Simplified for now
-        additional_costs: costsMap.get(worker.id) || 0,
-        total_amount: ((hoursResults[index]?.data || 0) * worker.hourly_rate) + (costsMap.get(worker.id) || 0),
-        profile_photo: photosMap.get(worker.id)
-      }));
+        reportData.push({
+          worker_id: worker.id,
+          worker_name: worker.name,
+          total_hours: totalHours,
+          hourly_rate: worker.hourly_rate,
+          jobs: [], // Simplified for now
+          additional_costs: additionalCosts,
+          total_amount: (totalHours * worker.hourly_rate) + additionalCosts,
+          profile_photo: photoData?.[0]?.clock_in_photo || undefined,
+        });
+      }
 
       setWeeklyData(reportData);
     } catch (error) {
@@ -187,112 +172,56 @@ export default function AdminReports() {
       const weekStart = new Date(selectedWeek);
       const weekEnd = addDays(weekStart, 6);
 
-      console.log('Detailed Report - Week range:', {
-        weekStart: format(weekStart, 'yyyy-MM-dd'),
-        weekEnd: format(weekEnd, 'yyyy-MM-dd')
-      });
-
-      // Step 1: Fetch clock entries first
-      const entriesResult = await supabase
+      const { data: entries, error } = await supabase
         .from('clock_entries')
-        .select('*')
+        .select(`
+          *,
+          workers(name),
+          jobs(name)
+        `)
         .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-        .lte('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
+        .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
         .not('clock_out', 'is', null)
         .order('worker_id')
         .order('clock_in');
 
-      if (entriesResult.error) {
-        console.error('Detailed Report - Entries query error:', entriesResult.error);
-        throw entriesResult.error;
-      }
+      if (error) throw error;
 
-      console.log('Detailed Report - Entries found:', entriesResult.data?.length || 0);
-
-      if (!entriesResult.data || entriesResult.data.length === 0) {
-        console.log('No clock entries found for the selected week');
-        setDetailedData([]);
-        return;
-      }
-
-      // Step 2: Get unique worker and job IDs
-      const workerIds = [...new Set(entriesResult.data.map(entry => entry.worker_id))];
-      const jobIds = [...new Set(entriesResult.data.map(entry => entry.job_id))];
-
-      console.log('Fetching data for workers:', workerIds.length, 'jobs:', jobIds.length);
-
-      // Step 3: Fetch workers, jobs, and photos in parallel
-      const [workersResult, jobsResult, photosResult] = await Promise.all([
-        supabase
-          .from('workers')
-          .select('id, name')
-          .in('id', workerIds),
-        supabase
-          .from('jobs')
-          .select('id, name')
-          .in('id', jobIds),
-        supabase
-          .from('clock_entries')
-          .select('worker_id, clock_in_photo')
-          .not('clock_in_photo', 'is', null)
-          .order('worker_id')
-          .order('clock_in', { ascending: true })
-      ]);
-
-      if (workersResult.error) {
-        console.error('Workers query error:', workersResult.error);
-      }
-      if (jobsResult.error) {
-        console.error('Jobs query error:', jobsResult.error);
-      }
-
-      console.log('Workers fetched:', workersResult.data?.length || 0);
-      console.log('Jobs fetched:', jobsResult.data?.length || 0);
-
-      // Step 4: Build lookup maps
-      const workersMap: Record<string, string> = {};
-      workersResult.data?.forEach(worker => {
-        workersMap[worker.id] = worker.name;
-      });
-
-      const jobsMap: Record<string, string> = {};
-      jobsResult.data?.forEach(job => {
-        jobsMap[job.id] = job.name;
-      });
-
-      // Build photo map (first photo per worker)
+      const detailedEntries: DetailedEntry[] = [];
       const workerPhotos: Record<string, string> = {};
-      photosResult.data?.forEach(photo => {
-        if (!workerPhotos[photo.worker_id]) {
-          workerPhotos[photo.worker_id] = photo.clock_in_photo;
+
+      for (const entry of entries || []) {
+        // Get profile photo if not already fetched
+        if (!workerPhotos[entry.worker_id]) {
+          const { data: photoData } = await supabase
+            .from('clock_entries')
+            .select('clock_in_photo')
+            .eq('worker_id', entry.worker_id)
+            .not('clock_in_photo', 'is', null)
+            .order('clock_in', { ascending: true })
+            .limit(1);
+          
+          workerPhotos[entry.worker_id] = photoData?.[0]?.clock_in_photo || '';
         }
-      });
 
-      // Step 5: Build detailed entries with proper names
-      const detailedEntries: DetailedEntry[] = entriesResult.data.map(entry => ({
-        id: entry.id,
-        worker_id: entry.worker_id,
-        worker_name: workersMap[entry.worker_id] || 'Unknown Worker',
-        date: format(new Date(entry.clock_in), 'yyyy-MM-dd'),
-        job_name: jobsMap[entry.job_id] || 'Unknown Job',
-        clock_in: entry.clock_in,
-        clock_out: entry.clock_out,
-        clock_in_photo: entry.clock_in_photo,
-        clock_out_photo: entry.clock_out_photo,
-        hours: entry.total_hours || 0,
-        profile_photo: workerPhotos[entry.worker_id] || undefined,
-      }));
+        detailedEntries.push({
+          id: entry.id,
+          worker_id: entry.worker_id,
+          worker_name: entry.workers?.name || 'Unknown',
+          date: format(new Date(entry.clock_in), 'yyyy-MM-dd'),
+          job_name: entry.jobs?.name || 'Unknown Job',
+          clock_in: entry.clock_in,
+          clock_out: entry.clock_out,
+          clock_in_photo: entry.clock_in_photo,
+          clock_out_photo: entry.clock_out_photo,
+          hours: entry.total_hours || 0,
+          profile_photo: workerPhotos[entry.worker_id],
+        });
+      }
 
-      console.log('Detailed Report - Processed entries with names:', detailedEntries.length);
-      console.log('Sample entry:', detailedEntries[0]);
       setDetailedData(detailedEntries);
     } catch (error) {
       console.error('Error generating detailed report:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate detailed report",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }

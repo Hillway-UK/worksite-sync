@@ -1,60 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { queryKeys } from '@/lib/query-client';
 
 export const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [organizationName, setOrganizationName] = useState<string>('');
 
-  // Fetch organization name with React Query
-  const { data: organizationData } = useQuery({
-    queryKey: queryKeys.organizations.name(user?.email || ''),
-    queryFn: async () => {
-      if (!user?.email) throw new Error('No user email');
-      
-      let organizationQuery;
-      
+  useEffect(() => {
+    fetchOrganizationName();
+  }, [user, userRole]);
+
+  const fetchOrganizationName = async () => {
+    if (!user?.email) return;
+    
+    try {
       if (userRole === 'manager') {
-        organizationQuery = supabase
+        const { data: manager } = await supabase
           .from('managers')
-          .select(`
-            organization_id,
-            organizations!managers_organization_id_fkey(name)
-          `)
+          .select('organization_id')
           .eq('email', user.email)
           .single();
+        
+        if (manager?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', manager.organization_id)
+            .single();
+          
+          if (org?.name) {
+            setOrganizationName(org.name);
+          }
+        }
       } else if (userRole === 'worker') {
-        organizationQuery = supabase
+        const { data: worker } = await supabase
           .from('workers')
-          .select(`
-            organization_id,
-            organizations!workers_organization_id_fkey(name)
-          `)
+          .select('organization_id')
           .eq('email', user.email)
           .single();
+        
+        if (worker?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', worker.organization_id)
+            .single();
+          
+          if (org?.name) {
+            setOrganizationName(org.name);
+          }
+        }
       }
-
-      if (organizationQuery) {
-        const { data, error } = await organizationQuery;
-        if (error) throw error;
-        return data?.organizations?.name || '';
-      }
-      
-      return '';
-    },
-    enabled: !!user?.email && !!userRole && (userRole === 'manager' || userRole === 'worker'),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-
-  const organizationName = organizationData || '';
+    } catch (error) {
+      console.error('Error fetching organization:', error);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSecureForm } from '@/hooks/useSecureForm';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff, Lock } from 'lucide-react';
 const updatePasswordSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -28,109 +27,122 @@ const UpdatePassword = () => {
   const [searchParams] = useSearchParams();
   const { updatePassword, user } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const hasHandledAuthCode = useRef(false);
 
   useEffect(() => {
-    // Guard against React Strict Mode double-mount by using sessionStorage lock
-    if (hasHandledAuthCode.current) return;
-    hasHandledAuthCode.current = true;
-
     (async () => {
       try {
-        console.log('UpdatePassword: Starting PKCE-only password reset validation');
+        // Check for error parameters in URL first (hash and query)
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
+        
+        const errorFromHash = hashParams.get('error');
+        const errorDescriptionFromHash = hashParams.get('error_description');
+        const errorFromQuery = searchParams.get('error');
+        const errorDescriptionFromQuery = searchParams.get('error_description');
+        
+        const error = errorFromHash || errorFromQuery;
+        const errorDescription = errorDescriptionFromHash || errorDescriptionFromQuery;
+        
+        console.log('UpdatePassword: URL parameters check', {
+          hash,
+          error,
+          errorDescription,
+          searchParams: Object.fromEntries(searchParams.entries())
+        });
 
-        const codeParam = searchParams.get('code');
+        if (error) {
+          console.error('UpdatePassword: Error in URL parameters', { error, errorDescription });
+          let message = 'The reset link is invalid or has expired.';
+          
+          if (error === 'access_denied' || errorDescription) {
+            message = errorDescription || 'Access denied. The reset link may have expired.';
+          }
+          
+          toast({
+            title: 'Invalid Reset Link',
+            description: message,
+            variant: 'destructive',
+          });
+          navigate('/forgot-password', { replace: true });
+          return;
+        }
 
-        // Helper: proceed if we already have a valid session (e.g., exchange already succeeded)
-        const allowIfSessionExists = async () => {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            console.log('UpdatePassword: Valid session found, allowing password reset UI');
+        // 1) Check for password reset hash tokens (#access_token=...&refresh_token=...&type=recovery)
+        const typeParam = hashParams.get('type') || searchParams.get('type');
+        
+        if (typeParam === 'recovery') {
+          console.log('UpdatePassword: Found recovery type, processing password reset flow');
+          
+          const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+          
+          if (accessToken && refreshToken) {
+            console.log('UpdatePassword: Found recovery tokens, setting session');
+            const { data: current } = await supabase.auth.getSession();
+            if (!current.session) {
+              const { error: setErr } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              if (setErr) {
+                console.error('UpdatePassword: setSession failed for recovery', setErr);
+                throw setErr;
+              }
+            }
+            
+            console.log('UpdatePassword: Password reset session established');
+            if (typeof window !== 'undefined') {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
             setIsValidating(false);
-            return true;
-          }
-          return false;
-        };
-
-        if (!codeParam) {
-          // If no code is present, we might already have an established session
-          if (await allowIfSessionExists()) return;
-
-          console.log('UpdatePassword: No PKCE code found and no session, redirecting to forgot password');
-          toast({
-            title: 'Invalid Reset Link',
-            description: 'The reset link is invalid or has expired. Please request a new one.',
-            variant: 'destructive',
-          });
-          navigate('/forgot-password', { replace: true });
-          return;
-        }
-
-        const lockKey = `pkce_code_exchanged_${codeParam}`;
-        const lockVal = typeof window !== 'undefined' ? window.sessionStorage.getItem(lockKey) : null;
-
-        if (lockVal === 'done' || lockVal === 'attempted') {
-          console.log('UpdatePassword: PKCE exchange already attempted, checking session');
-          if (await allowIfSessionExists()) {
-            // Clean URL if needed
-            if (typeof window !== 'undefined') {
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
             return;
           }
-          // If no session despite prior attempt, treat as invalid
-          toast({
-            title: 'Invalid Reset Link',
-            description: 'The reset link is invalid or has expired. Please request a new one.',
-            variant: 'destructive',
-          });
-          navigate('/forgot-password', { replace: true });
-          return;
         }
 
-        // Mark as attempted BEFORE calling exchange to survive remounts
-        if (typeof window !== 'undefined') {
-          window.sessionStorage.setItem(lockKey, 'attempted');
-        }
+        // 2) Fallback: Check for any access/refresh tokens without recovery type
+        const accessFromHash = hashParams.get('access_token');
+        const refreshFromHash = hashParams.get('refresh_token');
+        const accessFromQuery = searchParams.get('access_token');
+        const refreshFromQuery = searchParams.get('refresh_token');
 
-        console.log('UpdatePassword: Found PKCE code, exchanging for session');
-        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
+        const accessToken = accessFromQuery || accessFromHash;
+        const refreshToken = refreshFromQuery || refreshFromHash;
 
-        if (exchangeErr) {
-          console.error('UpdatePassword: PKCE exchangeCodeForSession failed', exchangeErr);
-          // If the exchange failed but a session is present (e.g., first attempt succeeded), allow
-          if (await allowIfSessionExists()) {
-            if (typeof window !== 'undefined') {
-              window.history.replaceState({}, document.title, window.location.pathname);
+        if (accessToken && refreshToken && typeParam !== 'recovery') {
+          console.log('UpdatePassword: Found general access/refresh tokens, setting session');
+          const { data: current } = await supabase.auth.getSession();
+          if (!current.session) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (setErr) {
+              console.error('UpdatePassword: setSession failed', setErr);
+              throw setErr;
             }
-            return;
           }
-
-          toast({
-            title: 'Invalid Reset Link',
-            description: 'This reset link is invalid or has expired. Please request a new one and open it in the same browser.',
-            variant: 'destructive',
-          });
-          navigate('/forgot-password', { replace: true });
+          setIsValidating(false);
           return;
         }
 
-        // Mark as done
-        if (typeof window !== 'undefined') {
-          window.sessionStorage.setItem(lockKey, 'done');
+        // 3) As a fallback, check if a session already exists
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          console.log('UpdatePassword: Found existing session');
+          setIsValidating(false);
+          return;
         }
 
-        console.log('UpdatePassword: PKCE session established successfully');
-        // Clean URL (remove the code param)
-        if (typeof window !== 'undefined') {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        setIsValidating(false);
-        return;
+        // Otherwise, invalid link
+        console.log('UpdatePassword: No valid tokens found, redirecting to forgot password');
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
       } catch (err) {
-        console.error('UpdatePassword: PKCE validation failed', err);
+        console.error('UpdatePassword: token handling failed', err);
         toast({
           title: 'Invalid Reset Link',
           description: 'The reset link is invalid or has expired. Please request a new one.',
@@ -193,102 +205,62 @@ const UpdatePassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
           <AutoTimeLogo className="mx-auto mb-4" />
-          <h1 className="text-2xl font-bold">Reset Your Password</h1>
-        </div>
-        
-        <form onSubmit={handleSecureSubmit} className="space-y-6">
-          <div className="space-y-4">
+          <CardTitle>Update Password</CardTitle>
+          <CardDescription>
+            Enter your new password below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSecureSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-foreground">
-                New Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter new password"
-                  {...register('password')}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <Label htmlFor="password">New Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter new password"
+                {...register('password')}
+                className="w-full"
+              />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Password requirements:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>At least 8 characters long</li>
+                  <li>Contains uppercase and lowercase letters</li>
+                  <li>Contains at least one number</li>
+                </ul>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-                Confirm New Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm new password"
-                  {...register('confirmPassword')}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm new password"
+                {...register('confirmPassword')}
+                className="w-full"
+              />
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
               )}
             </div>
-          </div>
 
-          <div className="text-sm text-muted-foreground space-y-2">
-            <p className="font-medium">Password requirements:</p>
-            <ul className="space-y-1 ml-4">
-              <li className="flex items-center space-x-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>At least 8 characters long</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>Contains uppercase and lowercase letters</span>
-              </li>
-              <li className="flex items-center space-x-2">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
-                <span>Contains at least one number</span>
-              </li>
-            </ul>
-          </div>
-
-          <Button 
-            type="submit" 
-            className="w-full bg-black hover:bg-black/90 text-white" 
-            disabled={isSubmitting}
-          >
-            <Lock size={16} className="mr-2" />
-            {isSubmitting ? 'Updating...' : 'Update Password'}
-          </Button>
-        </form>
-
-        <div className="text-center">
-          <Link 
-            to="/login" 
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Back to Login
-          </Link>
-        </div>
-      </div>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Updating...' : 'Update Password'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
