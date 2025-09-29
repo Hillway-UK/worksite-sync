@@ -132,8 +132,9 @@ export default function AdminReports() {
           `)
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-          .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
-          .not('clock_out', 'is', null);
+          .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
+          .not('clock_out', 'is', null)
+          .not('total_hours', 'is', null);
 
         // Aggregate job data
         const jobsMap = new Map();
@@ -653,8 +654,8 @@ export default function AdminReports() {
     ];
 
     const csvRows = weeklyData.map((worker, index) => {
-      // Get primary job site name (most hours worked) or "Multiple Sites" if multiple jobs
-      let trackingOption1 = 'CONSTRUCTION'; // Default fallback
+      // Get primary job site name (most hours worked) or fallback
+      let trackingOption1 = 'General Work'; // Default fallback
       if (worker.jobs.length === 1) {
         trackingOption1 = worker.jobs[0].job_name;
       } else if (worker.jobs.length > 1) {
