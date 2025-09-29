@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSecureForm } from '@/hooks/useSecureForm';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 const updatePasswordSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -27,6 +28,8 @@ const UpdatePassword = () => {
   const [searchParams] = useSearchParams();
   const { updatePassword, user } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -205,62 +208,102 @@ const UpdatePassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
           <AutoTimeLogo className="mx-auto mb-4" />
-          <CardTitle>Update Password</CardTitle>
-          <CardDescription>
-            Enter your new password below.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSecureSubmit} className="space-y-4">
+          <h1 className="text-2xl font-bold">Reset Your Password</h1>
+        </div>
+        
+        <form onSubmit={handleSecureSubmit} className="space-y-6">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter new password"
-                {...register('password')}
-                className="w-full"
-              />
+              <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter new password"
+                  {...register('password')}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Password requirements:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>At least 8 characters long</li>
-                  <li>Contains uppercase and lowercase letters</li>
-                  <li>Contains at least one number</li>
-                </ul>
-              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="Confirm new password"
-                {...register('confirmPassword')}
-                className="w-full"
-              />
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+                Confirm New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm new password"
+                  {...register('confirmPassword')}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
               )}
             </div>
+          </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium">Password requirements:</p>
+            <ul className="space-y-1 ml-4">
+              <li className="flex items-center space-x-2">
+                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                <span>At least 8 characters long</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                <span>Contains uppercase and lowercase letters</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <span className="w-1 h-1 bg-muted-foreground rounded-full"></span>
+                <span>Contains at least one number</span>
+              </li>
+            </ul>
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full bg-black hover:bg-black/90 text-white" 
+            disabled={isSubmitting}
+          >
+            <Lock size={16} className="mr-2" />
+            {isSubmitting ? 'Updating...' : 'Update Password'}
+          </Button>
+        </form>
+
+        <div className="text-center">
+          <Link 
+            to="/login" 
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Back to Login
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

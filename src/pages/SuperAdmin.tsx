@@ -20,6 +20,7 @@ export default function SuperAdmin() {
   const [showManagerDialog, setShowManagerDialog] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
+  const [creatingManager, setCreatingManager] = useState(false);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -217,6 +218,8 @@ export default function SuperAdmin() {
         return;
       }
 
+      setCreatingManager(true);
+
       // Create auth user using regular signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: managerForm.email,
@@ -233,41 +236,48 @@ export default function SuperAdmin() {
       if (authError) {
         // Check if user already exists
         if (authError.message.includes('already registered')) {
-          // User exists, just create manager record
+          // User exists, use upsert to handle potential duplicates gracefully
           const { error: managerError } = await supabase
             .from('managers')
-            .insert({
+            .upsert({
               email: managerForm.email,
               name: managerForm.name,
               organization_id: managerForm.organization_id
+            }, {
+              onConflict: 'email'
             });
           
           if (managerError) {
             toast.error(`Manager record error: ${managerError.message}`);
           } else {
-            toast.success('Manager linked to existing user');
+            toast.success('Manager linked to existing user successfully!');
             setShowManagerDialog(false);
             setManagerForm({ email: '', name: '', password: '', organization_id: '' });
             await fetchManagers();
           }
+          setCreatingManager(false);
           return;
         }
         
         toast.error(`Auth error: ${authError.message}`);
+        setCreatingManager(false);
         return;
       }
       
-      // Create manager record
+      // Create manager record for new user - use upsert to handle edge cases
       const { error: managerError } = await supabase
         .from('managers')
-        .insert({
+        .upsert({
           email: managerForm.email,
           name: managerForm.name,
           organization_id: managerForm.organization_id
+        }, {
+          onConflict: 'email'
         });
       
       if (managerError) {
         toast.error(`Failed to create manager record: ${managerError.message}`);
+        setCreatingManager(false);
         return;
       }
       
@@ -278,6 +288,8 @@ export default function SuperAdmin() {
       
     } catch (error: any) {
       toast.error(error.message || 'Failed to create manager');
+    } finally {
+      setCreatingManager(false);
     }
   };
 
@@ -562,8 +574,12 @@ export default function SuperAdmin() {
                 placeholder="Enter password"
               />
             </div>
-            <Button onClick={createManager} className="w-full">
-              Create Manager
+            <Button 
+              onClick={createManager} 
+              className="w-full"
+              disabled={creatingManager}
+            >
+              {creatingManager ? 'Creating Manager...' : 'Create Manager'}
             </Button>
           </div>
         </DialogContent>
