@@ -122,38 +122,54 @@ export default function AdminReports() {
 
         const totalHours = hoursData || 0;
 
-        // Get job details for this worker during the week
-        const { data: jobEntries, error: jobError } = await supabase
+        // Get clock entries for this worker during the week
+        const { data: clockEntries, error: clockError } = await supabase
           .from('clock_entries')
-          .select(`
-            job_id,
-            total_hours,
-            jobs(id, name, address)
-          `)
+          .select('job_id, total_hours')
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
           .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
           .not('clock_out', 'is', null)
           .not('total_hours', 'is', null);
 
-        if (jobError) {
-          console.error('Error fetching job entries for worker', worker.name, ':', jobError);
+        if (clockError) {
+          console.error('Error fetching clock entries for worker', worker.name, ':', clockError);
         }
 
-        console.log(`Job entries for ${worker.name} (${format(weekStart, 'yyyy-MM-dd')} to ${format(weekEnd, 'yyyy-MM-dd')}):`, jobEntries?.length || 0, jobEntries);
+        console.log(`Clock entries for ${worker.name}:`, clockEntries?.length || 0, clockEntries);
 
-        // Aggregate job data
+        // Get unique job IDs and fetch job details separately
+        const uniqueJobIds = [...new Set(clockEntries?.map(entry => entry.job_id).filter(Boolean))];
+        
+        let jobDetailsMap = new Map();
+        if (uniqueJobIds.length > 0) {
+          const { data: jobDetails, error: jobError } = await supabase
+            .from('jobs')
+            .select('id, name, address')
+            .in('id', uniqueJobIds);
+
+          if (jobError) {
+            console.error('Error fetching job details:', jobError);
+          } else {
+            console.log('Job details fetched:', jobDetails);
+            jobDetails?.forEach(job => {
+              jobDetailsMap.set(job.id, { name: job.name, address: job.address });
+            });
+          }
+        }
+
+        // Aggregate job data with proper job names
         const jobsMap = new Map();
-        jobEntries?.forEach(entry => {
-          if (entry.jobs) {
-            const jobId = entry.jobs.id;
-            if (jobsMap.has(jobId)) {
-              jobsMap.get(jobId).hours += entry.total_hours || 0;
+        clockEntries?.forEach(entry => {
+          if (entry.job_id) {
+            const jobDetails = jobDetailsMap.get(entry.job_id);
+            if (jobsMap.has(entry.job_id)) {
+              jobsMap.get(entry.job_id).hours += entry.total_hours || 0;
             } else {
-              jobsMap.set(jobId, {
-                job_id: jobId,
-                job_name: entry.jobs.name,
-                job_address: entry.jobs.address,
+              jobsMap.set(entry.job_id, {
+                job_id: entry.job_id,
+                job_name: jobDetails?.name || 'Unknown Job',
+                job_address: jobDetails?.address || '',
                 hours: entry.total_hours || 0,
               });
             }
