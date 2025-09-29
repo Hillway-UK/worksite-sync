@@ -63,7 +63,7 @@ interface PostcodeApiResponse {
   result: PostcodeResult;
 }
 
-// Geocode UK postcode using postcodes.io API
+// Geocode UK postcode using Supabase Edge Function
 export async function geocodePostcode(postcode: string): Promise<{
   latitude: number;
   longitude: number;
@@ -80,47 +80,27 @@ export async function geocodePostcode(postcode: string): Promise<{
       throw new Error(error);
     }
 
-    const formattedPostcode = formatPostcode(trimmedPostcode);
-    console.log('Formatted postcode:', formattedPostcode);
-    
-    const url = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`;
-    console.log('Fetching from URL:', url);
-    
-    const response = await fetch(url);
-    console.log('API Response status:', response.status);
-    
+    // Call our Supabase Edge Function instead of the external API
+    const response = await fetch('https://kejblmetyrsehzvrxgmt.supabase.co/functions/v1/geocode-postcode', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlamJsbWV0eXJzZWh6dnJ4Z210Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzOTI1NTIsImV4cCI6MjA2OTk2ODU1Mn0.4CxLNIJtyjWDgoxNzKOwz1LiKnuRHkVubort9fiFxac`,
+      },
+      body: JSON.stringify({ postcode: trimmedPostcode }),
+    });
+
     if (!response.ok) {
-      if (response.status === 404) {
-        const error = `Postcode "${formattedPostcode}" not found in database. Please check the postcode and try again.`;
-        console.error(error);
-        throw new Error(error);
-      }
-      if (response.status === 429) {
-        const error = 'Too many requests. Please wait a moment and try again.';
-        console.error(error);
-        throw new Error(error);
-      }
-      const error = `API error (${response.status}): ${response.statusText}`;
-      console.error(error);
+      const errorData = await response.json();
+      const error = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+      console.error('Edge function error:', error);
       throw new Error(error);
     }
 
-    const data: PostcodeApiResponse = await response.json();
-    console.log('API Response data:', data);
-    
-    if (data.status === 200 && data.result) {
-      const result = {
-        latitude: data.result.latitude,
-        longitude: data.result.longitude,
-        formatted_postcode: data.result.postcode,
-      };
-      console.log('Geocoding successful:', result);
-      return result;
-    }
+    const result = await response.json();
+    console.log('Geocoding successful:', result);
+    return result;
 
-    const error = 'Invalid response from postcode service';
-    console.error(error, data);
-    throw new Error(error);
   } catch (error) {
     console.error('Error geocoding postcode:', error);
     if (error instanceof Error) {
