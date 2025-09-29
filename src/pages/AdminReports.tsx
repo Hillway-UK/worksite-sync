@@ -122,6 +122,39 @@ export default function AdminReports() {
 
         const totalHours = hoursData || 0;
 
+        // Get job details for this worker during the week
+        const { data: jobEntries } = await supabase
+          .from('clock_entries')
+          .select(`
+            job_id,
+            total_hours,
+            jobs(id, name, address)
+          `)
+          .eq('worker_id', worker.id)
+          .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
+          .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
+          .not('clock_out', 'is', null);
+
+        // Aggregate job data
+        const jobsMap = new Map();
+        jobEntries?.forEach(entry => {
+          if (entry.jobs) {
+            const jobId = entry.jobs.id;
+            if (jobsMap.has(jobId)) {
+              jobsMap.get(jobId).hours += entry.total_hours || 0;
+            } else {
+              jobsMap.set(jobId, {
+                job_id: jobId,
+                job_name: entry.jobs.name,
+                job_address: entry.jobs.address,
+                hours: entry.total_hours || 0,
+              });
+            }
+          }
+        });
+
+        const jobs = Array.from(jobsMap.values());
+
         // Get additional costs
         const { data: costs } = await supabase
           .from('additional_costs')
@@ -146,7 +179,7 @@ export default function AdminReports() {
           worker_name: worker.name,
           total_hours: totalHours,
           hourly_rate: worker.hourly_rate,
-          jobs: [], // Simplified for now
+          jobs: jobs,
           additional_costs: additionalCosts,
           total_amount: (totalHours * worker.hourly_rate) + additionalCosts,
           profile_photo: photoData?.[0]?.clock_in_photo || undefined,
@@ -619,20 +652,34 @@ export default function AdminReports() {
       'TrackingOption1'
     ];
 
-    const csvRows = weeklyData.map((worker, index) => [
-      worker.worker_name,
-      `worker${worker.worker_id.slice(-4)}@company.com`,
-      `WE-${format(weekEnd, 'yyyyMMdd')}-${worker.worker_id.slice(-4)}`,
-      invoiceDate,
-      dueDate,
-      `Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`,
-      worker.total_hours.toString(),
-      worker.hourly_rate.toString(),
-      '200',
-      'No VAT',
-      'Job',
-      'CONSTRUCTION'
-    ]);
+    const csvRows = weeklyData.map((worker, index) => {
+      // Get primary job site name (most hours worked) or "Multiple Sites" if multiple jobs
+      let trackingOption1 = 'CONSTRUCTION'; // Default fallback
+      if (worker.jobs.length === 1) {
+        trackingOption1 = worker.jobs[0].job_name;
+      } else if (worker.jobs.length > 1) {
+        // Find job with most hours
+        const primaryJob = worker.jobs.reduce((max, job) => 
+          job.hours > max.hours ? job : max
+        );
+        trackingOption1 = primaryJob.job_name;
+      }
+
+      return [
+        worker.worker_name,
+        `worker${worker.worker_id.slice(-4)}@company.com`,
+        `WE-${format(weekEnd, 'yyyyMMdd')}-${worker.worker_id.slice(-4)}`,
+        invoiceDate,
+        dueDate,
+        `Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`,
+        worker.total_hours.toString(),
+        worker.hourly_rate.toString(),
+        '200',
+        'No VAT',
+        'Job',
+        trackingOption1
+      ];
+    });
 
     const csvContent = [csvHeaders, ...csvRows]
       .map(row => row.map(field => `"${field}"`).join(','))
