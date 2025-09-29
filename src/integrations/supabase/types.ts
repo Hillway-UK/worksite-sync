@@ -458,6 +458,39 @@ export type Database = {
         }
         Relationships: []
       }
+      postcodes: {
+        Row: {
+          country: string | null
+          county: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          postcode: string
+          town: string | null
+        }
+        Insert: {
+          country?: string | null
+          county?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          postcode: string
+          town?: string | null
+        }
+        Update: {
+          country?: string | null
+          county?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          postcode?: string
+          town?: string | null
+        }
+        Relationships: []
+      }
       subscription_usage: {
         Row: {
           active_managers: number | null

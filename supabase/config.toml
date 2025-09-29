@@ -64,5 +64,8 @@ verify_jwt = false
 [functions.secure-profile-operations]
 verify_jwt = true
 
+[functions.geocode-postcode]
+verify_jwt = false
+
 [functions.create-payment-intent]
 verify_jwt = false
