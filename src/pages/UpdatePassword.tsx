@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { AutoTimeLogo } from '@/components/AutoTimeLogo';
@@ -30,8 +30,11 @@ const UpdatePassword = () => {
   const [isValidating, setIsValidating] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const hasHandledAuthCode = useRef(false);
 
   useEffect(() => {
+    if (hasHandledAuthCode.current) return;
+    hasHandledAuthCode.current = true;
     (async () => {
       try {
         // Check for error parameters in URL first (hash and query)
