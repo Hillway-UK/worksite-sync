@@ -128,12 +128,11 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 3) Check if this is a normal authenticated user (not password reset)
+        // 3) As a fallback, check if a session already exists (allow password reset regardless)
         const { data } = await supabase.auth.getSession();
-        if (data.session && !typeParam) {
-          // User is already logged in normally, redirect to appropriate dashboard
-          console.log('UpdatePassword: Found existing session, redirecting to dashboard');
-          navigate('/login', { replace: true });
+        if (data.session) {
+          console.log('UpdatePassword: Found existing session, allowing password reset');
+          setIsValidating(false);
           return;
         }
 
