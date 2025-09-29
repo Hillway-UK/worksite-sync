@@ -123,7 +123,7 @@ export default function AdminReports() {
         const totalHours = hoursData || 0;
 
         // Get job details for this worker during the week
-        const { data: jobEntries } = await supabase
+        const { data: jobEntries, error: jobError } = await supabase
           .from('clock_entries')
           .select(`
             job_id,
@@ -135,6 +135,12 @@ export default function AdminReports() {
           .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
           .not('clock_out', 'is', null)
           .not('total_hours', 'is', null);
+
+        if (jobError) {
+          console.error('Error fetching job entries for worker', worker.name, ':', jobError);
+        }
+
+        console.log(`Job entries for ${worker.name} (${format(weekStart, 'yyyy-MM-dd')} to ${format(weekEnd, 'yyyy-MM-dd')}):`, jobEntries?.length || 0, jobEntries);
 
         // Aggregate job data
         const jobsMap = new Map();
