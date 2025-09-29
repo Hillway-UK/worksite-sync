@@ -70,6 +70,29 @@ const UpdatePassword = () => {
           return;
         }
 
+        // 0) New flow: handle `code` param (Supabase auth v2 email links)
+        const codeParam = searchParams.get('code');
+        if (codeParam) {
+          console.log('UpdatePassword: Found code param, exchanging for session');
+          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(codeParam);
+          if (exchangeErr) {
+            console.error('UpdatePassword: exchangeCodeForSession failed', exchangeErr);
+            toast({
+              title: 'Invalid Reset Link',
+              description: 'The reset link is invalid or has expired. Please request a new one.',
+              variant: 'destructive',
+            });
+            navigate('/forgot-password', { replace: true });
+            return;
+          }
+          // Clean URL (remove the code param)
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setIsValidating(false);
+          return;
+        }
+
         // 1) Check for password reset hash tokens (#access_token=...&refresh_token=...&type=recovery)
         const typeParam = hashParams.get('type') || searchParams.get('type');
         
