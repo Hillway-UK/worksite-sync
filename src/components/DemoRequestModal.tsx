@@ -52,7 +52,7 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
         return;
       }
 
-      const { error } = await supabase.functions.invoke('send-demo-request', {
+      const { data: result, error } = await supabase.functions.invoke('send-demo-request', {
         body: {
           name: data.name,
           email: data.email,
@@ -63,13 +63,22 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to submit request');
+      }
+
+      // Check for errors in the response data
+      if (result?.error) {
+        throw new Error(result.error);
+      }
 
       toast.success('Demo request submitted successfully! We\'ll be in touch soon.');
       setOpen(false);
     } catch (error: any) {
       // Secure logging - no sensitive data exposed
-      toast.error(error.message || 'Failed to submit demo request');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit demo request';
+      toast.error(errorMessage);
       throw error; // Re-throw to let SecureFormWrapper handle it
     }
   };
@@ -102,8 +111,8 @@ export const DemoRequestModal: React.FC<DemoRequestModalProps> = ({ children }) 
           requireCSRF={true}
           rateLimit={{
             key: 'demo-request',
-            maxRequests: 2,
-            windowMs: 300000, // 5 minutes
+            maxRequests: 10,
+            windowMs: 300000, // 5 minutes - increased for testing
           }}
           title="Secure Demo Request"
           description="Your information is protected with enterprise-grade security"
