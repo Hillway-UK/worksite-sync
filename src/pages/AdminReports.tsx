@@ -67,7 +67,7 @@ interface DetailedEntry {
 export default function AdminReports() {
   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
   const [detailedData, setDetailedData] = useState<DetailedEntry[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+  const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 6 }), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
@@ -123,10 +123,10 @@ export default function AdminReports() {
 
         const totalHours = hoursData || 0;
 
-        // Get clock entries for this worker during the week
+        // Get clock entries with joined job data for this worker during the week
         const { data: clockEntries, error: clockError } = await supabase
           .from('clock_entries')
-          .select('job_id, total_hours, clock_in, clock_out')
+          .select('job_id, total_hours, clock_in, clock_out, jobs:jobs(id, name, address)')
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
           .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
@@ -138,31 +138,10 @@ export default function AdminReports() {
 
         console.log(`Clock entries for ${worker.name}:`, clockEntries?.length || 0, clockEntries);
 
-        // Get unique job IDs and fetch job details separately
-        const uniqueJobIds = [...new Set(clockEntries?.map(entry => entry.job_id).filter(Boolean))];
-        
-        let jobDetailsMap = new Map();
-        if (uniqueJobIds.length > 0) {
-          const { data: jobDetails, error: jobError } = await supabase
-            .from('jobs')
-            .select('id, name, address')
-            .in('id', uniqueJobIds);
-
-          if (jobError) {
-            console.error('Error fetching job details:', jobError);
-          } else {
-            console.log('Job details fetched:', jobDetails);
-            jobDetails?.forEach(job => {
-              jobDetailsMap.set(job.id, { name: job.name, address: job.address });
-            });
-          }
-        }
-
-        // Aggregate job data with proper job names and computed hours
+        // Aggregate job data using joined job information
         const jobsMap = new Map();
         clockEntries?.forEach((entry: any) => {
-          if (entry.job_id) {
-            const jobDetails = jobDetailsMap.get(entry.job_id);
+          if (entry.job_id && entry.jobs) {
             const hours = entry.total_hours != null
               ? Number(entry.total_hours)
               : (entry.clock_in && entry.clock_out
@@ -174,8 +153,8 @@ export default function AdminReports() {
             } else {
               jobsMap.set(entry.job_id, {
                 job_id: entry.job_id,
-                job_name: jobDetails?.name || 'Unknown Job',
-                job_address: jobDetails?.address || '',
+                job_name: entry.jobs.name || 'Unknown Job',
+                job_address: entry.jobs.address || '',
                 hours,
               });
             }
