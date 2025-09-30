@@ -127,7 +127,7 @@ async function sendEmail(payload: Payload) {
     },
     body: JSON.stringify({
       from: FROM_EMAIL,
-      to: [TO_EMAIL],
+      to: TO_EMAIL,
       subject,
       html,
       reply_to: payload.email,
