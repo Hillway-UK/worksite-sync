@@ -693,7 +693,7 @@ export default function AdminReports() {
         const primaryJob = worker.jobs.reduce((max, job) => 
           job.hours > max.hours ? job : max
         );
-        trackingOption1 = primaryJob.job_name || 'General Work';
+        trackingOption1 = primaryJob.name || 'General Work';
       }
 
       // Escape quotes in CSV fields
