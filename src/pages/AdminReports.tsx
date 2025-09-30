@@ -688,12 +688,12 @@ export default function AdminReports() {
       // Get primary job site name (most hours worked) or fallback
       let trackingOption1 = 'General Work'; // Default fallback
       
-      if (worker.jobs.length > 0 && worker.total_hours > 0) {
+     if (worker.jobs && worker.jobs.length > 0) {
         // Find job with most hours (handles ties deterministically by taking first)
         const primaryJob = worker.jobs.reduce((max, job) => 
           job.hours > max.hours ? job : max
         );
-        trackingOption1 = primaryJob.name || 'General Work';
+        trackingOption1 = primaryJob.job_name || 'General Work';
       }
 
       // Escape quotes in CSV fields
