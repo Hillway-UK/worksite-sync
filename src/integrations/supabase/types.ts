@@ -398,6 +398,45 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          delivered_at: string | null
+          failed_reason: string | null
+          id: string
+          read_at: string | null
+          retry_count: number | null
+          title: string
+          type: string
+          worker_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          delivered_at?: string | null
+          failed_reason?: string | null
+          id?: string
+          read_at?: string | null
+          retry_count?: number | null
+          title: string
+          type?: string
+          worker_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          delivered_at?: string | null
+          failed_reason?: string | null
+          id?: string
+          read_at?: string | null
+          retry_count?: number | null
+          title?: string
+          type?: string
+          worker_id?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           address: string | null
