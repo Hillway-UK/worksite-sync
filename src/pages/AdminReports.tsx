@@ -20,6 +20,7 @@ import moment from 'moment';
 interface WeeklyData {
   worker_id: string;
   worker_name: string;
+  worker_email: string;
   total_hours: number;
   hourly_rate: number;
   jobs: { job_id: string; job_name: string; job_address: string; hours: number }[];
@@ -105,7 +106,7 @@ export default function AdminReports() {
       // Fetch workers and their data
       const { data: workers, error: workersError } = await supabase
         .from('workers')
-        .select('*')
+        .select('id, name, email, hourly_rate')
         .eq('is_active', true);
 
       if (workersError) throw workersError;
@@ -207,6 +208,7 @@ export default function AdminReports() {
         reportData.push({
           worker_id: worker.id,
           worker_name: worker.name,
+          worker_email: worker.email || '',
           total_hours: totalHours,
           hourly_rate: worker.hourly_rate,
           jobs: jobs,
@@ -685,29 +687,31 @@ export default function AdminReports() {
     const csvRows = weeklyData.map((worker, index) => {
       // Get primary job site name (most hours worked) or fallback
       let trackingOption1 = 'General Work'; // Default fallback
-      if (worker.jobs.length === 1) {
-        trackingOption1 = worker.jobs[0].job_name;
-      } else if (worker.jobs.length > 1) {
-        // Find job with most hours
+      
+      if (worker.jobs.length > 0 && worker.total_hours > 0) {
+        // Find job with most hours (handles ties deterministically by taking first)
         const primaryJob = worker.jobs.reduce((max, job) => 
           job.hours > max.hours ? job : max
         );
-        trackingOption1 = primaryJob.job_name;
+        trackingOption1 = primaryJob.job_name || 'General Work';
       }
 
+      // Escape quotes in CSV fields
+      const escapeCSV = (field: string) => field.replace(/"/g, '""');
+
       return [
-        worker.worker_name,
-        `worker${worker.worker_id.slice(-4)}@company.com`,
+        escapeCSV(worker.worker_name),
+        escapeCSV(worker.worker_email || ''),
         `WE-${format(weekEnd, 'yyyyMMdd')}-${worker.worker_id.slice(-4)}`,
         invoiceDate,
         dueDate,
-        `Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`,
+        escapeCSV(`Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`),
         worker.total_hours.toString(),
         worker.hourly_rate.toString(),
         '200',
         'No VAT',
         'Job',
-        trackingOption1
+        escapeCSV(trackingOption1)
       ];
     });
 
