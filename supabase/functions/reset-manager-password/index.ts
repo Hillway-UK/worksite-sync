@@ -163,7 +163,7 @@ serve(async (req) => {
         const resend = new Resend(resendApiKey);
         
         await resend.emails.send({
-          from: "AutoTime <onboarding@resend.dev>",
+          from: "AutoTime <no-reply@hillwayco.uk>",
           to: [manager.email],
           subject: "Your Manager Account Password Was Reset",
           html: `
