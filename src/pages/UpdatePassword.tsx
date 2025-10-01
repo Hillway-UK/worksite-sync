@@ -34,116 +34,60 @@ const UpdatePassword = () => {
   useEffect(() => {
     (async () => {
       try {
-        // Check for error parameters in URL first (hash and query)
-        const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
-        
-        const errorFromHash = hashParams.get('error');
-        const errorDescriptionFromHash = hashParams.get('error_description');
-        const errorFromQuery = searchParams.get('error');
-        const errorDescriptionFromQuery = searchParams.get('error_description');
-        
-        const error = errorFromHash || errorFromQuery;
-        const errorDescription = errorDescriptionFromHash || errorDescriptionFromQuery;
-        
-        console.log('UpdatePassword: URL parameters check', {
-          hash,
-          error,
-          errorDescription,
-          searchParams: Object.fromEntries(searchParams.entries())
-        });
+        if (typeof window === 'undefined') return;
 
-        if (error) {
-          console.error('UpdatePassword: Error in URL parameters', { error, errorDescription });
-          let message = 'The reset link is invalid or has expired.';
-          
-          if (error === 'access_denied' || errorDescription) {
-            message = errorDescription || 'Access denied. The reset link may have expired.';
-          }
-          
+        console.log("FULL URL", window.location.href);
+
+        const hashParams = new URLSearchParams(window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : '');
+        const queryParams = new URLSearchParams(window.location.search);
+
+        // Show explicit Supabase errors if present
+        const urlError = hashParams.get('error') || queryParams.get('error');
+        const urlErrorDesc = hashParams.get('error_description') || queryParams.get('error_description');
+        if (urlError) {
           toast({
             title: 'Invalid Reset Link',
-            description: message,
+            description: urlErrorDesc || 'The reset link is invalid or has expired.',
             variant: 'destructive',
           });
           navigate('/forgot-password', { replace: true });
           return;
         }
 
-        // 1) Check for password reset hash tokens (#access_token=...&refresh_token=...&type=recovery)
-        const typeParam = hashParams.get('type') || searchParams.get('type');
-        
-        if (typeParam === 'recovery') {
-          console.log('UpdatePassword: Found recovery type, processing password reset flow');
-          
-          const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
-          
-          if (accessToken && refreshToken) {
-            console.log('UpdatePassword: Found recovery tokens, setting session');
-            const { data: current } = await supabase.auth.getSession();
-            if (!current.session) {
-              const { error: setErr } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (setErr) {
-                console.error('UpdatePassword: setSession failed for recovery', setErr);
-                throw setErr;
-              }
-            }
-            
-            console.log('UpdatePassword: Password reset session established');
-            if (typeof window !== 'undefined') {
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-            setIsValidating(false);
-            return;
-          }
-        }
+        const typeParam = hashParams.get('type') || queryParams.get('type');
+        const accessToken =
+          hashParams.get('access_token') || queryParams.get('access_token');
+        const refreshToken =
+          hashParams.get('refresh_token') || queryParams.get('refresh_token');
 
-        // 2) Fallback: Check for any access/refresh tokens without recovery type
-        const accessFromHash = hashParams.get('access_token');
-        const refreshFromHash = hashParams.get('refresh_token');
-        const accessFromQuery = searchParams.get('access_token');
-        const refreshFromQuery = searchParams.get('refresh_token');
+        console.log('TOKENS', {
+          typeParam,
+          hasAccess: !!accessToken,
+          hasRefresh: !!refreshToken
+        });
 
-        const accessToken = accessFromQuery || accessFromHash;
-        const refreshToken = refreshFromQuery || refreshFromHash;
+        if (typeParam === 'recovery' && accessToken && refreshToken) {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setErr) throw setErr;
 
-        if (accessToken && refreshToken && typeParam !== 'recovery') {
-          console.log('UpdatePassword: Found general access/refresh tokens, setting session');
-          const { data: current } = await supabase.auth.getSession();
-          if (!current.session) {
-            const { error: setErr } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            if (setErr) {
-              console.error('UpdatePassword: setSession failed', setErr);
-              throw setErr;
-            }
-          }
+          // Clean URL (remove tokens/fragment)
+          window.history.replaceState({}, document.title, window.location.pathname);
           setIsValidating(false);
           return;
         }
 
-        // 3) As a fallback, check if a session already exists
+        // Fallback: already authenticated
         const { data } = await supabase.auth.getSession();
         if (data.session) {
-          console.log('UpdatePassword: Found existing session');
           setIsValidating(false);
           return;
         }
 
-        // Otherwise, invalid link
-        console.log('UpdatePassword: No valid tokens found, redirecting to forgot password');
-        toast({
-          title: 'Invalid Reset Link',
-          description: 'The reset link is invalid or has expired. Please request a new one.',
-          variant: 'destructive',
-        });
-        navigate('/forgot-password', { replace: true });
+        // No usable tokens/session
+        throw new Error('No valid tokens found');
       } catch (err) {
         console.error('UpdatePassword: token handling failed', err);
         toast({
@@ -154,7 +98,8 @@ const UpdatePassword = () => {
         navigate('/forgot-password', { replace: true });
       }
     })();
-  }, [searchParams, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
 
   const {
     register,

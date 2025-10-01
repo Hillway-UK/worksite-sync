@@ -231,8 +231,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const requestPasswordReset = async (email: string) => {
     try {
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/update-password`
+        : 'https://autotime.lovable.app/update-password';
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: redirectUrl,
       });
       return { error };
     } catch (error) {
