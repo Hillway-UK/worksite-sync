@@ -114,23 +114,15 @@ export default function AdminReports() {
       const reportData: WeeklyData[] = [];
 
       for (const worker of workers || []) {
-        // Get total hours for the week
-        const { data: hoursData } = await supabase
-          .rpc('get_worker_weekly_hours', {
-            worker_uuid: worker.id,
-            week_start: format(weekStart, 'yyyy-MM-dd'),
-          });
-
-        const totalHours = hoursData || 0;
-
-        // Get clock entries with joined job data for this worker during the week
+        // Unified hour calculation: Get clock entries with joined job data for this worker during the week
+        // Date filtering: weekStart (inclusive) to weekStart + 7 days (exclusive)
+        // Include all entries (even incomplete clock-outs) for comprehensive job tracking
         const { data: clockEntries, error: clockError } = await supabase
           .from('clock_entries')
           .select('job_id, total_hours, clock_in, clock_out, jobs:jobs(id, name, address)')
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-          .lt('clock_in', format(addDays(weekEnd, 1), 'yyyy-MM-dd'))
-          .not('clock_out', 'is', null);
+          .lt('clock_in', format(addDays(weekStart, 7), 'yyyy-MM-dd'));
 
         if (clockError) {
           console.error('Error fetching clock entries for worker', worker.name, ':', clockError);
@@ -138,16 +130,23 @@ export default function AdminReports() {
 
         console.log(`Clock entries for ${worker.name}:`, clockEntries?.length || 0, clockEntries);
 
-        // Aggregate job data using joined job information
+        // Calculate total hours using unified logic:
+        // Use total_hours if available, otherwise calculate from timestamps, default to 0 for incomplete entries
+        let totalHours = 0;
         const jobsMap = new Map();
+        
         clockEntries?.forEach((entry: any) => {
-          if (entry.job_id && entry.jobs) {
-            const hours = entry.total_hours != null
-              ? Number(entry.total_hours)
-              : (entry.clock_in && entry.clock_out
-                  ? (new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime()) / 36e5
-                  : 0);
+          // Calculate hours for this entry
+          const hours = entry.total_hours != null
+            ? Number(entry.total_hours)
+            : (entry.clock_in && entry.clock_out
+                ? (new Date(entry.clock_out).getTime() - new Date(entry.clock_in).getTime()) / 3600000
+                : 0);
 
+          totalHours += hours;
+
+          // Aggregate job data using joined job information
+          if (entry.job_id && entry.jobs) {
             if (jobsMap.has(entry.job_id)) {
               jobsMap.get(entry.job_id).hours += hours;
             } else {
@@ -214,8 +213,8 @@ export default function AdminReports() {
     setLoading(true);
     try {
       const weekStart = new Date(selectedWeek);
-      const weekEnd = addDays(weekStart, 6);
 
+      // Unified date filtering: weekStart (inclusive) to weekStart + 7 days (exclusive)
       const { data: entries, error } = await supabase
         .from('clock_entries')
         .select(`
@@ -224,7 +223,7 @@ export default function AdminReports() {
           jobs(name)
         `)
         .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-        .lte('clock_in', format(weekEnd, 'yyyy-MM-dd'))
+        .lt('clock_in', format(addDays(weekStart, 7), 'yyyy-MM-dd'))
         .not('clock_out', 'is', null)
         .order('worker_id')
         .order('clock_in');
@@ -663,36 +662,39 @@ export default function AdminReports() {
       'TrackingOption1'
     ];
 
-    const csvRows = weeklyData.map((worker, index) => {
-      // Get primary job site name (most hours worked) or fallback
-      let trackingOption1 = 'General Work'; // Default fallback
-      
-     if (worker.jobs && worker.jobs.length > 0) {
-        // Find job with most hours (handles ties deterministically by taking first)
-        const primaryJob = worker.jobs.reduce((max, job) => 
-          job.hours > max.hours ? job : max
-        );
-        trackingOption1 = primaryJob.job_name || 'General Work';
-      }
+    const csvRows = weeklyData
+      .filter(worker => worker.total_hours > 0) // Only include workers with hours
+      .map((worker, index) => {
+        // TrackingOption1: Collect ALL job names where worker had clock entries (comma-separated)
+        // If worker has job entries (even with 0 hours due to incomplete clock-out), include those job names
+        // If no job entries exist, default to "General Work"
+        let trackingOption1 = 'General Work';
+        
+        if (worker.jobs && worker.jobs.length > 0) {
+          const jobNames = worker.jobs.map(job => job.job_name).filter(Boolean);
+          if (jobNames.length > 0) {
+            trackingOption1 = jobNames.join(', ');
+          }
+        }
 
-      // Escape quotes in CSV fields
-      const escapeCSV = (field: string) => field.replace(/"/g, '""');
+        // Escape quotes in CSV fields
+        const escapeCSV = (field: string) => field.replace(/"/g, '""');
 
-      return [
-        escapeCSV(worker.worker_name),
-        escapeCSV(worker.worker_email || ''),
-        `WE-${format(weekEnd, 'yyyyMMdd')}-${worker.worker_id.slice(-4)}`,
-        invoiceDate,
-        dueDate,
-        escapeCSV(`Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`),
-        worker.total_hours.toString(),
-        worker.hourly_rate.toString(),
-        '200',
-        'No VAT',
-        'Job',
-        escapeCSV(trackingOption1)
-      ];
-    });
+        return [
+          escapeCSV(worker.worker_name),
+          escapeCSV(worker.worker_email || ''), // Use real worker email
+          `WE-${format(weekEnd, 'yyyyMMdd')}-${worker.worker_id.slice(-4)}`,
+          invoiceDate,
+          dueDate,
+          escapeCSV(`Construction work - Week ending ${format(weekEnd, 'dd/MM/yyyy')}`),
+          worker.total_hours.toFixed(2),
+          worker.hourly_rate.toFixed(2),
+          '200',
+          'No VAT',
+          'Job',
+          escapeCSV(trackingOption1)
+        ];
+      });
 
     const csvContent = [csvHeaders, ...csvRows]
       .map(row => row.map(field => `"${field}"`).join(','))
