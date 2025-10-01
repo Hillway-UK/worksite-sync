@@ -161,6 +161,8 @@ serve(async (req) => {
       const resendApiKey = Deno.env.get("RESEND_API_KEY");
       if (resendApiKey) {
         const resend = new Resend(resendApiKey);
+        const siteUrl = Deno.env.get('SITE_URL') || 'https://kejblmetyrsehzvrxgmt.lovable.app';
+        const loginUrl = `${siteUrl}/login`;
         
         await resend.emails.send({
           from: "AutoTime <no-reply@hillwayco.uk>",
@@ -171,6 +173,9 @@ serve(async (req) => {
             <p>Hello ${manager.name},</p>
             <p>Your manager account password was reset by a system administrator.</p>
             <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+            <p>⚠️ Please do not share this temporary password with anyone for your account security.</p>
+            <p>You can log in here: <a href="${loginUrl}">${loginUrl}</a></p>
             ${requirePasswordChange ? '<p><strong>Action Required:</strong> You will be required to change your password when you log in.</p>' : ''}
             <p>If you did not request this change, please contact your system administrator immediately.</p>
             <p>Best regards,<br>AutoTime Team</p>
