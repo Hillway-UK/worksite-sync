@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { getAppBaseUrl } from '@/lib/url';
 import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -231,12 +232,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const requestPasswordReset = async (email: string) => {
     try {
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/update-password`
-        : 'https://autotime.lovable.app/update-password';
+      const redirectTo = `${getAppBaseUrl()}/update-password`;
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
+        redirectTo,
       });
       return { error };
     } catch (error) {
