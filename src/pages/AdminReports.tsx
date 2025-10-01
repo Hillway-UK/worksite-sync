@@ -116,16 +116,22 @@ export default function AdminReports() {
       for (const worker of workers || []) {
         // Unified hour calculation: Get clock entries with joined job data for this worker during the week
         // Date filtering: weekStart (inclusive) to weekStart + 7 days (exclusive)
-        // Include all entries (even incomplete clock-outs) for comprehensive job tracking
+        // Only include completed entries (non-null clock_out) for weekly summary
         const { data: clockEntries, error: clockError } = await supabase
           .from('clock_entries')
           .select('job_id, total_hours, clock_in, clock_out, jobs:jobs(id, name, address)')
           .eq('worker_id', worker.id)
           .gte('clock_in', format(weekStart, 'yyyy-MM-dd'))
-          .lt('clock_in', format(addDays(weekStart, 7), 'yyyy-MM-dd'));
+          .lt('clock_in', format(addDays(weekStart, 7), 'yyyy-MM-dd'))
+          .not('clock_out', 'is', null);
 
         if (clockError) {
           console.error('Error fetching clock entries for worker', worker.name, ':', clockError);
+        }
+
+        // Skip workers who have no completed clock entries during the selected week
+        if (!clockEntries || clockEntries.length === 0) {
+          continue;
         }
 
         console.log(`Clock entries for ${worker.name}:`, clockEntries?.length || 0, clockEntries);
