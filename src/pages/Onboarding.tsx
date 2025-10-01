@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
+const stripePromise = loadStripe('pk_test_51Jv4K2LXpjQqS8kXFKkN0YV9X4mKRhGwY5Y8KZGxHvR4VvQZJ6NnPX9RY5FqK4x5RqN8M0xKqY5Z8Y5Z8Y5Z00Y5Z8Y5Z8');
 
 function PaymentStep({ orgData, organizationId }: any) {
   const stripe = useStripe();

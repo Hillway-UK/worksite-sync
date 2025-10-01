@@ -2,9 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog';
-import { ForcedPasswordUpdateModal } from '@/components/ForcedPasswordUpdateModal';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -30,16 +27,12 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<'super_admin' | 'manager' | 'worker' | null>(null);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [organization, setOrganization] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
-  const [showForcedUpdateModal, setShowForcedUpdateModal] = useState(false);
-  const [managerId, setManagerId] = useState<string | null>(null);
   
 
   // Optimized role detection using the new database function
@@ -258,54 +251,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check for password change requirement after user and role are loaded
-  useEffect(() => {
-    const checkPasswordChangeRequired = async () => {
-      if (!user?.email || !userRole || userRole !== 'manager') {
-        return;
-      }
-
-      try {
-        // Get manager details to check password flags
-        const { data: manager, error } = await supabase
-          .from('managers')
-          .select('id, must_change_password, first_login_completed')
-          .eq('email', user.email)
-          .single();
-
-        if (error || !manager) return;
-
-        setManagerId(manager.id);
-
-        // Check if this is first login
-        if (!manager.first_login_completed) {
-          setShowFirstLoginModal(true);
-        } else if (manager.must_change_password) {
-          // Check if forced password change is required
-          setShowForcedUpdateModal(true);
-        }
-      } catch (error) {
-        console.error('Error checking password requirements:', error);
-      }
-    };
-
-    checkPasswordChangeRequired();
-  }, [user?.email, userRole]);
-
-  const handlePasswordChangeSuccess = () => {
-    setShowFirstLoginModal(false);
-    setShowForcedUpdateModal(false);
-    // Sign out and redirect to login
-    signOut();
-    navigate('/login');
-  };
-
-  const handleForcedUpdateSuccess = () => {
-    setShowForcedUpdateModal(false);
-    // Refresh the page to continue with the normal flow
-    window.location.reload();
-  };
-
   const value = {
     user,
     session,
@@ -319,23 +264,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updatePassword,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-      {showFirstLoginModal && managerId && (
-        <FirstLoginPasswordDialog
-          open={showFirstLoginModal}
-          managerId={managerId}
-          onSuccess={handlePasswordChangeSuccess}
-        />
-      )}
-      {showForcedUpdateModal && managerId && (
-        <ForcedPasswordUpdateModal
-          open={showForcedUpdateModal}
-          managerId={managerId}
-          onSuccess={handleForcedUpdateSuccess}
-        />
-      )}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

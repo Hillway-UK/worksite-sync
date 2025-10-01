@@ -49,10 +49,6 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 
-
-[functions.reset-manager-password]
-verify_jwt = true
-
 [functions.create-subscription]
 verify_jwt = true
 
