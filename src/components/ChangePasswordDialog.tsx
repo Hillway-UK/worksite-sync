@@ -214,9 +214,6 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
                 {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Must be at least 8 characters with uppercase, lowercase, and numbers
-            </p>
           </div>
 
           {/* Confirm Password */}
@@ -243,6 +240,15 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
                 {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
+          </div>
+
+           <div className="text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">Password requirements:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>At least 8 characters long</li>
+              <li>Contains uppercase and lowercase letters</li>
+              <li>Contains at least one number</li>
+            </ul>
           </div>
 
           {/* Action Buttons */}
