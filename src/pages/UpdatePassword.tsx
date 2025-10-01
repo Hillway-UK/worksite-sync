@@ -62,10 +62,12 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 1) NEW PKCE FLOW: ?code=...
+        // 1) PKCE FLOW: ?code=... (only if verifier exists)
         const code = queryParams.get('code') || hashParams.get('code');
-        if (code) {
-          console.log('[UpdatePassword] Found PKCE code param. Exchanging…');
+        const hasPkceVerifier = Object.keys(localStorage).some(k => k.includes('pkce'));
+        
+        if (code && hasPkceVerifier) {
+          console.log('[UpdatePassword] Found PKCE code + verifier. Exchanging…');
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           console.log('[UpdatePassword] exchangeCodeForSession result:', { hasSession: !!data?.session, error });
 
