@@ -69,3 +69,6 @@ verify_jwt = false
 
 [functions.create-payment-intent]
 verify_jwt = false
+
+[functions.manager-change-password]
+verify_jwt = true
