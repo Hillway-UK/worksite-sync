@@ -72,6 +72,42 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          target_id: string
+          timestamp: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_id: string
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_id?: string
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       clock_entries: {
         Row: {
           approved_at: string | null
@@ -307,32 +343,44 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          first_login_completed: boolean | null
           id: string
           is_admin: boolean | null
           is_super: boolean | null
+          must_change_password: boolean | null
           name: string
           organization_id: string | null
+          password_reset_count: number | null
           pin: string | null
+          temporary_password_created_at: string | null
         }
         Insert: {
           created_at?: string | null
           email: string
+          first_login_completed?: boolean | null
           id?: string
           is_admin?: boolean | null
           is_super?: boolean | null
+          must_change_password?: boolean | null
           name: string
           organization_id?: string | null
+          password_reset_count?: number | null
           pin?: string | null
+          temporary_password_created_at?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string
+          first_login_completed?: boolean | null
           id?: string
           is_admin?: boolean | null
           is_super?: boolean | null
+          must_change_password?: boolean | null
           name?: string
           organization_id?: string | null
+          password_reset_count?: number | null
           pin?: string | null
+          temporary_password_created_at?: string | null
         }
         Relationships: [
           {
@@ -687,6 +735,7 @@ export type Database = {
           hourly_rate: number
           id: string
           is_active: boolean | null
+          must_change_password: boolean | null
           name: string
           organization_id: string
           phone: string | null
@@ -703,6 +752,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           is_active?: boolean | null
+          must_change_password?: boolean | null
           name: string
           organization_id: string
           phone?: string | null
@@ -719,6 +769,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           is_active?: boolean | null
+          must_change_password?: boolean | null
           name?: string
           organization_id?: string
           phone?: string | null

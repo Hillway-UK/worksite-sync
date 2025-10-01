@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
+import { ResetPasswordModal } from '@/components/ResetPasswordModal';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -457,14 +458,24 @@ export default function SuperAdmin() {
                   <TableCell>{manager.email}</TableCell>
                   <TableCell>{manager.organizations?.name || 'Unassigned'}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteManager(manager.email)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <ResetPasswordModal
+                        manager={{
+                          id: manager.id,
+                          name: manager.name,
+                          email: manager.email,
+                        }}
+                        onSuccess={() => fetchManagers()}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteManager(manager.email)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
