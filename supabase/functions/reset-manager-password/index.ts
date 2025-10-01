@@ -175,7 +175,7 @@ serve(async (req) => {
             <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
             <p><strong>Temporary Password:</strong> ${tempPassword}</p>
             <p>⚠️ Please do not share this temporary password with anyone for your account security.</p>
-            <p>You can log in here: <a href="${https://autotime.hillwayco.uk/login}">Login</a></p>
+            <p>You can log in here: <a href="https://autotime.hillwayco.uk/login">Login</a></p>
             ${requirePasswordChange ? '<p><strong>Action Required:</strong> You will be required to change your password when you log in.</p>' : ''}
             <p>If you did not request this change, please contact your system administrator immediately.</p>
             <p>Best regards,<br>AutoTime Team</p>
