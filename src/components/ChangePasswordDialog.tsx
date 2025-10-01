@@ -3,17 +3,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, EyeOff, Loader2, Lock, Check, X } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-interface ChangePasswordModalProps {
+interface ChangePasswordDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalProps) {
+export default function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialogProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,7 +21,6 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
   const { user } = useAuth();
 
   const resetForm = () => {
@@ -39,75 +38,87 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
     }
   }, [open]);
 
-  // Password validation
-  const hasMinLength = newPassword.length >= 8;
-  const hasUpperCase = /[A-Z]/.test(newPassword);
-  const hasLowerCase = /[a-z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
-
-  const isPasswordValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber;
-  const canSubmit = currentPassword && newPassword && confirmPassword && isPasswordValid && passwordsMatch;
+  const validatePassword = () => {
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return false;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      toast.error("Password must contain at least one uppercase letter");
+      return false;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      toast.error("Password must contain at least one lowercase letter");
+      return false;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      toast.error("Password must contain at least one number");
+      return false;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!canSubmit || !user?.email) return;
+    if (!user?.email || !currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (!validatePassword()) return;
+
     setIsProcessing(true);
 
     try {
-      // 1) Re-authenticate using current password to confirm identity
+      // Re-authenticate with current password
       const { error: reauthErr } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
       });
+      
       if (reauthErr) {
-        throw new Error("Current password is incorrect.");
+        toast.error("Current password is incorrect");
+        setIsProcessing(false);
+        return;
       }
 
-      // 2) Get access token for the Edge Function call
+      // Get access token
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
       if (sessErr || !sessionData?.session?.access_token) {
-        throw new Error("Unable to get a valid session. Please sign in again.");
+        toast.error("Unable to get a valid session. Please sign in again.");
+        setIsProcessing(false);
+        return;
       }
-      const token = sessionData.session.access_token;
 
-      // 3) Call the hardened Edge Function with Authorization header
+      // Call edge function to update password
       const { data, error } = await supabase.functions.invoke("manager-change-password", {
         body: { newPassword },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
       });
 
       if (error) {
-        // supabase-js wraps function errors here
-        throw new Error(error.message ?? "Password update failed.");
+        throw new Error(error.message ?? "Password update failed");
       }
       if (data?.error) {
-        // function returned structured error
         throw new Error(data.error);
       }
 
-      // 4) Success UX
-      toast({ title: "Success", description: "Password updated successfully." });
+      toast.success("Password updated successfully");
       resetForm();
       onOpenChange(false);
     } catch (err: any) {
       console.error("Error changing password:", err);
-      toast({
-        title: "Error",
-        description: err?.message || "Failed to change password",
-        variant: "destructive",
-      });
+      toast.error(err?.message || "Failed to change password");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleClose = () => {
-    resetForm();
-    onOpenChange(false);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -144,9 +155,6 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
                 {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Enter your current password or your temporary password if you're updating for the first time.
-            </p>
           </div>
 
           {/* New Password */}
@@ -173,6 +181,9 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
                 {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Must be at least 8 characters with uppercase, lowercase, and numbers
+            </p>
           </div>
 
           {/* Confirm Password */}
@@ -201,64 +212,12 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
             </div>
           </div>
 
-          {/* Password Requirements */}
-          {newPassword && (
-            <div className="space-y-2 p-3 bg-muted/50 rounded-md">
-              <p className="text-sm font-medium">Password Requirements:</p>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs">
-                  {hasMinLength ? (
-                    <Check className="h-3 w-3 text-green-600" />
-                  ) : (
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className={hasMinLength ? "text-green-600" : "text-muted-foreground"}>
-                    At least 8 characters long
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  {hasUpperCase && hasLowerCase ? (
-                    <Check className="h-3 w-3 text-green-600" />
-                  ) : (
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className={hasUpperCase && hasLowerCase ? "text-green-600" : "text-muted-foreground"}>
-                    Contains uppercase and lowercase letters
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  {hasNumber ? (
-                    <Check className="h-3 w-3 text-green-600" />
-                  ) : (
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className={hasNumber ? "text-green-600" : "text-muted-foreground"}>
-                    Contains at least one number
-                  </span>
-                </div>
-                {confirmPassword && (
-                  <div className="flex items-center gap-2 text-xs">
-                    {passwordsMatch ? (
-                      <Check className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <X className="h-3 w-3 text-destructive" />
-                    )}
-                    <span className={passwordsMatch ? "text-green-600" : "text-destructive"}>
-                      Passwords match
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!canSubmit || isProcessing}>
-              {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={handleSubmit} disabled={isProcessing}>
               Update Password
             </Button>
           </div>

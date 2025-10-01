@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight, KeyRound } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { ChangePasswordModal } from '@/components/ChangePasswordModal';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -387,7 +387,7 @@ export default function Admin() {
       </div>
 
       {/* Change Password Modal */}
-      <ChangePasswordModal 
+      <ChangePasswordDialog 
         open={showChangePassword} 
         onOpenChange={setShowChangePassword}
       />
