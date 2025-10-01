@@ -73,6 +73,8 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
     setIsProcessing(true);
 
     try {
+      console.log("Starting password change process...");
+      
       // Re-authenticate with current password
       const { error: reauthErr } = await supabase.auth.signInWithPassword({
         email: user.email,
@@ -80,38 +82,69 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
       });
       
       if (reauthErr) {
+        console.error("Re-authentication failed:", reauthErr);
         toast.error("Current password is incorrect");
         setIsProcessing(false);
         return;
       }
 
+      console.log("Re-authentication successful");
+
       // Get access token
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
       if (sessErr || !sessionData?.session?.access_token) {
+        console.error("Failed to get session:", sessErr);
         toast.error("Unable to get a valid session. Please sign in again.");
         setIsProcessing(false);
         return;
       }
 
-      // Call edge function to update password
-      const { data, error } = await supabase.functions.invoke("manager-change-password", {
+      console.log("Session retrieved, calling edge function...");
+
+      // Call edge function to update password with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Request timeout")), 15000)
+      );
+
+      const functionPromise = supabase.functions.invoke("manager-change-password", {
         body: { newPassword },
         headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
       });
 
+      const result = await Promise.race([functionPromise, timeoutPromise]) as any;
+      const { data, error } = result;
+
+      console.log("Edge function response:", { data, error });
+
       if (error) {
+        console.error("Edge function error:", error);
         throw new Error(error.message ?? "Password update failed");
       }
       if (data?.error) {
+        console.error("Edge function returned error:", data.error);
         throw new Error(data.error);
       }
 
+      if (!data?.ok) {
+        console.error("Unexpected response format:", data);
+        throw new Error("Invalid response from server");
+      }
+
+      console.log("Password updated successfully");
       toast.success("Password updated successfully");
       resetForm();
       onOpenChange(false);
     } catch (err: any) {
       console.error("Error changing password:", err);
-      toast.error(err?.message || "Failed to change password");
+      
+      let errorMessage = "Failed to change password";
+      if (err.message === "Request timeout") {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
     }
