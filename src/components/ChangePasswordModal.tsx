@@ -52,48 +52,54 @@ export function ChangePasswordModal({ open, onOpenChange, forcedMode = false }: 
 
   const handleSubmit = async () => {
     if (!canSubmit || !user?.email) return;
-
     setIsProcessing(true);
 
     try {
-      // Call edge function for secure password change
-      const { data, error } = await supabase.functions.invoke("manager-change-password", {
-        body: {
-          currentPassword,
-          newPassword,
-        },
+      // 1) Re-authenticate using current password to confirm identity
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
       });
-
-      if (error) throw error;
-
-      if (data.error) {
-        toast({
-          title: "Error",
-          description: data.error,
-          variant: "destructive",
-        });
-        return;
+      if (reauthErr) {
+        throw new Error("Current password is incorrect.");
       }
 
-      toast({
-        title: "Success",
-        description: "Password updated successfully",
+      // 2) Get access token for the Edge Function call
+      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr || !sessionData?.session?.access_token) {
+        throw new Error("Unable to get a valid session. Please sign in again.");
+      }
+      const token = sessionData.session.access_token;
+
+      // 3) Call the hardened Edge Function with Authorization header
+      const { data, error } = await supabase.functions.invoke("manager-change-password", {
+        body: { newPassword },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
+      if (error) {
+        // supabase-js wraps function errors here
+        throw new Error(error.message ?? "Password update failed.");
+      }
+      if (data?.error) {
+        // function returned structured error
+        throw new Error(data.error);
+      }
+
+      // 4) Success UX
+      toast({ title: "Success", description: "Password updated successfully." });
       resetForm();
       onOpenChange(false);
 
-      // If this was a forced password change, reload to clear the flag
       if (forcedMode) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
+        // Clear any cached state by reloading
+        setTimeout(() => window.location.reload(), 400);
       }
-    } catch (error: any) {
-      console.error("Error changing password:", error);
+    } catch (err: any) {
+      console.error("Error changing password:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to change password",
+        description: err?.message || "Failed to change password",
         variant: "destructive",
       });
     } finally {
