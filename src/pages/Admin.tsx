@@ -6,9 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight } from 'lucide-react';
+import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight, KeyRound } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -37,6 +38,7 @@ export default function Admin() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const [organizationName, setOrganizationName] = useState<string>('');
 
@@ -186,14 +188,25 @@ export default function Admin() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <Briefcase className="h-16 w-16 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-heading font-extrabold text-foreground mb-2">
-            Welcome, {managerName || 'Manager'}
-          </h1>
-          <p className="text-muted-foreground font-body">
-            AutoTime - Manager Console
-          </p>
+        <div className="flex items-start justify-between mb-8">
+          <div className="flex flex-col items-center flex-1">
+            <Briefcase className="h-16 w-16 text-primary mb-4" />
+            <h1 className="text-3xl font-heading font-extrabold text-foreground mb-2">
+              Welcome, {managerName || 'Manager'}
+            </h1>
+            <p className="text-muted-foreground font-body">
+              AutoTime - Manager Console
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setChangePasswordOpen(true)}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            <KeyRound className="h-4 w-4 mr-2" />
+            Change Password
+          </Button>
         </div>
 
         {organizationName && (
@@ -371,6 +384,11 @@ export default function Admin() {
           </Card>
         </div>
       </div>
+
+      <ChangePasswordModal 
+        open={changePasswordOpen} 
+        onOpenChange={setChangePasswordOpen} 
+      />
     </Layout>
   );
 }
