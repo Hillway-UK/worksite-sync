@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle, LogOut } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { TempPasswordModal } from '@/components/TempPasswordModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
@@ -21,6 +23,8 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
   const [creatingManager, setCreatingManager] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [tempPasswordModalOpen, setTempPasswordModalOpen] = useState(false);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -447,7 +451,7 @@ export default function SuperAdmin() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Organization</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -456,15 +460,40 @@ export default function SuperAdmin() {
                   <TableCell className="font-medium">{manager.name}</TableCell>
                   <TableCell>{manager.email}</TableCell>
                   <TableCell>{manager.organizations?.name || 'Unassigned'}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteManager(manager.email)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedManager({
+                                  id: manager.id,
+                                  name: manager.name,
+                                  email: manager.email,
+                                });
+                                setTempPasswordModalOpen(true);
+                              }}
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Generate temp password</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteManager(manager.email)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -584,6 +613,12 @@ export default function SuperAdmin() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <TempPasswordModal
+        open={tempPasswordModalOpen}
+        onOpenChange={setTempPasswordModalOpen}
+        manager={selectedManager}
+      />
     </div>
   );
 }
