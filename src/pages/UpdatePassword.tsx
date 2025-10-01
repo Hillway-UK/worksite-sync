@@ -16,10 +16,7 @@ const updatePasswordSchema = z.object({
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
-    ),
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -32,30 +29,30 @@ const UpdatePassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { updatePassword } = useAuth();
+
   const [isValidating, setIsValidating] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
+    let unsub: ReturnType<typeof supabase.auth.onAuthStateChange> | undefined;
+
     (async () => {
       try {
         if (typeof window === 'undefined') return;
 
-        // Helpful for debugging in case users paste screenshots
-        console.log('FULL URL', window.location.href);
+        console.log('[UpdatePassword] FULL URL:', window.location.href);
 
         const queryParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(
           window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : ''
         );
 
-        // 0) If Supabase sent error details in URL, surface it and bail.
-        const urlError =
-          hashParams.get('error') || queryParams.get('error');
-        const urlErrorDesc =
-          hashParams.get('error_description') || queryParams.get('error_description');
-
+        // Surface explicit Supabase errors if present
+        const urlError = hashParams.get('error') || queryParams.get('error');
+        const urlErrorDesc = hashParams.get('error_description') || queryParams.get('error_description');
         if (urlError) {
+          console.error('[UpdatePassword] URL error:', urlError, urlErrorDesc);
           toast({
             title: 'Invalid Reset Link',
             description: urlErrorDesc || 'The reset link is invalid or has expired.',
@@ -65,31 +62,30 @@ const UpdatePassword = () => {
           return;
         }
 
-        // 1) NEW FLOW (PKCE): Supabase redirects with ?code=...
-        const code = queryParams.get('code');
+        // 1) NEW PKCE FLOW: ?code=...
+        const code = queryParams.get('code') || hashParams.get('code');
         if (code) {
+          console.log('[UpdatePassword] Found PKCE code param. Exchanging…');
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+          console.log('[UpdatePassword] exchangeCodeForSession result:', { hasSession: !!data?.session, error });
 
-          // Clean the URL after exchanging the code
+          if (error) throw error;
+          // Clean URL
           window.history.replaceState({}, document.title, window.location.pathname);
           setIsValidating(false);
           return;
         }
 
-        // 2) LEGACY FLOW: hash/query tokens (?/#+access_token, +refresh_token) with type=recovery
+        // 2) LEGACY HASH FLOW: #access_token[&refresh_token]&type=recovery
         const typeParam = hashParams.get('type') || queryParams.get('type');
         const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
 
-        console.log('TOKENS', {
-          typeParam,
-          hasAccess: !!accessToken,
-          hasRefresh: !!refreshToken,
+        console.log('[UpdatePassword] Legacy token check:', {
+          typeParam, hasAccess: !!accessToken, hasRefresh: !!refreshToken
         });
 
         if (typeParam === 'recovery' && (accessToken || refreshToken)) {
-          // If both tokens exist, set the session explicitly.
           if (accessToken && refreshToken) {
             const { error: setErr } = await supabase.auth.setSession({
               access_token: accessToken,
@@ -97,11 +93,10 @@ const UpdatePassword = () => {
             });
             if (setErr) throw setErr;
           } else {
-            // If only access_token is present, give supabase-js a moment to hydrate the session.
-            await new Promise((r) => setTimeout(r, 100));
+            // Give supabase-js a moment to auto-hydrate if only access_token is present
+            await new Promise((r) => setTimeout(r, 120));
           }
 
-          // Check if we now have a session
           const { data } = await supabase.auth.getSession();
           if (data.session) {
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -110,17 +105,32 @@ const UpdatePassword = () => {
           }
         }
 
-        // 3) If we already have a session for any reason, proceed.
+        // 3) As a final safety, listen briefly for late auth changes (rare but helpful)
+        unsub = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session) {
+            console.log('[UpdatePassword] onAuthStateChange → session detected');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setIsValidating(false);
+          }
+        });
+
+        // If we already have a session, proceed
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           setIsValidating(false);
           return;
         }
 
-        // 4) Otherwise, invalid/expired link
-        throw new Error('No valid tokens found');
+        // No usable tokens/session → invalid link
+        console.warn('[UpdatePassword] No valid tokens/session found');
+        toast({
+          title: 'Invalid Reset Link',
+          description: 'The reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password', { replace: true });
       } catch (err) {
-        console.error('UpdatePassword: token handling failed', err);
+        console.error('[UpdatePassword] token handling failed:', err);
         toast({
           title: 'Invalid Reset Link',
           description: 'The reset link is invalid or has expired. Please request a new one.',
@@ -129,6 +139,12 @@ const UpdatePassword = () => {
         navigate('/forgot-password', { replace: true });
       }
     })();
+
+    return () => {
+      if (unsub && typeof unsub.subscription?.unsubscribe === 'function') {
+        unsub.subscription.unsubscribe();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, searchParams]);
 
@@ -138,11 +154,7 @@ const UpdatePassword = () => {
     formState: { errors, isSubmitting },
   } = useSecureForm<UpdatePasswordForm>({
     schema: updatePasswordSchema,
-    rateLimit: {
-      key: 'password_update',
-      maxRequests: 5,
-      windowMs: 300000, // 5 minutes
-    },
+    rateLimit: { key: 'password_update', maxRequests: 5, windowMs: 300000 },
     onSubmit: async (data) => {
       const { error } = await updatePassword(data.password);
 
@@ -160,7 +172,6 @@ const UpdatePassword = () => {
         description: 'Your password has been successfully updated. You can now log in with your new password.',
       });
 
-      // Sign out to force fresh login with new password
       await supabase.auth.signOut();
       navigate('/login');
     },
@@ -260,21 +271,14 @@ const UpdatePassword = () => {
             </ul>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full bg-black hover:bg-black/90 text-white"
-            disabled={isSubmitting}
-          >
+          <Button type="submit" className="w-full bg-black hover:bg-black/90 text-white" disabled={isSubmitting}>
             <Lock size={16} className="mr-2" />
             {isSubmitting ? 'Updating...' : 'Update Password'}
           </Button>
         </form>
 
         <div className="text-center">
-          <Link
-            to="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Back to Login
           </Link>
         </div>
