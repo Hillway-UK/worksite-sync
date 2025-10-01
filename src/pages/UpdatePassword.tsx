@@ -141,8 +141,8 @@ const UpdatePassword = () => {
     })();
 
     return () => {
-      if (unsub && typeof unsub.subscription?.unsubscribe === 'function') {
-        unsub.subscription.unsubscribe();
+      if (unsub && typeof unsub.data?.subscription?.unsubscribe === 'function') {
+        unsub.data.subscription.unsubscribe();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
