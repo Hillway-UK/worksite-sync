@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { AutoTimeLogo } from '@/components/AutoTimeLogo';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,14 +11,19 @@ import { useSecureForm } from '@/hooks/useSecureForm';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, EyeOff, Lock } from 'lucide-react';
+
 const updatePasswordSchema = z.object({
-  password: z.string()
+  password: z
+    .string()
     .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    ),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"],
+  path: ['confirmPassword'],
 });
 
 type UpdatePasswordForm = z.infer<typeof updatePasswordSchema>;
@@ -26,7 +31,7 @@ type UpdatePasswordForm = z.infer<typeof updatePasswordSchema>;
 const UpdatePassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { updatePassword, user } = useAuth();
+  const { updatePassword } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -36,14 +41,20 @@ const UpdatePassword = () => {
       try {
         if (typeof window === 'undefined') return;
 
-        console.log("FULL URL", window.location.href);
+        // Helpful for debugging in case users paste screenshots
+        console.log('FULL URL', window.location.href);
 
-        const hashParams = new URLSearchParams(window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : '');
         const queryParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(
+          window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : ''
+        );
 
-        // Show explicit Supabase errors if present
-        const urlError = hashParams.get('error') || queryParams.get('error');
-        const urlErrorDesc = hashParams.get('error_description') || queryParams.get('error_description');
+        // 0) If Supabase sent error details in URL, surface it and bail.
+        const urlError =
+          hashParams.get('error') || queryParams.get('error');
+        const urlErrorDesc =
+          hashParams.get('error_description') || queryParams.get('error_description');
+
         if (urlError) {
           toast({
             title: 'Invalid Reset Link',
@@ -54,39 +65,59 @@ const UpdatePassword = () => {
           return;
         }
 
-        const typeParam = hashParams.get('type') || queryParams.get('type');
-        const accessToken =
-          hashParams.get('access_token') || queryParams.get('access_token');
-        const refreshToken =
-          hashParams.get('refresh_token') || queryParams.get('refresh_token');
+        // 1) NEW FLOW (PKCE): Supabase redirects with ?code=...
+        const code = queryParams.get('code');
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
 
-        console.log('TOKENS', {
-          typeParam,
-          hasAccess: !!accessToken,
-          hasRefresh: !!refreshToken
-        });
-
-        if (typeParam === 'recovery' && accessToken && refreshToken) {
-          const { error: setErr } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (setErr) throw setErr;
-
-          // Clean URL (remove tokens/fragment)
+          // Clean the URL after exchanging the code
           window.history.replaceState({}, document.title, window.location.pathname);
           setIsValidating(false);
           return;
         }
 
-        // Fallback: already authenticated
+        // 2) LEGACY FLOW: hash/query tokens (?/#+access_token, +refresh_token) with type=recovery
+        const typeParam = hashParams.get('type') || queryParams.get('type');
+        const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+
+        console.log('TOKENS', {
+          typeParam,
+          hasAccess: !!accessToken,
+          hasRefresh: !!refreshToken,
+        });
+
+        if (typeParam === 'recovery' && (accessToken || refreshToken)) {
+          // If both tokens exist, set the session explicitly.
+          if (accessToken && refreshToken) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (setErr) throw setErr;
+          } else {
+            // If only access_token is present, give supabase-js a moment to hydrate the session.
+            await new Promise((r) => setTimeout(r, 100));
+          }
+
+          // Check if we now have a session
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setIsValidating(false);
+            return;
+          }
+        }
+
+        // 3) If we already have a session for any reason, proceed.
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           setIsValidating(false);
           return;
         }
 
-        // No usable tokens/session
+        // 4) Otherwise, invalid/expired link
         throw new Error('No valid tokens found');
       } catch (err) {
         console.error('UpdatePassword: token handling failed', err);
@@ -99,7 +130,7 @@ const UpdatePassword = () => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   const {
     register,
@@ -114,19 +145,19 @@ const UpdatePassword = () => {
     },
     onSubmit: async (data) => {
       const { error } = await updatePassword(data.password);
-      
+
       if (error) {
         toast({
-          title: "Update Failed",
-          description: error.message || "Failed to update password. Please try again.",
-          variant: "destructive",
+          title: 'Update Failed',
+          description: error.message || 'Failed to update password. Please try again.',
+          variant: 'destructive',
         });
         return;
       }
 
       toast({
-        title: "Password Updated",
-        description: "Your password has been successfully updated. You can now log in with your new password.",
+        title: 'Password Updated',
+        description: 'Your password has been successfully updated. You can now log in with your new password.',
       });
 
       // Sign out to force fresh login with new password
@@ -150,7 +181,6 @@ const UpdatePassword = () => {
     );
   }
 
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
@@ -158,7 +188,7 @@ const UpdatePassword = () => {
           <AutoTimeLogo className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Reset Your Password</h1>
         </div>
-        
+
         <form onSubmit={handleSecureSubmit} className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
@@ -168,7 +198,7 @@ const UpdatePassword = () => {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Enter new password"
                   {...register('password')}
                   className="pr-10"
@@ -193,7 +223,7 @@ const UpdatePassword = () => {
               <div className="relative">
                 <Input
                   id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
+                  type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Confirm new password"
                   {...register('confirmPassword')}
                   className="pr-10"
@@ -230,9 +260,9 @@ const UpdatePassword = () => {
             </ul>
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full bg-black hover:bg-black/90 text-white" 
+          <Button
+            type="submit"
+            className="w-full bg-black hover:bg-black/90 text-white"
             disabled={isSubmitting}
           >
             <Lock size={16} className="mr-2" />
@@ -241,8 +271,8 @@ const UpdatePassword = () => {
         </form>
 
         <div className="text-center">
-          <Link 
-            to="/login" 
+          <Link
+            to="/login"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Back to Login
