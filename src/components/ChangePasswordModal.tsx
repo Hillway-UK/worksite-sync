@@ -11,10 +11,9 @@ import { useAuth } from "@/contexts/AuthContext";
 interface ChangePasswordModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  forcedMode?: boolean;
 }
 
-export function ChangePasswordModal({ open, onOpenChange, forcedMode = false }: ChangePasswordModalProps) {
+export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -90,11 +89,6 @@ export function ChangePasswordModal({ open, onOpenChange, forcedMode = false }: 
       toast({ title: "Success", description: "Password updated successfully." });
       resetForm();
       onOpenChange(false);
-
-      if (forcedMode) {
-        // Clear any cached state by reloading
-        setTimeout(() => window.location.reload(), 400);
-      }
     } catch (err: any) {
       console.error("Error changing password:", err);
       toast({
@@ -108,27 +102,20 @@ export function ChangePasswordModal({ open, onOpenChange, forcedMode = false }: 
   };
 
   const handleClose = () => {
-    if (forcedMode) return; // Cannot close in forced mode
     resetForm();
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={forcedMode ? undefined : handleClose}>
-      <DialogContent 
-        className="sm:max-w-md" 
-        onInteractOutside={(e) => forcedMode && e.preventDefault()}
-        onEscapeKeyDown={(e) => forcedMode && e.preventDefault()}
-      >
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Lock className="h-5 w-5 text-primary" />
             <DialogTitle>Change Password</DialogTitle>
           </div>
           <DialogDescription>
-            {forcedMode 
-              ? "For security reasons, you must update your password before continuing."
-              : "Update your password to keep your account secure."}
+            Update your password to keep your account secure.
           </DialogDescription>
         </DialogHeader>
 
@@ -267,11 +254,9 @@ export function ChangePasswordModal({ open, onOpenChange, forcedMode = false }: 
 
           {/* Action Buttons */}
           <div className="flex gap-2 justify-end pt-2">
-            {!forcedMode && (
-              <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
-                Cancel
-              </Button>
-            )}
+            <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
+              Cancel
+            </Button>
             <Button onClick={handleSubmit} disabled={!canSubmit || isProcessing}>
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Password

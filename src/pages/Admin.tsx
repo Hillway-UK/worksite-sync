@@ -40,7 +40,6 @@ export default function Admin() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     const fetchOrganization = async () => {
@@ -71,41 +70,6 @@ export default function Admin() {
   useEffect(() => {
     fetchDashboardData();
   }, [user?.email]);
-
-  // Check if manager must change password
-  useEffect(() => {
-    const checkPasswordChangeRequired = async () => {
-      if (!user?.email) return;
-
-      try {
-        // Check user metadata first
-        const mustChange = user.user_metadata?.must_change_password === true || 
-                          user.app_metadata?.must_change_password === true;
-
-        if (mustChange) {
-          setMustChangePassword(true);
-          setShowChangePassword(true);
-          return;
-        }
-
-        // Also check the managers table
-        const { data: manager } = await supabase
-          .from('managers')
-          .select('*')
-          .eq('email', user.email)
-          .single();
-
-        if ((manager as any)?.must_change_password) {
-          setMustChangePassword(true);
-          setShowChangePassword(true);
-        }
-      } catch (error) {
-        console.error('Error checking password change requirement:', error);
-      }
-    };
-
-    checkPasswordChangeRequired();
-  }, [user]);
 
   const fetchDashboardData = async () => {
     if (!user?.email) return;
@@ -426,7 +390,6 @@ export default function Admin() {
       <ChangePasswordModal 
         open={showChangePassword} 
         onOpenChange={setShowChangePassword}
-        forcedMode={mustChangePassword}
       />
     </Layout>
   );
