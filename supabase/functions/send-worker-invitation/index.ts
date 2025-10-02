@@ -12,6 +12,7 @@ interface WorkerInvitationRequest {
   orgName: string;
   tempPassword: string;
   issuedAt: string;
+  __dryRun?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -34,9 +35,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Parse request body
-    const { email, fullName, orgName, tempPassword, issuedAt }: WorkerInvitationRequest = await req.json();
+    const { email, fullName, orgName, tempPassword, issuedAt, __dryRun }: WorkerInvitationRequest = await req.json();
 
     console.log("Processing worker invitation for:", email);
+    console.log("Dry run mode:", __dryRun ? "enabled" : "disabled");
 
     // Create Supabase admin client
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -46,10 +48,15 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
+    // Check if user already exists to determine link type
+    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    const linkType = existingUser ? 'invite' : 'signup';
+    
+    console.log(`Generating Supabase confirmation link (${linkType}) for:`, email);
+    
     // Generate Supabase confirmation link with redirectTo
-    console.log("Generating Supabase confirmation link for:", email);
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
+      type: linkType,
       email,
       options: {
         redirectTo: 'https://autotimeworkers.hillwayco.uk/'
@@ -75,6 +82,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Build production wrapper URL
     const loginHref = `https://autotime.hillwayco.uk/auth/confirm?confirmation_url=${encodeURIComponent(actionLink)}`;
+
+    // If dry run, return early without sending email
+    if (__dryRun) {
+      console.log("Dry run mode - skipping email send");
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          dryRun: true,
+          loginHref,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
     // Format timestamp for display
     const formattedTime = new Date(issuedAt).toLocaleString('en-GB', {
@@ -186,9 +209,8 @@ This is an automated message from AutoTime. Please do not reply to this email.`;
 
     return new Response(
       JSON.stringify({
-        success: true,
-        message: "Worker invitation email sent successfully",
-        emailId: resendData.id,
+        ok: true,
+        id: resendData.id,
       }),
       {
         status: 200,
@@ -199,7 +221,7 @@ This is an automated message from AutoTime. Please do not reply to this email.`;
     console.error("Error in send-worker-invitation function:", error);
     return new Response(
       JSON.stringify({
-        success: false,
+        ok: false,
         error: error.message || "Failed to send worker invitation email",
       }),
       {

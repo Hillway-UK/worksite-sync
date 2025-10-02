@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
 import { generateSecurePassword } from '@/lib/validation';
+import { sendWorkerInvitation } from '@/lib/sendWorkerInvitation';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -284,33 +285,25 @@ Please change your password on first login for security.`;
         
         // Send custom invitation email via edge function
         try {
-          console.log('Invoking send-worker-invitation edge function for:', data.email);
-          const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-worker-invitation', {
-            body: {
-              email: data.email,
-              fullName: data.name,
-              orgName: orgName,
-              tempPassword: tempPassword,
-              issuedAt: issuedAt
-            },
-            headers: {
-              'Content-Type': 'application/json'
-            }
+          const result = await sendWorkerInvitation({
+            email: data.email,
+            fullName: data.name,
+            orgName: orgName,
+            tempPassword: tempPassword,
+            issuedAt: issuedAt,
+            // dryRun: true, // Uncomment for testing without sending email
           });
 
-          if (emailError) {
-            console.error('Failed to send invitation email:', emailError);
-            toast({
-              title: "Worker Created",
-              description: "Worker account created but invitation email may not have been sent. Please share credentials manually.",
-              variant: "default",
-            });
-          } else {
-            console.log('Email function response:', emailResponse);
+          if (result.ok) {
+            console.log('Invitation email sent successfully:', result);
           }
         } catch (emailError) {
-          console.error('Error calling email function:', emailError);
-          // Don't fail the worker creation if email fails
+          console.error('Failed to send invitation email:', emailError);
+          toast({
+            title: "Worker Created",
+            description: "Worker account created but invitation email may not have been sent. Please share credentials manually.",
+            variant: "default",
+          });
         }
         
         // Store credentials for display
