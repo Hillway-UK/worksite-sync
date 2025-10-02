@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Clock, MapPin, User, FileText, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { FirstLoginModal } from '@/components/FirstLoginModal';
+import { toast } from 'sonner';
 
 const localizer = momentLocalizer(moment);
 
@@ -40,10 +42,66 @@ export default function Dashboard() {
   const [clockEntries, setClockEntries] = useState<ClockEntry[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
 
   useEffect(() => {
     fetchClockEntries();
   }, [user]);
+
+  useEffect(() => {
+    checkFirstLoginStatus();
+  }, [user]);
+
+  const checkFirstLoginStatus = async () => {
+    if (!user?.email) return;
+
+    try {
+      const { data: worker } = await supabase
+        .from('workers')
+        .select('id, first_login_info_dismissed')
+        .eq('email', user.email)
+        .single();
+
+      // Show modal only if flag is false/absent
+      if (worker && !worker.first_login_info_dismissed) {
+        setShowFirstLoginModal(true);
+      }
+    } catch (error) {
+      console.error('Error checking first login status:', error);
+    }
+  };
+
+  const handleDismissFirstLoginModal = async () => {
+    if (!user?.email) return;
+
+    try {
+      const { data: worker } = await supabase
+        .from('workers')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+
+      if (worker) {
+        const { error } = await supabase
+          .from('workers')
+          .update({ first_login_info_dismissed: true })
+          .eq('id', worker.id);
+
+        if (error) throw error;
+      }
+
+      // Close modal and redirect to Profile
+      setShowFirstLoginModal(false);
+      navigate('/profile');
+    } catch (error) {
+      console.error('Error dismissing first login modal:', error);
+      toast.error("Couldn't save your preference, but you can still change your password now.");
+      
+      // Still redirect to profile even if persistence fails
+      setShowFirstLoginModal(false);
+      navigate('/profile');
+    }
+  };
 
   const fetchClockEntries = async () => {
     if (!user?.email) return;
@@ -244,6 +302,11 @@ export default function Dashboard() {
             </DialogContent>
           </Dialog>
         )}
+
+        <FirstLoginModal 
+          open={showFirstLoginModal} 
+          onDismiss={handleDismissFirstLoginModal} 
+        />
       </div>
     </Layout>
   );

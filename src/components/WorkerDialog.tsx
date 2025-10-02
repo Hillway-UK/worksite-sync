@@ -235,7 +235,17 @@ Please change your password on first login for security.`;
         // Generate secure temporary password with better entropy
         const tempPassword = generateSecurePassword(12);
         
-        // Create auth user for worker
+        // Get organization name for email template
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', managerData.organization_id)
+          .single();
+
+        const orgName = orgData?.name || 'Your Organization';
+        const issuedAt = new Date().toISOString();
+        
+        // Create auth user for worker with enriched metadata for email
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: data.email,
           password: tempPassword,
@@ -243,7 +253,12 @@ Please change your password on first login for security.`;
             emailRedirectTo: `${window.location.origin}/`,
             data: {
               name: data.name,
-              role: 'worker'
+              role: 'worker',
+              // Additional fields for email template
+              full_name: data.name,
+              org_name: orgName,
+              temp_password: tempPassword,
+              issued_at: issuedAt
             }
           }
         });
