@@ -245,20 +245,15 @@ Please change your password on first login for security.`;
         const orgName = orgData?.name || 'Your Organization';
         const issuedAt = new Date().toISOString();
         
-        // Create auth user for worker with enriched metadata for email
+        // Create auth user for worker
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: data.email,
           password: tempPassword,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: 'https://autotimeworkers.hillwayco.uk/',
             data: {
               name: data.name,
               role: 'worker',
-              // Additional fields for email template
-              full_name: data.name,
-              org_name: orgName,
-              temp_password: tempPassword,
-              issued_at: issuedAt
             }
           }
         });
@@ -287,6 +282,31 @@ Please change your password on first login for security.`;
           return;
         }
         
+        // Send custom invitation email via edge function
+        try {
+          const { error: emailError } = await supabase.functions.invoke('send-worker-invitation', {
+            body: {
+              email: data.email,
+              fullName: data.name,
+              orgName: orgName,
+              tempPassword: tempPassword,
+              issuedAt: issuedAt
+            }
+          });
+
+          if (emailError) {
+            console.error('Failed to send invitation email:', emailError);
+            toast({
+              title: "Worker Created",
+              description: "Worker account created but invitation email may not have been sent. Please share credentials manually.",
+              variant: "default",
+            });
+          }
+        } catch (emailError) {
+          console.error('Error calling email function:', emailError);
+          // Don't fail the worker creation if email fails
+        }
+        
         // Store credentials for display
         setWorkerCredentials({
           name: data.name,
@@ -297,7 +317,7 @@ Please change your password on first login for security.`;
 
         toast({
           title: "Success",
-          description: "Worker created with mobile app login enabled!",
+          description: "Worker created and invitation email sent!",
           duration: 5000,
         });
       }
