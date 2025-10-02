@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
 import { generateSecurePassword } from '@/lib/validation';
-import { sendWorkerInvitation } from '@/lib/sendWorkerInvitation';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -236,25 +235,15 @@ Please change your password on first login for security.`;
         // Generate secure temporary password with better entropy
         const tempPassword = generateSecurePassword(12);
         
-        // Get organization name for email template
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('name')
-          .eq('id', managerData.organization_id)
-          .single();
-
-        const orgName = orgData?.name || 'Your Organization';
-        const issuedAt = new Date().toISOString();
-        
         // Create auth user for worker
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: data.email,
           password: tempPassword,
           options: {
-            emailRedirectTo: 'https://autotimeworkers.hillwayco.uk/',
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
               name: data.name,
-              role: 'worker',
+              role: 'worker'
             }
           }
         });
@@ -283,29 +272,6 @@ Please change your password on first login for security.`;
           return;
         }
         
-        // Send custom invitation email via edge function
-        try {
-          const result = await sendWorkerInvitation({
-            email: data.email,
-            fullName: data.name,
-            orgName: orgName,
-            tempPassword: tempPassword,
-            issuedAt: issuedAt,
-            // dryRun: true, // Uncomment for testing without sending email
-          });
-
-          if (result.ok) {
-            console.log('Invitation email sent successfully:', result);
-          }
-        } catch (emailError) {
-          console.error('Failed to send invitation email:', emailError);
-          toast({
-            title: "Worker Created",
-            description: "Worker account created but invitation email may not have been sent. Please share credentials manually.",
-            variant: "default",
-          });
-        }
-        
         // Store credentials for display
         setWorkerCredentials({
           name: data.name,
@@ -316,7 +282,7 @@ Please change your password on first login for security.`;
 
         toast({
           title: "Success",
-          description: "Worker created and invitation email sent!",
+          description: "Worker created with mobile app login enabled!",
           duration: 5000,
         });
       }

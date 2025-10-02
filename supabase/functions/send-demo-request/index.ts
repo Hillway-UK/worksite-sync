@@ -15,7 +15,7 @@ type Payload = {
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "Demo Requests <noreply@hillwayco.uk>";
-const TO_EMAIL = Deno.env.get("TO_EMAIL") ?? "hello@hillwayco.uk";
+const TO_EMAIL = Deno.env.get("TO_EMAIL") ?? "mira@hillwayco.uk";
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
 const logStep = (step: string, details?: any) => {

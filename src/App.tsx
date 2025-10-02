@@ -29,7 +29,6 @@ import AdminAmendments from "./pages/AdminAmendments";
 import AdminProfile from "./pages/AdminProfile";
 import OrganizationDashboard from "./pages/OrganizationDashboard";
 import OrganizationSettings from "./pages/OrganizationSettings";
-import AuthConfirm from "./pages/AuthConfirm";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,7 +49,6 @@ const App = () => (
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/update-password" element={<UpdatePassword />} />
-        <Route path="/auth/confirm" element={<AuthConfirm />} />
             <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Super Admin Routes */}

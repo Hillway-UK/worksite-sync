@@ -72,6 +72,3 @@ verify_jwt = false
 
 [functions.manager-change-password]
 verify_jwt = true
-
-[functions.send-worker-invitation]
-verify_jwt = true
