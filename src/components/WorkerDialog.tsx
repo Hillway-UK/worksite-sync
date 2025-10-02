@@ -240,7 +240,7 @@ Please change your password on first login for security.`;
           email: data.email,
           password: tempPassword,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: "https://autotimeworkers.hillwayco.uk/login",
             data: {
               name: data.name,
               role: 'worker'

@@ -125,7 +125,13 @@ export default function Onboarding() {
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: orgData.admin_email,
-        password: orgData.admin_password
+        password: orgData.admin_password,
+        options: {
+          emailRedirectTo: "https://autotime.hillwayco.uk/login",
+          data: {
+            role: 'super_admin'
+          }
+        }
       });
 
       if (authError) throw authError;

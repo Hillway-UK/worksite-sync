@@ -229,7 +229,7 @@ export default function SuperAdmin() {
         email: managerForm.email,
         password: managerForm.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: "https://autotime.hillwayco.uk/login",
           data: {
             name: managerForm.name,
             role: 'manager'
