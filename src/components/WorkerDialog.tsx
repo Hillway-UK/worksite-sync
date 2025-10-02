@@ -284,13 +284,17 @@ Please change your password on first login for security.`;
         
         // Send custom invitation email via edge function
         try {
-          const { error: emailError } = await supabase.functions.invoke('send-worker-invitation', {
+          console.log('Invoking send-worker-invitation edge function for:', data.email);
+          const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-worker-invitation', {
             body: {
               email: data.email,
               fullName: data.name,
               orgName: orgName,
               tempPassword: tempPassword,
               issuedAt: issuedAt
+            },
+            headers: {
+              'Content-Type': 'application/json'
             }
           });
 
@@ -301,6 +305,8 @@ Please change your password on first login for security.`;
               description: "Worker account created but invitation email may not have been sent. Please share credentials manually.",
               variant: "default",
             });
+          } else {
+            console.log('Email function response:', emailResponse);
           }
         } catch (emailError) {
           console.error('Error calling email function:', emailError);

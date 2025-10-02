@@ -47,6 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Generate Supabase confirmation link with redirectTo
+    console.log("Generating Supabase confirmation link for:", email);
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'signup',
       email,
@@ -60,14 +61,17 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Failed to generate confirmation link: ${linkError.message}`);
     }
 
-    const actionLink = linkData?.properties?.action_link;
+    console.log("Link data received:", JSON.stringify(linkData, null, 2));
+
+    // Check both possible paths for action_link (SDK version compatibility)
+    const actionLink = linkData?.properties?.action_link || linkData?.action_link;
 
     if (!actionLink) {
-      console.error("No action link in response:", linkData);
+      console.error("No action link found in response. Full data:", JSON.stringify(linkData, null, 2));
       throw new Error("No confirmation link generated");
     }
 
-    console.log("Generated confirmation link successfully");
+    console.log("Generated confirmation link successfully:", actionLink);
 
     // Build production wrapper URL
     const loginHref = `https://autotime.hillwayco.uk/auth/confirm?confirmation_url=${encodeURIComponent(actionLink)}`;
@@ -144,30 +148,41 @@ AutoTime Team
 This is an automated message from AutoTime. Please do not reply to this email.`;
 
     // Send email via Resend
-    console.log("Sending email via Resend...");
+    console.log("Sending email via Resend to:", email);
+    console.log("Login href in email:", loginHref);
+    
+    const emailPayload = {
+      from: "AutoTime <no-reply@hillwayco.uk>",
+      to: [email],
+      subject: "Confirm AutoTime Sign up",
+      html: htmlBody,
+      text: textBody,
+    };
+    
+    console.log("Resend API request payload:", JSON.stringify({ ...emailPayload, html: '[HTML content]', text: '[Text content]' }));
+    
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: "AutoTime <no-reply@hillwayco.uk>",
-        to: [email],
-        subject: "Confirm AutoTime Sign up",
-        html: htmlBody,
-        text: textBody,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
+    console.log("Resend API response status:", resendResponse.status);
+    
+    const responseText = await resendResponse.text();
+    console.log("Resend API raw response:", responseText);
+
     if (!resendResponse.ok) {
-      const errorText = await resendResponse.text();
-      console.error("Resend API error:", errorText);
-      throw new Error(`Resend API error: ${resendResponse.status} - ${errorText}`);
+      console.error("Resend API error - Status:", resendResponse.status);
+      console.error("Resend API error - Body:", responseText);
+      throw new Error(`Resend API error: ${resendResponse.status} - ${responseText}`);
     }
 
-    const resendData = await resendResponse.json();
-    console.log("Email sent successfully:", resendData);
+    const resendData = JSON.parse(responseText);
+    console.log("Email sent successfully! Email ID:", resendData.id);
 
     return new Response(
       JSON.stringify({
