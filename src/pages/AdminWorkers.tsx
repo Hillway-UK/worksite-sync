@@ -186,12 +186,26 @@ export default function AdminWorkers() {
   const deleteWorker = async (worker: Worker) => {
     setOperationLoading(prev => ({ ...prev, [worker.id]: true }));
     try {
+      // First, get the auth user ID by email
+      const { data, error: authLookupError } = await supabase.auth.admin.listUsers();
+      const authUser = data?.users?.find((u: any) => u.email === worker.email);
+
+      // Delete from workers table
       const { error } = await supabase
         .from('workers')
         .delete()
         .eq('id', worker.id);
 
       if (error) throw error;
+
+      // Delete from auth.users if found
+      if (authUser) {
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(authUser.id);
+        if (authDeleteError) {
+          console.error('Error deleting auth user:', authDeleteError);
+          // Continue even if auth deletion fails
+        }
+      }
 
       setWorkers(workers.filter(w => w.id !== worker.id));
       setDeleteDialog({ isOpen: false, worker: null });
