@@ -48,15 +48,13 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
-    // Check if user already exists to determine link type
-    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-    const linkType = existingUser ? 'invite' : 'signup';
-    
-    console.log(`Generating Supabase confirmation link (${linkType}) for:`, email);
+    // User is already created via signUp() before this function is called
+    // Therefore we always use 'invite' type for the confirmation link
+    console.log("Generating Supabase confirmation link (type: invite) for:", email);
     
     // Generate Supabase confirmation link with redirectTo
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: linkType,
+      type: 'invite',
       email,
       options: {
         redirectTo: 'https://autotimeworkers.hillwayco.uk/'
