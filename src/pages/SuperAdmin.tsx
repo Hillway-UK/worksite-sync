@@ -318,28 +318,14 @@ export default function SuperAdmin() {
     if (!confirm('Remove this manager? This action cannot be undone.')) return;
     
     try {
-      // First, get the auth user ID by email
-      const { data, error: authLookupError } = await supabase.auth.admin.listUsers();
-      const authUser = data?.users?.find((u: any) => u.email === email);
+      // Call edge function to delete both database record and auth user
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { email, table: 'managers' }
+      });
 
-      // Delete from managers table
-      const { error } = await supabase
-        .from('managers')
-        .delete()
-        .eq('email', email);
-      
       if (error) {
         toast.error('Failed to delete manager');
         return;
-      }
-
-      // Delete from auth.users if found
-      if (authUser) {
-        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(authUser.id);
-        if (authDeleteError) {
-          console.error('Error deleting auth user:', authDeleteError);
-          // Continue even if auth deletion fails
-        }
       }
       
       toast.success('Manager removed');
