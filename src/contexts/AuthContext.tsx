@@ -221,13 +221,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setUserRole(null);
-    setOrganizationId(null);
-    setOrganization(null);
-    setLoading(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Ignore errors if session is already invalid
+      console.log('Sign out error (session may already be expired):', error);
+    } finally {
+      // Always clear local state regardless of API response
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+      setOrganizationId(null);
+      setOrganization(null);
+      setLoading(false);
+    }
   };
 
   const requestPasswordReset = async (email: string) => {
