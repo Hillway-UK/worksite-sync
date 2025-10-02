@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { TempPasswordModal } from '@/components/TempPasswordModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { generateSecurePassword } from '@/lib/validation';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
@@ -25,6 +27,8 @@ export default function SuperAdmin() {
   const [creatingManager, setCreatingManager] = useState(false);
   const [selectedManager, setSelectedManager] = useState<{ id: string; name: string; email: string } | null>(null);
   const [tempPasswordModalOpen, setTempPasswordModalOpen] = useState(false);
+  const [showManagerSuccessModal, setShowManagerSuccessModal] = useState(false);
+  const [managerCredentials, setManagerCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -36,7 +40,6 @@ export default function SuperAdmin() {
   const [managerForm, setManagerForm] = useState({
     email: '',
     name: '',
-    password: '',
     organization_id: ''
   });
 
@@ -217,17 +220,20 @@ export default function SuperAdmin() {
 
   const createManager = async () => {
     try {
-      if (!managerForm.email || !managerForm.name || !managerForm.password || !managerForm.organization_id) {
+      if (!managerForm.email || !managerForm.name || !managerForm.organization_id) {
         toast.error('Please fill in all fields');
         return;
       }
 
       setCreatingManager(true);
 
+      // Auto-generate secure password
+      const autoPassword = generateSecurePassword(12);
+
       // Create auth user using regular signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: managerForm.email,
-        password: managerForm.password,
+        password: autoPassword,
         options: {
           emailRedirectTo: "https://autotime.hillwayco.uk/login",
           data: {
@@ -256,7 +262,7 @@ export default function SuperAdmin() {
           } else {
             toast.success('Manager linked to existing user successfully!');
             setShowManagerDialog(false);
-            setManagerForm({ email: '', name: '', password: '', organization_id: '' });
+            setManagerForm({ email: '', name: '', organization_id: '' });
             await fetchManagers();
           }
           setCreatingManager(false);
@@ -285,9 +291,16 @@ export default function SuperAdmin() {
         return;
       }
       
-      toast.success('Manager created successfully! They can now log in.');
+      // Store credentials and show success modal
+      setManagerCredentials({
+        name: managerForm.name,
+        email: managerForm.email,
+        password: autoPassword
+      });
+      
       setShowManagerDialog(false);
-      setManagerForm({ email: '', name: '', password: '', organization_id: '' });
+      setManagerForm({ email: '', name: '', organization_id: '' });
+      setShowManagerSuccessModal(true);
       await fetchManagers();
       
     } catch (error: any) {
@@ -295,6 +308,28 @@ export default function SuperAdmin() {
     } finally {
       setCreatingManager(false);
     }
+  };
+
+  const copyManagerCredentialsToClipboard = () => {
+    if (!managerCredentials) return;
+    
+    const text = `Welcome to AutoTime Manager Portal
+
+Name: ${managerCredentials.name}
+Email: ${managerCredentials.email}
+Temporary Password: ${managerCredentials.password}
+
+Manager Portal URL: https://autotime.hillwayco.uk/login
+
+Please change your password on first login for security.`;
+    
+    navigator.clipboard.writeText(text);
+    toast.success('Login details copied to clipboard!');
+  };
+
+  const handleManagerSuccessModalClose = () => {
+    setShowManagerSuccessModal(false);
+    setManagerCredentials(null);
   };
 
   const deleteOrganization = async (id: string) => {
@@ -598,17 +633,10 @@ export default function SuperAdmin() {
                 placeholder="Enter email address"
               />
             </div>
-            <div>
-              <Label htmlFor="manager-password">Password *</Label>
-              <Input
-                id="manager-password"
-                type="password"
-                value={managerForm.password}
-                onChange={(e) => setManagerForm({...managerForm, password: e.target.value})}
-                placeholder="Enter password"
-              />
+            <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+              A secure password will be automatically generated for the manager.
             </div>
-            <Button 
+            <Button
               onClick={createManager} 
               className="w-full"
               disabled={creatingManager}
@@ -624,6 +652,43 @@ export default function SuperAdmin() {
         onOpenChange={setTempPasswordModalOpen}
         manager={selectedManager}
       />
+
+      {/* Manager Success Modal */}
+      <AlertDialog open={showManagerSuccessModal} onOpenChange={handleManagerSuccessModalClose}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Manager Created Successfully!</AlertDialogTitle>
+            <AlertDialogDescription>
+              The manager account has been created. Please share these temporary credentials:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {managerCredentials && (
+            <div className="bg-green-50 border border-green-200 p-4 rounded-md space-y-2">
+              <div>
+                <strong>Name:</strong> {managerCredentials.name}
+              </div>
+              <div>
+                <strong>Email:</strong> {managerCredentials.email}
+              </div>
+              <div>
+                <strong>Temporary Password:</strong> {managerCredentials.password}
+              </div>
+              <div className="text-sm text-muted-foreground mt-3 pt-3 border-t border-green-300">
+                ⚠️ Manager should change this password on first login for security.
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={copyManagerCredentialsToClipboard}
+              className="mr-2"
+            >
+              Copy Login Details
+            </AlertDialogAction>
+            <AlertDialogCancel onClick={handleManagerSuccessModalClose}>Done</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
