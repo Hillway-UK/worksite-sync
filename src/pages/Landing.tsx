@@ -22,7 +22,7 @@ export default function Landing() {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-5xl font-bold mb-6">Construction Workforce Time Management</h2>
+        <h2 className="text-5xl font-bold mb-6">AutoTime - Geo Fenced Timesheet Management System </h2>
         <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
           Simple, powerful time tracking for construction companies. Track hours, manage workers, and export to Xero with ease.
         </p>
