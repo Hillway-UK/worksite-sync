@@ -36,6 +36,8 @@ serve(async (req) => {
     });
 
     console.log(`[invite-worker] Attempting to invite worker: ${email}`);
+    console.log(`[invite-worker] Redirect URL: https://autotimeworkers.hillwayco.uk/reset-password?source=invite`);
+    console.log(`[invite-worker] Worker metadata:`, { name, role: 'worker', organization_id: organizationId });
 
     // Try to invite the user
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
@@ -77,6 +79,7 @@ serve(async (req) => {
         }
 
         console.log(`[invite-worker] Reset email sent successfully to ${email}`);
+        console.log(`[invite-worker] User should receive email shortly`);
         
         return new Response(
           JSON.stringify({
@@ -96,6 +99,7 @@ serve(async (req) => {
     }
 
     console.log(`[invite-worker] Invitation sent successfully to ${email}`);
+    console.log(`[invite-worker] User ID: ${inviteData?.user?.id}`);
 
     return new Response(
       JSON.stringify({

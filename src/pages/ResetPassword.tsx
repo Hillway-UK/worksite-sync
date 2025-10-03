@@ -35,45 +35,24 @@ const ResetPassword = () => {
   useEffect(() => {
     (async () => {
       try {
-        // 1. Check for PKCE code first
+        // 1. Check for PKCE code first (modern flow - works best on mobile)
         const code = searchParams.get('code');
         if (code) {
-          console.log('ResetPassword: Exchanging code for session...');
+          console.log('ResetPassword: Exchanging PKCE code for session...');
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
           
-          // Clear URL after successful exchange
-          window.history.replaceState({}, document.title, window.location.pathname);
+          // Clear URL after successful exchange (keep source param)
+          const sourceParam = searchParams.get('source');
+          const newUrl = sourceParam 
+            ? `${window.location.pathname}?source=${sourceParam}`
+            : window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
           setIsValidating(false);
           return;
         }
 
-        // 2. Extract tokens from hash and query parameters
-        const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        const hashParams = new URLSearchParams(hash && hash.startsWith('#') ? hash.slice(1) : '');
-        
-        const accessToken = searchParams.get('access_token') || hashParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token') || hashParams.get('refresh_token');
-        const type = searchParams.get('type') || hashParams.get('type');
-
-        // 3. If we have tokens and it's a recovery link, establish session
-        if (accessToken && refreshToken && type === 'recovery') {
-          console.log('ResetPassword: Setting session with recovery tokens...');
-          
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          
-          if (error) throw error;
-          
-          // Clear URL tokens after successful session establishment
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setIsValidating(false);
-          return;
-        }
-
-        // 4. Check if we already have a valid session
+        // 2. Check if we already have a valid session (user might have clicked link again)
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           console.log('ResetPassword: Valid session found');
@@ -81,8 +60,8 @@ const ResetPassword = () => {
           return;
         }
 
-        // 5. No valid tokens or session found
-        console.log('ResetPassword: No valid tokens found, redirecting...');
+        // 3. No valid code or session found
+        console.log('ResetPassword: No valid token found, redirecting...');
         setShouldRedirect(true);
         toast({
           title: 'Invalid Reset Link',
@@ -121,6 +100,19 @@ const ResetPassword = () => {
       windowMs: 300000, // 5 minutes
     },
     onSubmit: async (data) => {
+      // Verify session is still valid before updating
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        toast({
+          title: "Session Expired",
+          description: "Your reset link has expired. Please request a new one.",
+          variant: "destructive",
+        });
+        navigate('/forgot-password');
+        return;
+      }
+
       const { error } = await updatePassword(data.password);
       
       if (error) {
@@ -160,6 +152,9 @@ const ResetPassword = () => {
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p>Validating reset link...</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                If this takes too long, try opening the link in your default browser.
+              </p>
             </div>
           </CardContent>
         </Card>
