@@ -939,18 +939,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _active_count_for_org: {
-        Args: { p_org: string; p_table: unknown }
-        Returns: number
-      }
-      _col_exists: {
-        Args: { p_col: string; p_table: unknown }
-        Returns: boolean
-      }
-      assert_org_capacity: {
-        Args: { p_kind: string; p_org: string }
-        Returns: undefined
-      }
       auto_clock_out_after_12_hours: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -974,15 +962,6 @@ export type Database = {
           is_manager: boolean
           is_super_admin: boolean
           organization_id: string
-        }[]
-      }
-      get_org_seat_summary: {
-        Args: { p_org: string }
-        Returns: {
-          kind: string
-          remaining: number
-          seat_limit: number
-          used: number
         }[]
       }
       get_recent_activity: {
