@@ -53,44 +53,92 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[DELETE-ORGANIZATION] Request to delete: ${organization_id}`);
 
-    // --- Authentication: Get user from JWT ---
-    const authed = getAuthedClient(req);
-    const { data: userData, error: userError } = await authed.auth.getUser();
+    // --- AUTH / ROLE CHECK ---
 
-    if (userError || !userData?.user) {
-      console.error("[DELETE-ORGANIZATION] Auth failed:", userError);
+    // Read caller (uses the Authorization header the client sent)
+    const authed = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    });
+    const { data: ures, error: uerr } = await authed.auth.getUser();
+
+    if (uerr || !ures?.user) {
+      console.error("[DELETE-ORGANIZATION] Auth failed:", uerr);
       return forbid({ error: "Not authenticated" });
     }
 
-    const user = userData.user;
-    console.log(`[DELETE-ORGANIZATION] User: ${user.email}`);
+    const user = ures.user;
+    console.log(`[DELETE-ORGANIZATION] User email: ${user.email}`);
 
-    // --- Authorization: Check for superadmin role ---
-    const roleMeta =
-      (user.app_metadata as any)?.role ??
-      (user.app_metadata as any)?.roles ??
-      (user.user_metadata as any)?.role;
+    // 1) Check app_metadata / user_metadata
+    const am: any = user.app_metadata ?? {};
+    const um: any = user.user_metadata ?? {};
 
-    const roles: string[] = Array.isArray(roleMeta)
-      ? roleMeta
-      : typeof roleMeta === "string"
-      ? [roleMeta]
+    const metaRoles: string[] = Array.isArray(am.roles)
+      ? am.roles
+      : typeof am.roles === "string"
+      ? [am.roles]
       : [];
 
-    const isSuperadmin =
-      roles.includes("superadmin") ||
-      roles.includes("super_admin") ||
-      (user.app_metadata as any)?.is_superadmin === true ||
-      (user.user_metadata as any)?.is_superadmin === true;
+    const singleMetaRole = am.role || um.role; // may be a string
 
-    // Also check super_admins table as fallback
-    const { data: superAdminRecord } = await admin
-      .from("super_admins")
-      .select("id")
-      .eq("email", user.email)
-      .maybeSingle();
+    const isSuperFromMeta =
+      (singleMetaRole === "superadmin") ||
+      (singleMetaRole === "super_admin") ||
+      metaRoles.includes("superadmin") ||
+      metaRoles.includes("super_admin") ||
+      am.is_superadmin === true ||
+      um.is_superadmin === true;
 
-    if (!isSuperadmin && !superAdminRecord) {
+    // 2) Fallback: check super_admins table (uses email)
+    let isSuperFromSuperAdminsTable = false;
+    {
+      const { data: saRow, error: saErr } = await admin
+        .from("super_admins")
+        .select("id, email, is_owner")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (saErr) {
+        console.error("[DELETE-ORGANIZATION] super_admins table check error:", saErr);
+      } else {
+        isSuperFromSuperAdminsTable = Boolean(saRow?.id); // exists in super_admins
+      }
+    }
+
+    // 3) Additional fallback: check managers table for is_super flag
+    let isSuperFromManagersTable = false;
+    {
+      const { data: mgrRow, error: mgrErr } = await admin
+        .from("managers")
+        .select("id, email, is_super")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (mgrErr) {
+        console.error("[DELETE-ORGANIZATION] managers table check error:", mgrErr);
+      } else {
+        isSuperFromManagersTable = Boolean(mgrRow?.is_super);
+      }
+    }
+
+    const isSuperadmin = isSuperFromMeta || isSuperFromSuperAdminsTable || isSuperFromManagersTable;
+
+    // Comprehensive debug logging
+    console.log("[DELETE-ORGANIZATION] auth debug", {
+      uid: user.id,
+      email: user.email,
+      am_role: am.role,
+      am_roles: am.roles,
+      am_is_superadmin: am.is_superadmin,
+      um_role: um.role,
+      um_is_superadmin: um.is_superadmin,
+      isSuperFromMeta,
+      isSuperFromSuperAdminsTable,
+      isSuperFromManagersTable,
+      final_isSuperadmin: isSuperadmin,
+    });
+
+    if (!isSuperadmin) {
       console.log(`[DELETE-ORGANIZATION] Not authorized: ${user.email}`);
       return forbid({ error: "Superadmin role required" });
     }
