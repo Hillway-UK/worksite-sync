@@ -9,8 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
-import { generateSecurePassword } from '@/lib/validation';
+import { Plus, Edit, CheckCircle } from 'lucide-react';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -62,42 +61,12 @@ export function WorkerDialog({ worker, onSave, trigger, open: controlledOpen, on
   const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [workerCredentials, setWorkerCredentials] = useState<{
-    name: string;
-    email: string;
-    password: string;
-  } | null>(null);
+  const [invitationType, setInvitationType] = useState<'invite' | 'reset' | null>(null);
 
   // Use controlled open state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
-  const copyCredentialsToClipboard = async () => {
-    if (!workerCredentials) return;
-    
-    const credentialText = `Welcome to AutoTime
-
-Name: ${workerCredentials.name}
-Email: ${workerCredentials.email}
-Temporary Password: ${workerCredentials.password}
-App URL: ${window.location.origin}
-
-Please change your password on first login for security.`;
-
-    try {
-      await navigator.clipboard.writeText(credentialText);
-      toast({
-        title: "Copied!",
-        description: "Login credentials copied to clipboard",
-      });
-    } catch (error) {
-      toast({
-        title: "Copy failed",
-        description: "Please manually copy the credentials",
-        variant: "destructive",
-      });
-    }
-  };
 
   const {
     register,
@@ -231,34 +200,9 @@ Please change your password on first login for security.`;
         reset();
         onSave();
       } else {
-        // Create new worker - including auth user creation
-        // Generate secure temporary password with better entropy
-        const tempPassword = generateSecurePassword(12);
+        // Create new worker - send invitation email via edge function
         
-        // Create auth user for worker
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: data.email,
-          password: tempPassword,
-          options: {
-            emailRedirectTo: "https://autotimeworkers.hillwayco.uk/login",
-            data: {
-              name: data.name,
-              role: 'worker'
-            }
-          }
-        });
-        
-        // Handle auth user creation
-        if (authError && !authError.message.includes('already registered')) {
-          toast({
-            title: "Account Creation Failed",
-            description: `Failed to create login account: ${authError.message}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Create worker database record
+        // First create the worker database record
         const { error: workerError } = await supabase
           .from('workers')
           .insert(workerData);
@@ -271,18 +215,50 @@ Please change your password on first login for security.`;
           });
           return;
         }
-        
-        // Store credentials for display
-        setWorkerCredentials({
-          name: data.name,
-          email: data.email,
-          password: tempPassword,
+
+        // Then send invitation email via edge function
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('invite-worker', {
+          body: {
+            email: data.email,
+            name: data.name,
+            organizationId: managerData.organization_id,
+          },
         });
+
+        if (inviteError) {
+          toast({
+            title: "Invitation Failed",
+            description: `Worker created but failed to send invitation: ${inviteError.message}`,
+            variant: "destructive",
+          });
+          // Still call onSave to refresh the list
+          onSave();
+          setOpen(false);
+          reset();
+          return;
+        }
+
+        if (!inviteResult?.success) {
+          toast({
+            title: "Invitation Failed",
+            description: `Worker created but: ${inviteResult?.error || 'Unknown error'}`,
+            variant: "destructive",
+          });
+          onSave();
+          setOpen(false);
+          reset();
+          return;
+        }
+
+        // Show success modal with invitation type
+        setInvitationType(inviteResult.type);
         setShowSuccessModal(true);
 
         toast({
           title: "Success",
-          description: "Worker created with mobile app login enabled!",
+          description: inviteResult.type === 'invite' 
+            ? "Worker created and invitation email sent!"
+            : "Worker created and password reset email sent!",
           duration: 5000,
         });
       }
@@ -307,7 +283,7 @@ Please change your password on first login for security.`;
 
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
-    setWorkerCredentials(null);
+    setInvitationType(null);
     setOpen(false);
     reset();
     onSave();
@@ -447,43 +423,41 @@ Please change your password on first login for security.`;
           <AlertDialogHeader>
             <div className="flex items-center gap-3 mb-2">
               <CheckCircle className="h-8 w-8 text-green-600" />
-              <AlertDialogTitle className="text-xl">Worker Created Successfully!</AlertDialogTitle>
+              <AlertDialogTitle className="text-xl">
+                {invitationType === 'invite' ? 'Invitation Sent!' : 'Reset Email Sent!'}
+              </AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-base space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-                <div>
-                  <span className="font-medium text-green-800">Worker Name:</span>
-                  <p className="text-green-700 font-mono">{workerCredentials?.name}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Email:</span>
-                  <p className="text-green-700 font-mono">{workerCredentials?.email}</p>
-                </div>
-                <div>
-                  <span className="font-medium text-green-800">Temporary Password:</span>
-                  <p className="text-green-700 font-mono text-lg bg-green-100 p-2 rounded border">
-                    {workerCredentials?.password}
-                  </p>
-                </div>
+                {invitationType === 'invite' ? (
+                  <>
+                    <p className="text-green-800">
+                      ✅ An invitation email has been sent to the worker with instructions to set their password.
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      The worker will receive an email with a secure link to create their password and access the system.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-green-800">
+                      ✅ A password reset email has been sent to the worker (user already existed).
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      The worker will receive an email with a secure link to reset their password and access the system.
+                    </p>
+                  </>
+                )}
               </div>
-              <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm">
-                  <strong>Important:</strong> Please share these credentials securely with the worker. 
-                  They must change their password on first login.
+                  <strong>Note:</strong> No plaintext passwords are sent via email. 
+                  The worker will set their own secure password using the link.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={copyCredentialsToClipboard}
-              className="flex items-center gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              Copy Login Details
-            </Button>
+          <AlertDialogFooter>
             <AlertDialogAction onClick={handleSuccessModalClose}>
               Done
             </AlertDialogAction>

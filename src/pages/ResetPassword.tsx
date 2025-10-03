@@ -28,6 +28,9 @@ const ResetPassword = () => {
   const { updatePassword } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  
+  // Get source parameter to determine flow (invite or reset)
+  const source = searchParams.get('source'); // 'invite' or 'reset'
 
   useEffect(() => {
     (async () => {
@@ -129,14 +132,23 @@ const ResetPassword = () => {
         return;
       }
 
-      toast({
-        title: "Password Updated",
-        description: "Your password has been successfully updated. You can now log in with your new password.",
-      });
-
-      // Sign out user and redirect to login for fresh authentication
-      await supabase.auth.signOut();
-      navigate('/login');
+      // Handle different flows based on source parameter
+      if (source === 'invite') {
+        // Worker invitation flow - keep them signed in and redirect to dashboard
+        toast({
+          title: "Welcome to AutoTime!",
+          description: "Your password has been set successfully.",
+        });
+        navigate('/');
+      } else {
+        // Password reset flow - sign out and redirect to login
+        toast({
+          title: "Password Updated",
+          description: "Your password has been successfully updated. You can now log in with your new password.",
+        });
+        await supabase.auth.signOut();
+        navigate('/login');
+      }
     },
   });
 
@@ -160,9 +172,14 @@ const ResetPassword = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <AutoTimeLogo className="mx-auto mb-4" />
-          <CardTitle>Reset Password</CardTitle>
+          <CardTitle>
+            {source === 'invite' ? 'Welcome to AutoTime!' : 'Reset Password'}
+          </CardTitle>
           <CardDescription>
-            Enter your new password below.
+            {source === 'invite' 
+              ? 'Set your password to get started with AutoTime'
+              : 'Enter your new password below'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -200,7 +217,7 @@ const ResetPassword = () => {
               className="w-full" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Updating...' : 'Confirm Reset'}
+              {isSubmitting ? 'Setting Password...' : (source === 'invite' ? 'Set Password & Continue' : 'Confirm Reset')}
             </Button>
 
             <div className="text-center">
