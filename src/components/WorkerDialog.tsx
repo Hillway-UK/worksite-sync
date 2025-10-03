@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit, CheckCircle, Copy } from 'lucide-react';
 import { generateSecurePassword } from '@/lib/validation';
-import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -126,8 +125,6 @@ Please change your password on first login for security.`;
     },
   });
 
-  const { checkCapacity } = useCapacityCheck();
-
   const onSubmit = async (data: WorkerFormData) => {
     setLoading(true);
     
@@ -166,21 +163,6 @@ Please change your password on first login for security.`;
           variant: "destructive",
         });
         return;
-      }
-
-      // Check capacity before creating new worker
-      if (!worker) {
-        const capacity = await checkCapacity('worker', managerData.organization_id);
-        
-        if (!capacity.canCreate) {
-          toast({
-            title: "Worker Limit Reached",
-            description: `Your plan allows ${capacity.limit} workers and you currently have ${capacity.current}. Please upgrade your plan or deactivate a worker to free a seat.`,
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
       }
 
       // Check for duplicate email (only for new workers)
