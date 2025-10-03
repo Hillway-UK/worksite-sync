@@ -333,30 +333,54 @@ Please change your password on first login for security.`;
   };
 
   const deleteOrganization = async (id: string) => {
-    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
-    
+    if (!id) {
+      toast.error('Missing organization id');
+      return;
+    }
+
+    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) {
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Call edge function for safe cascading deletion
+
       const { data, error } = await supabase.functions.invoke('delete-organization', {
-        body: { organizationId: id }
+        body: { organization_id: id },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (error) {
-        toast.error(`Failed to delete organization: ${error.message}`);
+        // Extract actual error message from response
+        const status = (error as any)?.context?.response?.status;
+        let errorText = error.message;
+        
+        try {
+          const responseText = await (error as any)?.context?.response?.text?.();
+          if (responseText) {
+            const parsed = JSON.parse(responseText);
+            errorText = parsed.error || errorText;
+          }
+        } catch {
+          // If parsing fails, use the original error message
+        }
+
+        console.error('Edge function error:', status, errorText);
+        toast.error(errorText || `Failed to delete organization (HTTP ${status || 400})`);
         return;
       }
 
       if (data?.success) {
-        toast.success(`Organization deleted successfully. Removed ${data.details?.worker_count || 0} workers and ${data.details?.manager_count || 0} managers.`);
+        toast.success(
+          `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`
+        );
         await fetchOrganizations();
       } else {
         toast.error(data?.error || 'Failed to delete organization');
       }
-    } catch (error: any) {
-      console.error('Error deleting organization:', error);
-      toast.error('An unexpected error occurred while deleting the organization');
+    } catch (err: any) {
+      console.error('Error deleting organization:', err);
+      toast.error(err?.message || 'Unexpected error while deleting organization');
     } finally {
       setLoading(false);
     }

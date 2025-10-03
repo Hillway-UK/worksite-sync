@@ -1,368 +1,333 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// deno-lint-ignore-file no-explicit-any
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[DELETE-ORGANIZATION] ${step}${detailsStr}`);
-};
+/** HTTP helpers with CORS */
+function json(body: Record<string, any>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
+  });
+}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+const bad = (b: Record<string, any>) => json(b, 400);
+const forbid = (b: Record<string, any> = { error: "Forbidden" }) => json(b, 403);
+const oops = (b: Record<string, any> = { error: "Unexpected error" }) => json(b, 500);
 
+/** Service-role client for privileged operations */
+const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+/** Client using caller token for reading user */
+function getAuthedClient(req: Request) {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  return createClient(SUPABASE_URL, SERVICE_ROLE, {
+    global: { headers: { Authorization: authHeader } },
+  });
+}
+
+Deno.serve(async (req: Request) => {
   try {
-    logStep("Function started");
-
-    // Get authorization header
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
     }
 
-    // Create client with user's token for authentication only
-    const authClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { 
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false }
-      }
-    );
-
-    // Get requesting user
-    const { data: { user }, error: userError } = await authClient.auth.getUser();
-    if (userError || !user) {
-      logStep("Authentication failed", { error: userError });
-      throw new Error('Unauthorized');
+    if (req.method !== "POST") {
+      return bad({ error: "Method not allowed. Use POST." });
     }
 
-    const { organizationId } = await req.json();
-    logStep("Request data parsed", { organizationId, userEmail: user.email });
+    // Parse and normalize input - accept multiple key names
+    const raw = await req.json().catch(() => ({}));
+    const organization_id = raw.organization_id ?? raw.organizationId ?? raw.id ?? "";
 
-    if (!organizationId) {
-      throw new Error('Organization ID is required');
+    // Validate input
+    if (!organization_id || typeof organization_id !== "string" || organization_id.trim() === "") {
+      return bad({ error: "organization_id is required and must be a non-empty string" });
     }
 
-    // Use service role for all database operations (including authorization check)
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    console.log(`[DELETE-ORGANIZATION] Request to delete: ${organization_id}`);
 
-    // Verify user is a super admin (global) using service role
-    const { data: anySuper, error: anySuperError } = await serviceClient
-      .from('super_admins')
-      .select('id, organization_id, email, is_owner')
-      .eq('email', user.email)
+    // --- Authentication: Get user from JWT ---
+    const authed = getAuthedClient(req);
+    const { data: userData, error: userError } = await authed.auth.getUser();
+
+    if (userError || !userData?.user) {
+      console.error("[DELETE-ORGANIZATION] Auth failed:", userError);
+      return forbid({ error: "Not authenticated" });
+    }
+
+    const user = userData.user;
+    console.log(`[DELETE-ORGANIZATION] User: ${user.email}`);
+
+    // --- Authorization: Check for superadmin role ---
+    const roleMeta =
+      (user.app_metadata as any)?.role ??
+      (user.app_metadata as any)?.roles ??
+      (user.user_metadata as any)?.role;
+
+    const roles: string[] = Array.isArray(roleMeta)
+      ? roleMeta
+      : typeof roleMeta === "string"
+      ? [roleMeta]
+      : [];
+
+    const isSuperadmin =
+      roles.includes("superadmin") ||
+      roles.includes("super_admin") ||
+      (user.app_metadata as any)?.is_superadmin === true ||
+      (user.user_metadata as any)?.is_superadmin === true;
+
+    // Also check super_admins table as fallback
+    const { data: superAdminRecord } = await admin
+      .from("super_admins")
+      .select("id")
+      .eq("email", user.email)
       .maybeSingle();
 
-    if (anySuperError) {
-      logStep("Authorization query failed", { error: anySuperError });
-      throw new Error(`Authorization check failed: ${anySuperError.message}`);
+    if (!isSuperadmin && !superAdminRecord) {
+      console.log(`[DELETE-ORGANIZATION] Not authorized: ${user.email}`);
+      return forbid({ error: "Superadmin role required" });
     }
 
-    if (!anySuper) {
-      logStep("Authorization failed - user not a super admin", { userEmail: user.email });
-      throw new Error('Only super admins can perform this action');
+    console.log(`[DELETE-ORGANIZATION] Authorization verified for: ${user.email}`);
+
+    // --- Check organization exists ---
+    const { data: org, error: orgErr } = await admin
+      .from("organizations")
+      .select("id, name")
+      .eq("id", organization_id)
+      .maybeSingle();
+
+    if (orgErr) {
+      console.error("[DELETE-ORGANIZATION] Org lookup error:", orgErr);
+      return oops({ error: "Failed to lookup organization" });
     }
 
-    logStep("Authorization verified (global super admin)", { adminEmail: user.email });
-
-    // Get all workers in the organization for cascading deletes
-    const { data: workers, error: workersError } = await serviceClient
-      .from('workers')
-      .select('id')
-      .eq('organization_id', organizationId);
-
-    if (workersError) {
-      logStep("Failed to fetch workers", { error: workersError });
-      throw new Error(`Failed to fetch workers: ${workersError.message}`);
+    if (!org) {
+      return bad({ error: "Organization not found" });
     }
 
-    const workerIds = workers?.map(w => w.id) || [];
-    logStep("Workers fetched", { count: workerIds.length });
+    console.log(`[DELETE-ORGANIZATION] Deleting organization: ${org.name}`);
 
-    // Get all managers in the organization
-    const { data: managers, error: managersError } = await serviceClient
-      .from('managers')
-      .select('id, email')
-      .eq('organization_id', organizationId);
+    // --- Cascading deletes in correct order ---
 
-    if (managersError) {
-      logStep("Failed to fetch managers", { error: managersError });
-      throw new Error(`Failed to fetch managers: ${managersError.message}`);
+    // 1. Get all worker IDs in this organization
+    const { data: workers, error: workersErr } = await admin
+      .from("workers")
+      .select("id")
+      .eq("organization_id", organization_id);
+
+    if (workersErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to fetch workers:", workersErr);
+      return oops({ error: "Failed to fetch workers" });
     }
 
-    const managerIds = managers?.map(m => m.id) || [];
-    logStep("Managers fetched", { count: managerIds.length });
+    const worker_ids = (workers ?? []).map((w) => w.id);
+    const worker_count = worker_ids.length;
 
-    // Delete in correct order to respect foreign keys
-    const deletionSteps = [];
+    console.log(`[DELETE-ORGANIZATION] Found ${worker_count} workers`);
 
-    // 1. Delete clock entries for workers
-    if (workerIds.length > 0) {
-      const { error: clockError } = await serviceClient
-        .from('clock_entries')
+    // 2. Delete worker-related data
+    if (worker_ids.length > 0) {
+      // Clock entries
+      const { error: ceErr } = await admin
+        .from("clock_entries")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (clockError) {
-        logStep("Failed to delete clock entries", { error: clockError });
-        throw new Error(`Failed to delete clock entries: ${clockError.message}`);
+        .in("worker_id", worker_ids);
+      if (ceErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete clock_entries:", ceErr);
+        return oops({ error: `Failed to delete clock entries: ${ceErr.message}` });
       }
-      deletionSteps.push('clock_entries');
-      logStep("Clock entries deleted");
-    }
 
-    // 2. Delete time amendments
-    if (workerIds.length > 0) {
-      const { error: amendError } = await serviceClient
-        .from('time_amendments')
+      // Time amendments
+      const { error: taErr } = await admin
+        .from("time_amendments")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (amendError) {
-        logStep("Failed to delete amendments", { error: amendError });
-        throw new Error(`Failed to delete amendments: ${amendError.message}`);
+        .in("worker_id", worker_ids);
+      if (taErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
+        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
       }
-      deletionSteps.push('time_amendments');
-      logStep("Amendments deleted");
-    }
 
-    // 3. Delete additional costs
-    if (workerIds.length > 0) {
-      const { error: costsError } = await serviceClient
-        .from('additional_costs')
+      // Additional costs
+      const { error: acErr } = await admin
+        .from("additional_costs")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (costsError) {
-        logStep("Failed to delete additional costs", { error: costsError });
-        throw new Error(`Failed to delete additional costs: ${costsError.message}`);
+        .in("worker_id", worker_ids);
+      if (acErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs:", acErr);
+        return oops({ error: `Failed to delete additional costs: ${acErr.message}` });
       }
-      deletionSteps.push('additional_costs');
-      logStep("Additional costs deleted");
-    }
 
-    // 4. Delete notifications
-    if (workerIds.length > 0) {
-      const { error: notifError } = await serviceClient
-        .from('notifications')
+      // Notifications
+      const { error: notifErr } = await admin
+        .from("notifications")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (notifError) {
-        logStep("Failed to delete notifications", { error: notifError });
-        throw new Error(`Failed to delete notifications: ${notifError.message}`);
+        .in("worker_id", worker_ids);
+      if (notifErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete notifications:", notifErr);
+        return oops({ error: `Failed to delete notifications: ${notifErr.message}` });
       }
-      deletionSteps.push('notifications');
-      logStep("Notifications deleted");
-    }
 
-    // 5. Delete notification preferences
-    if (workerIds.length > 0) {
-      const { error: prefError } = await serviceClient
-        .from('notification_preferences')
+      // Notification preferences
+      const { error: npErr } = await admin
+        .from("notification_preferences")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (prefError) {
-        logStep("Failed to delete notification preferences", { error: prefError });
-        throw new Error(`Failed to delete notification preferences: ${prefError.message}`);
+        .in("worker_id", worker_ids);
+      if (npErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete notification_preferences:", npErr);
+        return oops({ error: `Failed to delete notification preferences: ${npErr.message}` });
       }
-      deletionSteps.push('notification_preferences');
-      logStep("Notification preferences deleted");
-    }
 
-    // 6. Delete notification logs
-    if (workerIds.length > 0) {
-      const { error: logError } = await serviceClient
-        .from('notification_log')
+      // Notification log
+      const { error: nlErr } = await admin
+        .from("notification_log")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (logError) {
-        logStep("Failed to delete notification logs", { error: logError });
-        throw new Error(`Failed to delete notification logs: ${logError.message}`);
+        .in("worker_id", worker_ids);
+      if (nlErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete notification_log:", nlErr);
+        return oops({ error: `Failed to delete notification log: ${nlErr.message}` });
       }
-      deletionSteps.push('notification_log');
-      logStep("Notification logs deleted");
-    }
 
-    // 7. Delete auto clockout counters
-    if (workerIds.length > 0) {
-      const { error: counterError } = await serviceClient
-        .from('auto_clockout_counters')
+      // Auto clockout counters
+      const { error: accErr } = await admin
+        .from("auto_clockout_counters")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (counterError) {
-        logStep("Failed to delete auto clockout counters", { error: counterError });
-        throw new Error(`Failed to delete auto clockout counters: ${counterError.message}`);
+        .in("worker_id", worker_ids);
+      if (accErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete auto_clockout_counters:", accErr);
+        return oops({ error: `Failed to delete auto clockout counters: ${accErr.message}` });
       }
-      deletionSteps.push('auto_clockout_counters');
-      logStep("Auto clockout counters deleted");
-    }
 
-    // 8. Delete auto clockout audit
-    if (workerIds.length > 0) {
-      const { error: auditError } = await serviceClient
-        .from('auto_clockout_audit')
+      // Auto clockout audit
+      const { error: acaErr } = await admin
+        .from("auto_clockout_audit")
         .delete()
-        .in('worker_id', workerIds);
-      
-      if (auditError) {
-        logStep("Failed to delete auto clockout audit", { error: auditError });
-        throw new Error(`Failed to delete auto clockout audit: ${auditError.message}`);
+        .in("worker_id", worker_ids);
+      if (acaErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete auto_clockout_audit:", acaErr);
+        return oops({ error: `Failed to delete auto clockout audit: ${acaErr.message}` });
       }
-      deletionSteps.push('auto_clockout_audit');
-      logStep("Auto clockout audit deleted");
     }
 
-    // 9. Delete workers
-    if (workerIds.length > 0) {
-      const { error: workersDelError } = await serviceClient
-        .from('workers')
+    // 3. Get all manager IDs in this organization (for expense types)
+    const { data: managers, error: managersErr } = await admin
+      .from("managers")
+      .select("id")
+      .eq("organization_id", organization_id);
+
+    if (managersErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to fetch managers:", managersErr);
+      return oops({ error: "Failed to fetch managers" });
+    }
+
+    const manager_ids = (managers ?? []).map((m) => m.id);
+    const manager_count = manager_ids.length;
+
+    console.log(`[DELETE-ORGANIZATION] Found ${manager_count} managers`);
+
+    // 4. Delete expense types (created by managers)
+    if (manager_ids.length > 0) {
+      const { error: etErr } = await admin
+        .from("expense_types")
         .delete()
-        .eq('organization_id', organizationId);
-      
-      if (workersDelError) {
-        logStep("Failed to delete workers", { error: workersDelError });
-        throw new Error(`Failed to delete workers: ${workersDelError.message}`);
+        .in("created_by", manager_ids);
+      if (etErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete expense_types:", etErr);
+        return oops({ error: `Failed to delete expense types: ${etErr.message}` });
       }
-      deletionSteps.push('workers');
-      logStep("Workers deleted");
     }
 
-    // 10. Delete jobs
-    const { error: jobsError } = await serviceClient
-      .from('jobs')
+    // 5. Delete workers
+    const { error: wErr } = await admin
+      .from("workers")
       .delete()
-      .eq('organization_id', organizationId);
-    
-    if (jobsError) {
-      logStep("Failed to delete jobs", { error: jobsError });
-      throw new Error(`Failed to delete jobs: ${jobsError.message}`);
-    }
-    deletionSteps.push('jobs');
-    logStep("Jobs deleted");
-
-    // 11. Delete expense types (created by managers)
-    if (managerIds.length > 0) {
-      const { error: expenseError } = await serviceClient
-        .from('expense_types')
-        .delete()
-        .in('created_by', managerIds);
-      
-      if (expenseError) {
-        logStep("Failed to delete expense types", { error: expenseError });
-        throw new Error(`Failed to delete expense types: ${expenseError.message}`);
-      }
-      deletionSteps.push('expense_types');
-      logStep("Expense types deleted");
+      .eq("organization_id", organization_id);
+    if (wErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete workers:", wErr);
+      return oops({ error: `Failed to delete workers: ${wErr.message}` });
     }
 
-    // 12. Delete managers
-    const { error: managersDelError } = await serviceClient
-      .from('managers')
+    // 6. Delete jobs
+    const { error: jErr } = await admin
+      .from("jobs")
       .delete()
-      .eq('organization_id', organizationId);
-    
-    if (managersDelError) {
-      logStep("Failed to delete managers", { error: managersDelError });
-      throw new Error(`Failed to delete managers: ${managersDelError.message}`);
+      .eq("organization_id", organization_id);
+    if (jErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete jobs:", jErr);
+      return oops({ error: `Failed to delete jobs: ${jErr.message}` });
     }
-    deletionSteps.push('managers');
-    logStep("Managers deleted");
 
-    // 13. Delete subscription usage
-    const { error: subUsageError } = await serviceClient
-      .from('subscription_usage')
+    // 7. Delete managers
+    const { error: mErr } = await admin
+      .from("managers")
       .delete()
-      .eq('organization_id', organizationId);
-    
-    if (subUsageError) {
-      logStep("Failed to delete subscription usage", { error: subUsageError });
-      throw new Error(`Failed to delete subscription usage: ${subUsageError.message}`);
+      .eq("organization_id", organization_id);
+    if (mErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete managers:", mErr);
+      return oops({ error: `Failed to delete managers: ${mErr.message}` });
     }
-    deletionSteps.push('subscription_usage');
-    logStep("Subscription usage deleted");
 
-    // 14. Delete super admins (except the one deleting)
-    const { error: superAdminsError } = await serviceClient
-      .from('super_admins')
+    // 8. Delete subscription usage
+    const { error: suErr } = await admin
+      .from("subscription_usage")
       .delete()
-      .eq('organization_id', organizationId);
-    
-    if (superAdminsError) {
-      logStep("Failed to delete super admins", { error: superAdminsError });
-      throw new Error(`Failed to delete super admins: ${superAdminsError.message}`);
+      .eq("organization_id", organization_id);
+    if (suErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete subscription_usage:", suErr);
+      return oops({ error: `Failed to delete subscription usage: ${suErr.message}` });
     }
-    deletionSteps.push('super_admins');
-    logStep("Super admins deleted");
 
-    // 15. Finally, delete the organization
-    const { error: orgError } = await serviceClient
-      .from('organizations')
+    // 9. Delete super_admins for this org
+    const { error: saErr } = await admin
+      .from("super_admins")
       .delete()
-      .eq('id', organizationId);
-    
-    if (orgError) {
-      logStep("Failed to delete organization", { error: orgError });
-      throw new Error(`Failed to delete organization: ${orgError.message}`);
-    }
-    deletionSteps.push('organizations');
-    logStep("Organization deleted successfully");
-
-    // Log audit trail
-    try {
-      await serviceClient
-        .from('audit_logs')
-        .insert({
-          action: 'organization_deleted',
-          actor_id: user.id,
-          target_id: organizationId,
-          metadata: {
-            deleted_tables: deletionSteps,
-            worker_count: workerIds.length,
-            manager_count: managerIds.length
-          }
-        });
-      logStep("Audit log created");
-    } catch (auditErr) {
-      // Non-critical, just log
-      logStep("Failed to create audit log", { error: auditErr });
+      .eq("organization_id", organization_id);
+    if (saErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete super_admins:", saErr);
+      return oops({ error: `Failed to delete super admins: ${saErr.message}` });
     }
 
-    return new Response(JSON.stringify({ 
+    // 10. Finally, delete the organization
+    const { error: orgDelErr } = await admin
+      .from("organizations")
+      .delete()
+      .eq("id", organization_id);
+
+    if (orgDelErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete organization:", orgDelErr);
+      return oops({ error: `Failed to delete organization: ${orgDelErr.message}` });
+    }
+
+    console.log(`[DELETE-ORGANIZATION] Successfully deleted organization: ${org.name}`);
+
+    // Create audit log
+    await admin.from("audit_logs").insert({
+      actor_id: user.id,
+      target_id: organization_id,
+      action: "delete_organization",
+      metadata: {
+        organization_name: org.name,
+        worker_count,
+        manager_count,
+      },
+    });
+
+    return json({
       success: true,
-      message: "Organization and all related data deleted successfully",
       details: {
-        deleted_tables: deletionSteps,
-        worker_count: workerIds.length,
-        manager_count: managerIds.length
-      }
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+        worker_count,
+        manager_count,
+      },
     });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in delete-organization", { message: errorMessage });
-    return new Response(JSON.stringify({ 
-      error: errorMessage,
-      success: false 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+  } catch (e: any) {
+    console.error("[DELETE-ORGANIZATION] Unexpected error:", e);
+    return oops({ error: e?.message ?? "Unexpected error occurred" });
   }
 });
