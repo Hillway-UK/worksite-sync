@@ -25,8 +25,8 @@ serve(async (req) => {
       throw new Error('Missing authorization header');
     }
 
-    // Create client with user's token for authorization check
-    const supabaseClient = createClient(
+    // Create client with user's token for authentication only
+    const authClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { 
@@ -36,7 +36,7 @@ serve(async (req) => {
     );
 
     // Get requesting user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
     if (userError || !user) {
       logStep("Authentication failed", { error: userError });
       throw new Error('Unauthorized');
@@ -49,27 +49,35 @@ serve(async (req) => {
       throw new Error('Organization ID is required');
     }
 
-    // Verify user is super admin of this organization
-    const { data: superAdmin, error: adminError } = await supabaseClient
-      .from('super_admins')
-      .select('id, organization_id')
-      .eq('email', user.email)
-      .eq('organization_id', organizationId)
-      .maybeSingle();
-
-    if (adminError || !superAdmin) {
-      logStep("Authorization failed", { error: adminError, superAdmin });
-      throw new Error('Only super admins can delete their organization');
-    }
-
-    logStep("Authorization verified", { adminId: superAdmin.id });
-
-    // Use service role for deletion operations
+    // Use service role for all database operations (including authorization check)
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
+
+    // Verify user is super admin of this organization using service role
+    const { data: superAdmin, error: adminError } = await serviceClient
+      .from('super_admins')
+      .select('id, organization_id, email')
+      .eq('email', user.email)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (adminError) {
+      logStep("Authorization query failed", { error: adminError });
+      throw new Error(`Authorization check failed: ${adminError.message}`);
+    }
+
+    if (!superAdmin) {
+      logStep("Authorization failed - user not super admin", { 
+        userEmail: user.email, 
+        organizationId 
+      });
+      throw new Error('Only super admins can delete their organization');
+    }
+
+    logStep("Authorization verified", { adminId: superAdmin.id });
 
     // Get all workers in the organization for cascading deletes
     const { data: workers, error: workersError } = await serviceClient
