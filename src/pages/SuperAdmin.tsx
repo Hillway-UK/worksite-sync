@@ -335,18 +335,31 @@ Please change your password on first login for security.`;
   const deleteOrganization = async (id: string) => {
     if (!confirm('Delete this organization and all its data? This action cannot be undone.')) return;
     
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      toast.error('Failed to delete organization');
-      return;
+    try {
+      setLoading(true);
+      
+      // Call edge function for safe cascading deletion
+      const { data, error } = await supabase.functions.invoke('delete-organization', {
+        body: { organizationId: id }
+      });
+
+      if (error) {
+        toast.error(`Failed to delete organization: ${error.message}`);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success(`Organization deleted successfully. Removed ${data.details?.worker_count || 0} workers and ${data.details?.manager_count || 0} managers.`);
+        await fetchOrganizations();
+      } else {
+        toast.error(data?.error || 'Failed to delete organization');
+      }
+    } catch (error: any) {
+      console.error('Error deleting organization:', error);
+      toast.error('An unexpected error occurred while deleting the organization');
+    } finally {
+      setLoading(false);
     }
-    
-    toast.success('Organization deleted');
-    fetchOrganizations();
   };
 
   const deleteManager = async (email: string) => {

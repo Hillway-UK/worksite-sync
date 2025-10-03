@@ -72,3 +72,6 @@ verify_jwt = false
 
 [functions.manager-change-password]
 verify_jwt = true
+
+[functions.delete-organization]
+verify_jwt = true
