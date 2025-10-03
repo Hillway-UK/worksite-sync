@@ -20,63 +20,59 @@ export function useCapacityCheck() {
         .eq('id', organizationId)
         .single();
 
-      if (orgError) {
-        console.error('Failed to fetch organization limits:', orgError);
-        return { canCreate: true, current: 0, limit: null, remaining: null };
-      }
+      if (orgError) throw orgError;
 
       const limit = type === 'worker' ? org?.max_workers : org?.max_managers;
 
-      // Count current active records
-      let count: number | null = null;
-      let countError: any = null;
-
+      // Count current active records with separate queries to avoid TypeScript issues
+      let count: number | null = 0;
+      
       if (type === 'worker') {
-        const result = await supabase
+        const { count: workerCount, error: countError } = await supabase
           .from('workers')
-          .select('id', { count: 'exact', head: true })
+          .select('*', { count: 'exact', head: true })
           .eq('organization_id', organizationId)
           .eq('is_active', true);
-        count = result.count;
-        countError = result.error;
+        
+        if (countError) throw countError;
+        count = workerCount;
       } else {
-        const result = await supabase
+        const { count: managerCount, error: countError } = await supabase
           .from('managers')
-          .select('id', { count: 'exact', head: true })
+          .select('*', { count: 'exact', head: true })
           .eq('organization_id', organizationId);
-        count = result.count;
-        countError = result.error;
+        
+        if (countError) throw countError;
+        count = managerCount;
       }
 
-      if (countError) {
-        console.error('Failed to count records:', countError);
-        // On error, allow creation (fail open)
-        return { canCreate: true, current: 0, limit, remaining: null };
-      }
+      const current = count ?? 0;
 
       // NULL limit = unlimited
       if (limit === null || limit === undefined) {
-        return {
-          canCreate: true,
-          current: count ?? 0,
-          limit: null,
-          remaining: null,
+        return { 
+          canCreate: true, 
+          current, 
+          limit: null, 
+          remaining: null 
         };
       }
 
-      const currentCount = count ?? 0;
-      const remaining = Math.max(limit - currentCount, 0);
-
       return {
-        canCreate: currentCount < limit,
-        current: currentCount,
+        canCreate: current < limit,
+        current,
         limit,
-        remaining,
+        remaining: Math.max(limit - current, 0)
       };
     } catch (error) {
-      console.error('Capacity check error:', error);
-      // On error, allow creation (fail open)
-      return { canCreate: true, current: 0, limit: null, remaining: null };
+      console.error('Error checking capacity:', error);
+      // On error, allow creation but log the issue
+      return {
+        canCreate: true,
+        current: 0,
+        limit: null,
+        remaining: null
+      };
     }
   };
 
