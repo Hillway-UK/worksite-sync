@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { TempPasswordModal } from '@/components/TempPasswordModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generateSecurePassword } from '@/lib/validation';
+import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
@@ -218,6 +219,8 @@ export default function SuperAdmin() {
     }
   };
 
+  const { checkCapacity } = useCapacityCheck();
+
   const createManager = async () => {
     try {
       if (!managerForm.email || !managerForm.name || !managerForm.organization_id) {
@@ -226,6 +229,17 @@ export default function SuperAdmin() {
       }
 
       setCreatingManager(true);
+
+      // Check capacity before creating manager
+      const capacity = await checkCapacity('manager', managerForm.organization_id);
+      
+      if (!capacity.canCreate) {
+        toast.error(
+          `Manager limit reached: This organization has ${capacity.current} of ${capacity.limit} managers. Please upgrade the plan or remove a manager to free a seat.`
+        );
+        setCreatingManager(false);
+        return;
+      }
 
       // Auto-generate secure password
       const autoPassword = generateSecurePassword(12);
