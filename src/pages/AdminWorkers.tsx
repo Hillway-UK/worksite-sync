@@ -50,6 +50,13 @@ export default function AdminWorkers() {
     worker: null,
   });
   const [operationLoading, setOperationLoading] = useState<Record<string, boolean>>({});
+  const [invitationDialog, setInvitationDialog] = useState<{
+    isOpen: boolean;
+    credentials: { email: string; password: string } | null;
+  }>({
+    isOpen: false,
+    credentials: null,
+  });
   const [workerDialogOpen, setWorkerDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -208,44 +215,31 @@ export default function AdminWorkers() {
   const resendInvitation = async (worker: Worker) => {
     setOperationLoading(prev => ({ ...prev, [worker.id]: true }));
     try {
-      // Get manager's organization ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        throw new Error("Not authenticated");
+      // Generate new temporary password
+      const tempPassword = `temp${Math.random().toString(36).slice(2, 10)}${Math.floor(Math.random() * 100)}`;
+      
+      // Update the auth user's password
+      const { error: authError } = await supabase.auth.admin.updateUserById(
+        worker.id, // Note: This assumes worker.id matches auth.users.id
+        { password: tempPassword }
+      );
+
+      if (authError) {
+        // If admin API isn't available, show a message to the user
+        throw new Error('Unable to reset password. Please contact your system administrator.');
       }
 
-      const { data: manager } = await supabase
-        .from('managers')
-        .select('organization_id')
-        .eq('email', user.email)
-        .single();
-
-      if (!manager?.organization_id) {
-        throw new Error("Organization not found");
-      }
-
-      // Call edge function to send invitation
-      const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('invite-worker', {
-        body: {
+      setInvitationDialog({
+        isOpen: true,
+        credentials: {
           email: worker.email,
-          name: worker.name,
-          organizationId: manager.organization_id,
+          password: tempPassword,
         },
       });
 
-      if (inviteError) {
-        throw new Error(inviteError.message);
-      }
-
-      if (!inviteResult?.success) {
-        throw new Error(inviteResult?.error || 'Unknown error');
-      }
-
       toast({
         title: "Success",
-        description: inviteResult.type === 'invite'
-          ? `Invitation email sent to ${worker.name}`
-          : `Password reset email sent to ${worker.name}`,
+        description: `New credentials generated for ${worker.name}`,
         duration: 5000,
       });
     } catch (error) {
@@ -260,6 +254,16 @@ export default function AdminWorkers() {
     }
   };
 
+  const copyCredentialsToClipboard = () => {
+    if (invitationDialog.credentials) {
+      const text = `Email: ${invitationDialog.credentials.email}\nPassword: ${invitationDialog.credentials.password}`;
+      navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied!",
+        description: "Credentials copied to clipboard",
+      });
+    }
+  };
 
   const handleAddWorker = async () => {
     try {
@@ -616,6 +620,37 @@ export default function AdminWorkers() {
               >
                 Delete Worker
               </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Resend Invitation Success Dialog */}
+        <AlertDialog open={invitationDialog.isOpen} onOpenChange={(open) => !open && setInvitationDialog({ isOpen: false, credentials: null })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>New Credentials Generated</AlertDialogTitle>
+              <AlertDialogDescription>
+                New temporary credentials have been generated. Please share these with the worker:
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {invitationDialog.credentials && (
+              <div className="bg-muted p-4 rounded-md space-y-2">
+                <div>
+                  <strong>Email:</strong> {invitationDialog.credentials.email}
+                </div>
+                <div>
+                  <strong>Temporary Password:</strong> {invitationDialog.credentials.password}
+                </div>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogAction
+                onClick={copyCredentialsToClipboard}
+                className="mr-2"
+              >
+                Copy to Clipboard
+              </AlertDialogAction>
+              <AlertDialogCancel>Close</AlertDialogCancel>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

@@ -35,7 +35,7 @@ export const supabase = createClient<Database>(
       
       // SECURITY: Enhanced auth configuration
       detectSessionInUrl: true,
-      flowType: 'pkce', // Use PKCE flow for better security and mobile compatibility
+      flowType: 'implicit', // Use implicit flow to support password recovery links
       
       // SECURITY: Auto logout on suspicious activity
       debug: false, // Disable debug logs in production
