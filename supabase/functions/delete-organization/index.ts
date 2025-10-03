@@ -56,28 +56,24 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Verify user is super admin of this organization using service role
-    const { data: superAdmin, error: adminError } = await serviceClient
+    // Verify user is a super admin (global) using service role
+    const { data: anySuper, error: anySuperError } = await serviceClient
       .from('super_admins')
-      .select('id, organization_id, email')
+      .select('id, organization_id, email, is_owner')
       .eq('email', user.email)
-      .eq('organization_id', organizationId)
       .maybeSingle();
 
-    if (adminError) {
-      logStep("Authorization query failed", { error: adminError });
-      throw new Error(`Authorization check failed: ${adminError.message}`);
+    if (anySuperError) {
+      logStep("Authorization query failed", { error: anySuperError });
+      throw new Error(`Authorization check failed: ${anySuperError.message}`);
     }
 
-    if (!superAdmin) {
-      logStep("Authorization failed - user not super admin", { 
-        userEmail: user.email, 
-        organizationId 
-      });
-      throw new Error('Only super admins can delete their organization');
+    if (!anySuper) {
+      logStep("Authorization failed - user not a super admin", { userEmail: user.email });
+      throw new Error('Only super admins can perform this action');
     }
 
-    logStep("Authorization verified", { adminId: superAdmin.id });
+    logStep("Authorization verified (global super admin)", { adminEmail: user.email });
 
     // Get all workers in the organization for cascading deletes
     const { data: workers, error: workersError } = await serviceClient
