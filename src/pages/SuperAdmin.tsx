@@ -333,7 +333,9 @@ Please change your password on first login for security.`;
   };
 
   const deleteOrganization = async (id: string) => {
-    if (!id) {
+    // Guard + validation
+    if (id == null || id === '') {
+      console.error('deleteOrganization(): missing id', id);
       toast.error('Missing organization id');
       return;
     }
@@ -342,47 +344,56 @@ Please change your password on first login for security.`;
       return;
     }
 
-    try {
-      setLoading(true);
+    // Optimistic UI: snapshot current state for rollback
+    const prevOrganizations = organizations;
+    setOrganizations(prev => prev.filter(o => o.id !== id));
 
+    // Debug log
+    console.debug('deleteOrganization(): sending body', { organization_id: String(id) });
+
+    try {
+      // ✅ Explicit method + proper body
       const { data, error } = await supabase.functions.invoke('delete-organization', {
-        body: { organization_id: id },
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        body: { organization_id: String(id) },
       });
 
       if (error) {
-        // Extract actual error message from response
-        const status = (error as any)?.context?.response?.status;
-        let errorText = error.message;
+        // Extract server body if present
+        const resp = (error as any)?.context?.response;
+        let msg = error.message || 'Edge Function returned an error';
         
-        try {
-          const responseText = await (error as any)?.context?.response?.text?.();
-          if (responseText) {
-            const parsed = JSON.parse(responseText);
-            errorText = parsed.error || errorText;
+        if (resp && typeof resp.text === 'function') {
+          const text = await resp.text();
+          try { 
+            msg = JSON.parse(text).error || text; 
+          } catch { 
+            msg = text || msg; 
           }
-        } catch {
-          // If parsing fails, use the original error message
         }
-
-        console.error('Edge function error:', status, errorText);
-        toast.error(errorText || `Failed to delete organization (HTTP ${status || 400})`);
+        
+        // Rollback optimistic change
+        setOrganizations(prevOrganizations);
+        console.error('Edge function error:', msg);
+        toast.error(msg);
         return;
       }
 
-      if (data?.success) {
-        toast.success(
-          `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`
-        );
-        await fetchOrganizations();
-      } else {
+      if (!data?.success) {
+        setOrganizations(prevOrganizations);
         toast.error(data?.error || 'Failed to delete organization');
+        return;
       }
-    } catch (err: any) {
-      console.error('Error deleting organization:', err);
-      toast.error(err?.message || 'Unexpected error while deleting organization');
-    } finally {
-      setLoading(false);
+
+      toast.success(
+        `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`
+      );
+      // Optional: light refetch to ensure consistency
+      await fetchOrganizations();
+    } catch (e: any) {
+      setOrganizations(prevOrganizations); // rollback
+      console.error('Delete org unexpected error:', e);
+      toast.error(e?.message || 'Unexpected error while deleting organization');
     }
   };
 
