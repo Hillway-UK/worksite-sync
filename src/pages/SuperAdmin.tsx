@@ -34,7 +34,9 @@ export default function SuperAdmin() {
     name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    plannedManagers: 1,
+    plannedWorkers: 0
   });
   
   const [managerForm, setManagerForm] = useState({
@@ -190,6 +192,16 @@ export default function SuperAdmin() {
         return;
       }
 
+      if (orgForm.plannedManagers < 1) {
+        toast.error('Planned managers must be at least 1');
+        return;
+      }
+
+      if (orgForm.plannedWorkers < 0) {
+        toast.error('Planned workers cannot be negative');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('organizations')
         .insert({
@@ -208,10 +220,31 @@ export default function SuperAdmin() {
         toast.error(`Failed to create organization: ${error.message}`);
         return;
       }
+
+      // Create subscription_usage record
+      const totalCost = (orgForm.plannedManagers * 25) + (orgForm.plannedWorkers * 1.50);
+      const { error: usageError } = await supabase
+        .from('subscription_usage')
+        .insert({
+          organization_id: data.id,
+          month: new Date().toISOString().split('T')[0],
+          planned_number_of_managers: orgForm.plannedManagers,
+          planned_number_of_workers: orgForm.plannedWorkers,
+          total_cost: totalCost,
+          active_managers: 0,
+          active_workers: 0,
+          billed: false
+        });
+
+      if (usageError) {
+        console.error('Failed to create subscription usage:', usageError);
+        toast.error('Organization created but subscription tracking failed');
+      } else {
+        toast.success(`Organization created with estimated cost: £${totalCost.toFixed(2)}/month`);
+      }
       
-      toast.success('Organization created successfully');
       setShowOrgDialog(false);
-      setOrgForm({ name: '', email: '', phone: '', address: '' });
+      setOrgForm({ name: '', email: '', phone: '', address: '', plannedManagers: 1, plannedWorkers: 0 });
       await fetchOrganizations();
     } catch (err: any) {
       toast.error('An unexpected error occurred');
@@ -289,6 +322,22 @@ export default function SuperAdmin() {
         toast.error(`Failed to create manager record: ${managerError.message}`);
         setCreatingManager(false);
         return;
+      }
+
+      // Update subscription_usage active_managers count
+      const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7); // YYYY-MM
+      const { data: usageData } = await supabase
+        .from('subscription_usage')
+        .select('*')
+        .eq('organization_id', managerForm.organization_id)
+        .gte('month', currentMonth + '-01')
+        .maybeSingle();
+
+      if (usageData) {
+        await supabase
+          .from('subscription_usage')
+          .update({ active_managers: (usageData.active_managers || 0) + 1 })
+          .eq('id', usageData.id);
       }
       
       // Store credentials and show success modal
@@ -633,6 +682,37 @@ Please change your password on first login for security.`;
                 onChange={(e) => setOrgForm({...orgForm, address: e.target.value})}
                 placeholder="Enter address"
               />
+            </div>
+            <div>
+              <Label htmlFor="org-planned-managers">Planned Number of Managers *</Label>
+              <Input
+                id="org-planned-managers"
+                type="number"
+                min="1"
+                value={orgForm.plannedManagers}
+                onChange={(e) => setOrgForm({...orgForm, plannedManagers: parseInt(e.target.value) || 1})}
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="org-planned-workers">Planned Number of Workers *</Label>
+              <Input
+                id="org-planned-workers"
+                type="number"
+                min="0"
+                value={orgForm.plannedWorkers}
+                onChange={(e) => setOrgForm({...orgForm, plannedWorkers: parseInt(e.target.value) || 0})}
+                placeholder="0"
+              />
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="text-sm font-medium mb-2">Estimated Monthly Cost</div>
+              <div className="text-2xl font-bold text-primary">
+                £{((orgForm.plannedManagers * 25) + (orgForm.plannedWorkers * 1.50)).toFixed(2)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                ({orgForm.plannedManagers} × £25.00) + ({orgForm.plannedWorkers} × £1.50)
+              </div>
             </div>
             <Button onClick={createOrganization} className="w-full">
               Create Organization
