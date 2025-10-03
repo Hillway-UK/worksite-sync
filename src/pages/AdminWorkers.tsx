@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WorkerDialog } from '@/components/WorkerDialog';
 import { PhotoModal } from '@/components/PhotoModal';
 import { toast } from '@/hooks/use-toast';
-import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Mail, Trash2, MoreVertical } from 'lucide-react';
+import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Trash2, MoreVertical } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -205,56 +205,6 @@ export default function AdminWorkers() {
     }
   };
 
-  const resendInvitation = async (worker: Worker) => {
-    setOperationLoading(prev => ({ ...prev, [worker.id]: true }));
-    try {
-      // Get current manager's organization
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        throw new Error('Not authenticated');
-      }
-
-      const { data: manager } = await supabase
-        .from('managers')
-        .select('organization_id')
-        .eq('email', user.email)
-        .single();
-
-      if (!manager?.organization_id) {
-        throw new Error('Organization not found');
-      }
-
-      // Call the invite-worker edge function
-      const { data, error } = await supabase.functions.invoke('invite-worker', {
-        body: {
-          email: worker.email,
-          name: worker.name,
-          organizationId: manager.organization_id
-        }
-      });
-
-      if (error) throw error;
-
-      const message = data.type === 'invite' 
-        ? `Invitation email sent to ${worker.name}` 
-        : `Reset email sent to ${worker.name}`;
-
-      toast({
-        title: "Success",
-        description: message,
-        duration: 5000,
-      });
-    } catch (error) {
-      console.error('Error resending invitation:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to resend invitation",
-        variant: "destructive",
-      });
-    } finally {
-      setOperationLoading(prev => ({ ...prev, [worker.id]: false }));
-    }
-  };
 
   const handleAddWorker = async () => {
     try {
@@ -533,13 +483,6 @@ export default function AdminWorkers() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => resendInvitation(worker)}
-                                  disabled={operationLoading[worker.id]}
-                                >
-                                  <Mail className="h-4 w-4 mr-2" />
-                                  Resend Invitation
-                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => toggleWorkerStatus(worker.id, worker.is_active)}
                                   disabled={operationLoading[worker.id]}
