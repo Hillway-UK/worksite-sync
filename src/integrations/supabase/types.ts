@@ -996,6 +996,17 @@ export type Database = {
           worker_name: string
         }[]
       }
+      get_subscription_capacity: {
+        Args: { org_id: string }
+        Returns: {
+          active_managers: number
+          active_workers: number
+          managers_available: number
+          planned_managers: number
+          planned_workers: number
+          workers_available: number
+        }[]
+      }
       get_total_hours_today: {
         Args: Record<PropertyKey, never>
         Returns: number

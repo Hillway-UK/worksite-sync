@@ -14,6 +14,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { TempPasswordModal } from '@/components/TempPasswordModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generateSecurePassword } from '@/lib/validation';
+import { useCapacityCheck } from '@/hooks/useCapacityCheck';
+import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
 
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
@@ -29,6 +31,14 @@ export default function SuperAdmin() {
   const [tempPasswordModalOpen, setTempPasswordModalOpen] = useState(false);
   const [showManagerSuccessModal, setShowManagerSuccessModal] = useState(false);
   const [managerCredentials, setManagerCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [capacityLimitDialog, setCapacityLimitDialog] = useState({
+    open: false,
+    type: 'manager' as 'manager' | 'worker',
+    planned: 0,
+    active: 0
+  });
+  
+  const { checkCapacity } = useCapacityCheck();
   
   const [orgForm, setOrgForm] = useState({
     name: '',
@@ -258,6 +268,23 @@ export default function SuperAdmin() {
         return;
       }
 
+      // Check capacity BEFORE creating manager
+      const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
+      
+      if (!capacityCheck.allowed) {
+        if (capacityCheck.capacity) {
+          setCapacityLimitDialog({
+            open: true,
+            type: 'manager',
+            planned: capacityCheck.capacity.planned,
+            active: capacityCheck.capacity.active
+          });
+        } else {
+          toast.error(capacityCheck.error || 'Cannot add manager at this time');
+        }
+        return;
+      }
+
       setCreatingManager(true);
 
       // Auto-generate secure password
@@ -322,22 +349,6 @@ export default function SuperAdmin() {
         toast.error(`Failed to create manager record: ${managerError.message}`);
         setCreatingManager(false);
         return;
-      }
-
-      // Update subscription_usage active_managers count
-      const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7); // YYYY-MM
-      const { data: usageData } = await supabase
-        .from('subscription_usage')
-        .select('*')
-        .eq('organization_id', managerForm.organization_id)
-        .gte('month', currentMonth + '-01')
-        .maybeSingle();
-
-      if (usageData) {
-        await supabase
-          .from('subscription_usage')
-          .update({ active_managers: (usageData.active_managers || 0) + 1 })
-          .eq('id', usageData.id);
       }
       
       // Store credentials and show success modal
@@ -817,6 +828,15 @@ Please change your password on first login for security.`;
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Capacity Limit Dialog */}
+      <CapacityLimitDialog
+        open={capacityLimitDialog.open}
+        onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
+        type={capacityLimitDialog.type}
+        planned={capacityLimitDialog.planned}
+        active={capacityLimitDialog.active}
+      />
     </div>
   );
 }

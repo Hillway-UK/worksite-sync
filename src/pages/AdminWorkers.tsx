@@ -14,6 +14,8 @@ import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Trash2, M
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useCapacityCheck } from '@/hooks/useCapacityCheck';
+import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
 
 interface Worker {
   id: string;
@@ -51,6 +53,14 @@ export default function AdminWorkers() {
   });
   const [operationLoading, setOperationLoading] = useState<Record<string, boolean>>({});
   const [workerDialogOpen, setWorkerDialogOpen] = useState(false);
+  const [capacityLimitDialog, setCapacityLimitDialog] = useState({
+    open: false,
+    type: 'worker' as 'manager' | 'worker',
+    planned: 0,
+    active: 0
+  });
+  
+  const { checkCapacity } = useCapacityCheck();
 
   useEffect(() => {
     fetchWorkers();
@@ -208,7 +218,6 @@ export default function AdminWorkers() {
 
   const handleAddWorker = async () => {
     try {
-      // Get current user's organization first
       const { data: currentUser, error: userError } = await supabase.auth.getUser();
       if (userError) {
         console.error('User fetch error:', userError);
@@ -228,43 +237,31 @@ export default function AdminWorkers() {
         return;
       }
 
-      // Get organization with max_workers
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .select('id, max_workers')
-        .eq('id', manager.organization_id)
-        .single();
+      // Check subscription capacity
+      const capacityCheck = await checkCapacity(manager.organization_id, 'worker');
       
-      if (orgError || !org) {
-        console.error('Organization fetch error:', orgError);
-        // If no org or max_workers, just proceed without limit check
-        setWorkerDialogOpen(true);
-        return;
-      }
-
-      // Check current worker count if max_workers is set
-      if (org.max_workers && org.max_workers > 0) {
-        const { count: currentWorkers } = await supabase
-          .from('workers')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', org.id)
-          .eq('is_active', true);
-
-        if (currentWorkers && currentWorkers >= org.max_workers) {
+      if (!capacityCheck.allowed) {
+        if (capacityCheck.capacity) {
+          setCapacityLimitDialog({
+            open: true,
+            type: 'worker',
+            planned: capacityCheck.capacity.planned,
+            active: capacityCheck.capacity.active
+          });
+        } else {
           toast({
-            title: "Worker limit reached",
-            description: `You've reached your limit of ${org.max_workers} workers. Please contact support to add more.`,
+            title: "Error",
+            description: capacityCheck.error || 'Cannot add worker at this time',
             variant: "destructive",
           });
-          return;
         }
+        return;
       }
       
       // Open dialog if checks pass
       setWorkerDialogOpen(true);
     } catch (error) {
       console.error('Error checking worker limit:', error);
-      // On any error, just open the dialog
       setWorkerDialogOpen(true);
     }
   };
@@ -557,6 +554,15 @@ export default function AdminWorkers() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Capacity Limit Dialog */}
+        <CapacityLimitDialog
+          open={capacityLimitDialog.open}
+          onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
+          type={capacityLimitDialog.type}
+          planned={capacityLimitDialog.planned}
+          active={capacityLimitDialog.active}
+        />
       </div>
     </Layout>
   );
