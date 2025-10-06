@@ -115,22 +115,21 @@ const watchedPostcode = watch('postcode');
         setValue('postcode', result.formatted_postcode);
         
         toast({
-          title: "Success",
-          description: "Location found and updated on map",
+          title: "Location Found",
+          description: `Coordinates: ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}`,
         });
       } else {
-        const errorMessage = result?.error || "Could not find location for this postcode. Please check the format (e.g., SW1A 1AA) and try again.";
         toast({
-          title: "Location Not Found",
-          description: errorMessage,
+          title: "Geocoding Services Unavailable",
+          description: "All geocoding services are currently unavailable. Please click on the map below to manually set the job location.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Geocoding error:', error);
       toast({
-        title: "Error",
-        description: "Failed to geocode postcode. Please check your internet connection and try again.",
+        title: "Geocoding Failed",
+        description: "Unable to find location. Please click on the map to manually set the job location.",
         variant: "destructive",
       });
     } finally {
