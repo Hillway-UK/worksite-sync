@@ -193,7 +193,41 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
       }
 
-      // Clock entries
+      // Fetch related clock entry IDs for these workers (needed to clean dependent additional_costs first)
+      const { data: ceRows, error: ceIdsErr } = await admin
+        .from("clock_entries")
+        .select("id")
+        .in("worker_id", worker_ids);
+      if (ceIdsErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to fetch clock_entry ids:", ceIdsErr);
+        return oops({ error: `Failed to fetch clock entry ids: ${ceIdsErr.message}` });
+      }
+      const clock_entry_ids = (ceRows ?? []).map((r: { id: string }) => r.id);
+      console.log(`[DELETE-ORGANIZATION] Found ${clock_entry_ids.length} clock entries`);
+
+      // Additional costs that reference clock entries (delete FIRST to satisfy FK additional_costs_clock_entry_id_fkey)
+      if (clock_entry_ids.length > 0) {
+        const { error: acByCeErr } = await admin
+          .from("additional_costs")
+          .delete()
+          .in("clock_entry_id", clock_entry_ids);
+        if (acByCeErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by clock_entry_id:", acByCeErr);
+          return oops({ error: `Failed to delete additional costs (by clock entry): ${acByCeErr.message}` });
+        }
+      }
+
+      // Additional costs by worker (catch costs not linked to a clock entry)
+      const { error: acByWorkerErr } = await admin
+        .from("additional_costs")
+        .delete()
+        .in("worker_id", worker_ids);
+      if (acByWorkerErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by worker_id:", acByWorkerErr);
+        return oops({ error: `Failed to delete additional costs (by worker): ${acByWorkerErr.message}` });
+      }
+
+      // Finally delete clock entries (now safe after purging dependent additional_costs)
       const { error: ceErr } = await admin
         .from("clock_entries")
         .delete()
@@ -201,16 +235,6 @@ Deno.serve(async (req: Request) => {
       if (ceErr) {
         console.error("[DELETE-ORGANIZATION] Failed to delete clock_entries:", ceErr);
         return oops({ error: `Failed to delete clock entries: ${ceErr.message}` });
-      }
-
-      // Additional costs
-      const { error: acErr } = await admin
-        .from("additional_costs")
-        .delete()
-        .in("worker_id", worker_ids);
-      if (acErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs:", acErr);
-        return oops({ error: `Failed to delete additional costs: ${acErr.message}` });
       }
 
       // Notifications
