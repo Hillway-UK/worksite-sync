@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key } from 'lucide-react';
+import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { TempPasswordModal } from '@/components/TempPasswordModal';
@@ -23,6 +23,7 @@ export default function SuperAdmin() {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [showOrgDialog, setShowOrgDialog] = useState(false);
+  const [showUpdateOrgDialog, setShowUpdateOrgDialog] = useState(false);
   const [showManagerDialog, setShowManagerDialog] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
@@ -47,6 +48,14 @@ export default function SuperAdmin() {
     address: '',
     plannedManagers: 1,
     plannedWorkers: 0
+  });
+
+  const [updateOrgForm, setUpdateOrgForm] = useState({
+    organizationId: '',
+    organizationName: '',
+    plannedManagers: 1,
+    plannedWorkers: 0,
+    currentActive: { managers: 0, workers: 0 }
   });
   
   const [managerForm, setManagerForm] = useState({
@@ -392,6 +401,102 @@ Please change your password on first login for security.`;
     setManagerCredentials(null);
   };
 
+  const openUpdateOrgDialog = async (org: any) => {
+    try {
+      // Fetch current subscription usage
+      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      const { data: usageData, error: usageError } = await supabase
+        .from('subscription_usage')
+        .select('*')
+        .eq('organization_id', org.id)
+        .gte('month', currentMonth)
+        .order('month', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (usageError && usageError.code !== 'PGRST116') {
+        toast.error('Failed to fetch subscription data');
+        return;
+      }
+
+      setUpdateOrgForm({
+        organizationId: org.id,
+        organizationName: org.name,
+        plannedManagers: usageData?.planned_number_of_managers || 1,
+        plannedWorkers: usageData?.planned_number_of_workers || 0,
+        currentActive: {
+          managers: usageData?.active_managers || 0,
+          workers: usageData?.active_workers || 0
+        }
+      });
+      setShowUpdateOrgDialog(true);
+    } catch (err: any) {
+      toast.error('Failed to load organization data');
+    }
+  };
+
+  const updateOrganization = async () => {
+    try {
+      if (updateOrgForm.plannedManagers < 1) {
+        toast.error('Planned managers must be at least 1');
+        return;
+      }
+
+      if (updateOrgForm.plannedWorkers < 0) {
+        toast.error('Planned workers cannot be negative');
+        return;
+      }
+
+      // Check if planned numbers are less than active
+      if (updateOrgForm.plannedManagers < updateOrgForm.currentActive.managers) {
+        toast.error(`Planned managers (${updateOrgForm.plannedManagers}) cannot be less than active managers (${updateOrgForm.currentActive.managers})`);
+        return;
+      }
+
+      if (updateOrgForm.plannedWorkers < updateOrgForm.currentActive.workers) {
+        toast.error(`Planned workers (${updateOrgForm.plannedWorkers}) cannot be less than active workers (${updateOrgForm.currentActive.workers})`);
+        return;
+      }
+
+      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      const totalCost = (updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50);
+
+      // Update or insert subscription_usage for current month
+      const { error: usageError } = await supabase
+        .from('subscription_usage')
+        .upsert({
+          organization_id: updateOrgForm.organizationId,
+          month: currentMonth,
+          planned_number_of_managers: updateOrgForm.plannedManagers,
+          planned_number_of_workers: updateOrgForm.plannedWorkers,
+          total_cost: totalCost,
+          active_managers: updateOrgForm.currentActive.managers,
+          active_workers: updateOrgForm.currentActive.workers,
+          billed: false
+        }, {
+          onConflict: 'organization_id,month'
+        });
+
+      if (usageError) {
+        toast.error(`Failed to update subscription: ${usageError.message}`);
+        return;
+      }
+
+      toast.success(`Organization updated! New estimated cost: £${totalCost.toFixed(2)}/month`);
+      setShowUpdateOrgDialog(false);
+      setUpdateOrgForm({
+        organizationId: '',
+        organizationName: '',
+        plannedManagers: 1,
+        plannedWorkers: 0,
+        currentActive: { managers: 0, workers: 0 }
+      });
+      await fetchOrganizations();
+    } catch (err: any) {
+      toast.error('Failed to update organization');
+    }
+  };
+
   const deleteOrganization = async (id: string) => {
     // Guard + validation
     if (id == null || id === '') {
@@ -564,14 +669,24 @@ Please change your password on first login for security.`;
                   <TableCell>{org.phone || 'Not set'}</TableCell>
                   <TableCell>{org.managers?.count || 0}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteOrganization(org.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openUpdateOrgDialog(org)}
+                        className="hover:text-primary"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteOrganization(org.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -727,6 +842,66 @@ Please change your password on first login for security.`;
             </div>
             <Button onClick={createOrganization} className="w-full">
               Create Organization
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Organization Dialog */}
+      <Dialog open={showUpdateOrgDialog} onOpenChange={setShowUpdateOrgDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Organization Capacity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="text-sm font-medium">{updateOrgForm.organizationName}</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Active: {updateOrgForm.currentActive.managers} managers, {updateOrgForm.currentActive.workers} workers
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="update-planned-managers">Planned Number of Managers *</Label>
+              <Input
+                id="update-planned-managers"
+                type="number"
+                min={updateOrgForm.currentActive.managers}
+                value={updateOrgForm.plannedManagers}
+                onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1})}
+                placeholder="1"
+              />
+              <div className="text-xs text-muted-foreground mt-1">
+                Minimum: {updateOrgForm.currentActive.managers} (current active managers)
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="update-planned-workers">Planned Number of Workers *</Label>
+              <Input
+                id="update-planned-workers"
+                type="number"
+                min={updateOrgForm.currentActive.workers}
+                value={updateOrgForm.plannedWorkers}
+                onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0})}
+                placeholder="0"
+              />
+              <div className="text-xs text-muted-foreground mt-1">
+                Minimum: {updateOrgForm.currentActive.workers} (current active workers)
+              </div>
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="text-sm font-medium mb-2">Updated Monthly Cost</div>
+              <div className="text-2xl font-bold text-primary">
+                £{((updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50)).toFixed(2)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                ({updateOrgForm.plannedManagers} × £25.00) + ({updateOrgForm.plannedWorkers} × £1.50)
+              </div>
+            </div>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers, {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
+            </div>
+            <Button onClick={updateOrganization} className="w-full">
+              Update Organization
             </Button>
           </div>
         </DialogContent>
