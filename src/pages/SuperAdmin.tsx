@@ -809,7 +809,7 @@ Please change your password on first login for security.`;
 
       {/* Organization Dialog */}
       <Dialog open={showOrgDialog} onOpenChange={setShowOrgDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Organization</DialogTitle>
           </DialogHeader>
