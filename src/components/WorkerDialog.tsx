@@ -264,6 +264,35 @@ Please change your password on first login for security.`;
           .insert(workerData);
 
         if (workerError) {
+          // Check if this is a capacity limit error from the database trigger
+          if (workerError.message.includes('Worker limit reached')) {
+            // Parse the error message: "Worker limit reached for organization X (active Y / planned Z)"
+            const match = workerError.message.match(/active (\d+) \/ planned (\d+)/);
+            if (match) {
+              const currentCount = parseInt(match[1]);
+              const plannedCount = parseInt(match[2]);
+              
+              // Get organization capacity info for display
+              const { data: orgData } = await supabase
+                .from('organizations')
+                .select('max_workers, subscription_status')
+                .eq('id', managerData.organization_id)
+                .single();
+              
+              const planName = orgData?.subscription_status === 'trial' ? 'Trial' 
+                : orgData?.max_workers === 10 ? 'Starter'
+                : orgData?.max_workers === 100 ? 'Pro'
+                : 'Enterprise';
+              
+              toast({
+                title: "Worker Limit Reached",
+                description: `Your ${planName} plan allows ${plannedCount} workers. You currently have ${currentCount} active workers. Please upgrade your plan to add more workers.`,
+                variant: "destructive",
+              });
+              return;
+            }
+          }
+          
           toast({
             title: "Creation Failed", 
             description: `Failed to add worker: ${workerError.message}`,

@@ -459,6 +459,27 @@ export default function SuperAdmin() {
             });
           
           if (managerError) {
+            // Check if this is a capacity limit error from the database trigger
+            if (managerError.message.includes('Manager limit reached')) {
+              const match = managerError.message.match(/active (\d+) \/ planned (\d+)/);
+              if (match) {
+                const currentCount = parseInt(match[1]);
+                const plannedCount = parseInt(match[2]);
+                
+                const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
+                
+                setCapacityLimitDialog({
+                  open: true,
+                  type: 'manager',
+                  planName: capacityCheck.capacity?.planName || 'Current Plan',
+                  currentCount: currentCount,
+                  maxAllowed: capacityCheck.capacity?.maxManagers || plannedCount,
+                  plannedCount: plannedCount
+                });
+                setCreatingManager(false);
+                return;
+              }
+            }
             toast.error(`Manager record error: ${managerError.message}`);
           } else {
             toast.success('Manager linked to existing user successfully!');
@@ -487,6 +508,30 @@ export default function SuperAdmin() {
         });
       
       if (managerError) {
+        // Check if this is a capacity limit error from the database trigger
+        if (managerError.message.includes('Manager limit reached')) {
+          // Parse the error message: "Manager limit reached for organization X (active Y / planned Z)"
+          const match = managerError.message.match(/active (\d+) \/ planned (\d+)/);
+          if (match) {
+            const currentCount = parseInt(match[1]);
+            const plannedCount = parseInt(match[2]);
+            
+            // Get plan info for display
+            const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
+            
+            setCapacityLimitDialog({
+              open: true,
+              type: 'manager',
+              planName: capacityCheck.capacity?.planName || 'Current Plan',
+              currentCount: currentCount,
+              maxAllowed: capacityCheck.capacity?.maxManagers || plannedCount,
+              plannedCount: plannedCount
+            });
+            setCreatingManager(false);
+            return;
+          }
+        }
+        
         toast.error(`Failed to create manager record: ${managerError.message}`);
         setCreatingManager(false);
         return;

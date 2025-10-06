@@ -961,6 +961,10 @@ export type Database = {
         Args: { user_email: string }
         Returns: boolean
       }
+      ensure_usage_row: {
+        Args: { p_org: string }
+        Returns: undefined
+      }
       get_clocked_in_workers: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -976,6 +980,13 @@ export type Database = {
           is_manager: boolean
           is_super_admin: boolean
           organization_id: string
+        }[]
+      }
+      get_plan_limits: {
+        Args: { p_month: string; p_org: string }
+        Returns: {
+          planned_managers: number
+          planned_workers: number
         }[]
       }
       get_recent_activity: {
