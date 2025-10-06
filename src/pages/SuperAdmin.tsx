@@ -53,6 +53,11 @@ export default function SuperAdmin() {
   const [updateOrgForm, setUpdateOrgForm] = useState({
     organizationId: '',
     organizationName: '',
+    email: '',
+    phone: '',
+    address: '',
+    company_number: '',
+    vat_number: '',
     plannedManagers: 1,
     plannedWorkers: 0,
     currentActive: { managers: 0, workers: 0 }
@@ -422,6 +427,11 @@ Please change your password on first login for security.`;
       setUpdateOrgForm({
         organizationId: org.id,
         organizationName: org.name,
+        email: org.email || '',
+        phone: org.phone || '',
+        address: org.address || '',
+        company_number: org.company_number || '',
+        vat_number: org.vat_number || '',
         plannedManagers: usageData?.planned_number_of_managers || 1,
         plannedWorkers: usageData?.planned_number_of_workers || 0,
         currentActive: {
@@ -437,6 +447,11 @@ Please change your password on first login for security.`;
 
   const updateOrganization = async () => {
     try {
+      if (!updateOrgForm.organizationName) {
+        toast.error('Organization name is required');
+        return;
+      }
+
       if (updateOrgForm.plannedManagers < 1) {
         toast.error('Planned managers must be at least 1');
         return;
@@ -455,6 +470,24 @@ Please change your password on first login for security.`;
 
       if (updateOrgForm.plannedWorkers < updateOrgForm.currentActive.workers) {
         toast.error(`Planned workers (${updateOrgForm.plannedWorkers}) cannot be less than active workers (${updateOrgForm.currentActive.workers})`);
+        return;
+      }
+
+      // First update the organization details
+      const { error: orgError } = await supabase
+        .from('organizations')
+        .update({
+          name: updateOrgForm.organizationName,
+          email: updateOrgForm.email || null,
+          phone: updateOrgForm.phone || null,
+          address: updateOrgForm.address || null,
+          company_number: updateOrgForm.company_number || null,
+          vat_number: updateOrgForm.vat_number || null
+        })
+        .eq('id', updateOrgForm.organizationId);
+
+      if (orgError) {
+        toast.error(`Failed to update organization: ${orgError.message}`);
         return;
       }
 
@@ -487,6 +520,11 @@ Please change your password on first login for security.`;
       setUpdateOrgForm({
         organizationId: '',
         organizationName: '',
+        email: '',
+        phone: '',
+        address: '',
+        company_number: '',
+        vat_number: '',
         plannedManagers: 1,
         plannedWorkers: 0,
         currentActive: { managers: 0, workers: 0 }
@@ -849,57 +887,126 @@ Please change your password on first login for security.`;
 
       {/* Update Organization Dialog */}
       <Dialog open={showUpdateOrgDialog} onOpenChange={setShowUpdateOrgDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Update Organization Capacity</DialogTitle>
+            <DialogTitle>Update Organization</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-3 bg-muted rounded-lg">
-              <div className="text-sm font-medium">{updateOrgForm.organizationName}</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Active: {updateOrgForm.currentActive.managers} managers, {updateOrgForm.currentActive.workers} workers
+            {/* Company Details Section */}
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-foreground">Company Details</div>
+              <div>
+                <Label htmlFor="update-org-name">Organization Name *</Label>
+                <Input
+                  id="update-org-name"
+                  value={updateOrgForm.organizationName}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, organizationName: e.target.value})}
+                  placeholder="Enter organization name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="update-org-email">Email</Label>
+                <Input
+                  id="update-org-email"
+                  type="email"
+                  value={updateOrgForm.email}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <Label htmlFor="update-org-phone">Phone</Label>
+                <Input
+                  id="update-org-phone"
+                  value={updateOrgForm.phone}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, phone: e.target.value})}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="update-org-address">Address</Label>
+                <Input
+                  id="update-org-address"
+                  value={updateOrgForm.address}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, address: e.target.value})}
+                  placeholder="Enter address"
+                />
               </div>
             </div>
-            <div>
-              <Label htmlFor="update-planned-managers">Planned Number of Managers *</Label>
-              <Input
-                id="update-planned-managers"
-                type="number"
-                min={updateOrgForm.currentActive.managers}
-                value={updateOrgForm.plannedManagers}
-                onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1})}
-                placeholder="1"
-              />
-              <div className="text-xs text-muted-foreground mt-1">
-                Minimum: {updateOrgForm.currentActive.managers} (current active managers)
+
+            {/* Registration Details Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <div className="text-sm font-semibold text-foreground">Registration Details</div>
+              <div>
+                <Label htmlFor="update-org-company-number">Company Number</Label>
+                <Input
+                  id="update-org-company-number"
+                  value={updateOrgForm.company_number}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, company_number: e.target.value})}
+                  placeholder="Enter company number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="update-org-vat-number">VAT Number</Label>
+                <Input
+                  id="update-org-vat-number"
+                  value={updateOrgForm.vat_number}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, vat_number: e.target.value})}
+                  placeholder="Enter VAT number"
+                />
               </div>
             </div>
-            <div>
-              <Label htmlFor="update-planned-workers">Planned Number of Workers *</Label>
-              <Input
-                id="update-planned-workers"
-                type="number"
-                min={updateOrgForm.currentActive.workers}
-                value={updateOrgForm.plannedWorkers}
-                onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0})}
-                placeholder="0"
-              />
-              <div className="text-xs text-muted-foreground mt-1">
-                Minimum: {updateOrgForm.currentActive.workers} (current active workers)
+
+            {/* Subscription Capacity Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <div className="text-sm font-semibold text-foreground">Subscription Capacity</div>
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground">
+                  Active: {updateOrgForm.currentActive.managers} managers, {updateOrgForm.currentActive.workers} workers
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="update-planned-managers">Planned Number of Managers *</Label>
+                <Input
+                  id="update-planned-managers"
+                  type="number"
+                  min={updateOrgForm.currentActive.managers}
+                  value={updateOrgForm.plannedManagers}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1})}
+                  placeholder="1"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Minimum: {updateOrgForm.currentActive.managers} (current active managers)
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="update-planned-workers">Planned Number of Workers *</Label>
+                <Input
+                  id="update-planned-workers"
+                  type="number"
+                  min={updateOrgForm.currentActive.workers}
+                  value={updateOrgForm.plannedWorkers}
+                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0})}
+                  placeholder="0"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Minimum: {updateOrgForm.currentActive.workers} (current active workers)
+                </div>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-sm font-medium mb-2">Updated Monthly Cost</div>
+                <div className="text-2xl font-bold text-primary">
+                  £{((updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50)).toFixed(2)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  ({updateOrgForm.plannedManagers} × £25.00) + ({updateOrgForm.plannedWorkers} × £1.50)
+                </div>
+              </div>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers, {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
               </div>
             </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="text-sm font-medium mb-2">Updated Monthly Cost</div>
-              <div className="text-2xl font-bold text-primary">
-                £{((updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50)).toFixed(2)}
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">
-                ({updateOrgForm.plannedManagers} × £25.00) + ({updateOrgForm.plannedWorkers} × £1.50)
-              </div>
-            </div>
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers, {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
-            </div>
+
             <Button onClick={updateOrganization} className="w-full">
               Update Organization
             </Button>
