@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building, Database } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const Navigation: React.FC = () => {
@@ -167,6 +167,14 @@ export const Navigation: React.FC = () => {
                 Reports
               </Button>
               <Button
+                variant={location.pathname === '/admin/postcodes' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/admin/postcodes')}
+                className="text-white hover:bg-gray-800"
+              >
+                <Database className="mr-2 h-4 w-4" />
+                Postcodes
+              </Button>
+              <Button
                 variant="ghost"
                 onClick={handleLogout}
                 className="text-white hover:bg-red-600"
@@ -280,6 +288,14 @@ export const Navigation: React.FC = () => {
                     >
                       <FileText className="mr-2 h-4 w-4" />
                       Reports
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/admin/postcodes'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      Postcodes
                     </Button>
                   </>
                 )}

@@ -75,3 +75,6 @@ verify_jwt = true
 
 [functions.delete-organization]
 verify_jwt = true
+
+[functions.import-uk-postcodes]
+verify_jwt = true
