@@ -139,10 +139,11 @@ const watchedPostcode = watch('postcode');
   };
 
   const onSubmit = async (data: JobFormData) => {
-    if (!selectedLocation) {
+    // Validate that we have a valid location (not 0,0 which indicates geocoding failure)
+    if (!selectedLocation || (selectedLocation[0] === 0 && selectedLocation[1] === 0)) {
       toast({
-        title: "Error",
-        description: "Please select a location on the map or enter a valid postcode",
+        title: "Location Required",
+        description: "Please click on the map to set the job location, or try the 'Find Location' button with a valid UK postcode.",
         variant: "destructive",
       });
       return;

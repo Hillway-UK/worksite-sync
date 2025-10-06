@@ -77,36 +77,52 @@ export async function geocodePostcode(postcode: string): Promise<{
     if (!validatePostcode(trimmedPostcode)) {
       const error = `Invalid postcode format: "${trimmedPostcode}". Please use format like SW1A 1AA, M1 1AA, or B33 8TH`;
       console.error(error);
-      throw new Error(error);
+      return { latitude: 0, longitude: 0, formatted_postcode: trimmedPostcode, error };
     }
 
-    // Call our Supabase Edge Function instead of the external API
-    const response = await fetch('https://kejblmetyrsehzvrxgmt.supabase.co/functions/v1/geocode-postcode', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlamJsbWV0eXJzZWh6dnJ4Z210Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzOTI1NTIsImV4cCI6MjA2OTk2ODU1Mn0.4CxLNIJtyjWDgoxNzKOwz1LiKnuRHkVubort9fiFxac`,
-      },
-      body: JSON.stringify({ postcode: trimmedPostcode }),
+    // Import Supabase client dynamically to avoid circular dependencies
+    const { supabase } = await import('@/integrations/supabase/client');
+
+    // Call our Supabase Edge Function using the client's invoke method
+    const { data, error } = await supabase.functions.invoke('geocode-postcode', {
+      body: { postcode: trimmedPostcode }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      const error = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+    if (error) {
       console.error('Edge function error:', error);
-      throw new Error(error);
+      return { 
+        latitude: 0, 
+        longitude: 0, 
+        formatted_postcode: trimmedPostcode, 
+        error: `Geocoding service error: ${error.message}. You can still manually set the location on the map.`
+      };
     }
 
-    const result = await response.json();
-    console.log('Geocoding successful:', result);
-    return result;
+    if (!data || data.latitude === undefined || data.longitude === undefined) {
+      return { 
+        latitude: 0, 
+        longitude: 0, 
+        formatted_postcode: trimmedPostcode, 
+        error: 'No location data returned. You can manually set the location on the map.'
+      };
+    }
+
+    console.log('Geocoding successful:', data);
+    return {
+      latitude: data.latitude,
+      longitude: data.longitude,
+      formatted_postcode: data.formatted_postcode || trimmedPostcode,
+    };
 
   } catch (error) {
     console.error('Error geocoding postcode:', error);
-    if (error instanceof Error) {
-      return { latitude: 0, longitude: 0, formatted_postcode: trimmedPostcode, error: error.message };
-    }
-    return { latitude: 0, longitude: 0, formatted_postcode: trimmedPostcode, error: 'Unknown error occurred' };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return { 
+      latitude: 0, 
+      longitude: 0, 
+      formatted_postcode: trimmedPostcode, 
+      error: `${errorMessage}. You can manually set the location on the map by clicking.`
+    };
   }
 }
 
