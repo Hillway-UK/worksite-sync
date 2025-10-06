@@ -943,6 +943,20 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      check_capacity_with_plan: {
+        Args: { org_id: string }
+        Returns: {
+          can_add_manager: boolean
+          can_add_worker: boolean
+          current_manager_count: number
+          current_worker_count: number
+          max_managers: number
+          max_workers: number
+          plan_name: string
+          planned_managers: number
+          planned_workers: number
+        }[]
+      }
       check_is_manager: {
         Args: { user_email: string }
         Returns: boolean

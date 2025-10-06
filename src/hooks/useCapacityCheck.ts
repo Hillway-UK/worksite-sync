@@ -4,9 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 export type CapacityType = 'manager' | 'worker';
 
 interface CapacityData {
-  planned: number;
-  active: number;
-  available: number;
+  canAddManager: boolean;
+  canAddWorker: boolean;
+  currentManagerCount: number;
+  currentWorkerCount: number;
+  maxManagers: number | null;
+  maxWorkers: number | null;
+  plannedManagers: number;
+  plannedWorkers: number;
+  planName: string;
 }
 
 export const useCapacityCheck = () => {
@@ -20,7 +26,7 @@ export const useCapacityCheck = () => {
     
     try {
       const { data, error } = await supabase
-        .rpc('get_subscription_capacity', { org_id: organizationId });
+        .rpc('check_capacity_with_plan', { org_id: organizationId });
 
       if (error) throw error;
       
@@ -31,29 +37,26 @@ export const useCapacityCheck = () => {
         };
       }
 
-      const capacity = data[0];
+      const capacityInfo = data[0];
       
-      if (type === 'manager') {
-        const available = capacity.managers_available || 0;
-        return {
-          allowed: available > 0,
-          capacity: {
-            planned: capacity.planned_managers,
-            active: capacity.active_managers,
-            available
-          }
-        };
-      } else {
-        const available = capacity.workers_available || 0;
-        return {
-          allowed: available > 0,
-          capacity: {
-            planned: capacity.planned_workers,
-            active: capacity.active_workers,
-            available
-          }
-        };
-      }
+      const allowed = type === 'manager' 
+        ? capacityInfo.can_add_manager 
+        : capacityInfo.can_add_worker;
+      
+      return {
+        allowed,
+        capacity: {
+          canAddManager: capacityInfo.can_add_manager,
+          canAddWorker: capacityInfo.can_add_worker,
+          currentManagerCount: capacityInfo.current_manager_count,
+          currentWorkerCount: capacityInfo.current_worker_count,
+          maxManagers: capacityInfo.max_managers === 999999 ? null : capacityInfo.max_managers,
+          maxWorkers: capacityInfo.max_workers === 999999 ? null : capacityInfo.max_workers,
+          plannedManagers: capacityInfo.planned_managers,
+          plannedWorkers: capacityInfo.planned_workers,
+          planName: capacityInfo.plan_name
+        }
+      };
     } catch (error: any) {
       console.error('Capacity check error:', error);
       return { allowed: false, error: error.message };

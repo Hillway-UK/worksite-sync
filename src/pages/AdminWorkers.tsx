@@ -56,8 +56,10 @@ export default function AdminWorkers() {
   const [capacityLimitDialog, setCapacityLimitDialog] = useState({
     open: false,
     type: 'worker' as 'manager' | 'worker',
-    planned: 0,
-    active: 0
+    planName: '',
+    currentCount: 0,
+    maxAllowed: null as number | null,
+    plannedCount: 0
   });
   
   const { checkCapacity } = useCapacityCheck();
@@ -245,8 +247,10 @@ export default function AdminWorkers() {
           setCapacityLimitDialog({
             open: true,
             type: 'worker',
-            planned: capacityCheck.capacity.planned,
-            active: capacityCheck.capacity.active
+            planName: capacityCheck.capacity.planName,
+            currentCount: capacityCheck.capacity.currentWorkerCount,
+            maxAllowed: capacityCheck.capacity.maxWorkers,
+            plannedCount: capacityCheck.capacity.plannedWorkers
           });
         } else {
           toast({
@@ -556,13 +560,15 @@ export default function AdminWorkers() {
         </AlertDialog>
 
         {/* Capacity Limit Dialog */}
-        <CapacityLimitDialog
-          open={capacityLimitDialog.open}
-          onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
-          type={capacityLimitDialog.type}
-          planned={capacityLimitDialog.planned}
-          active={capacityLimitDialog.active}
-        />
+      <CapacityLimitDialog
+        open={capacityLimitDialog.open}
+        onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
+        type={capacityLimitDialog.type}
+        planName={capacityLimitDialog.planName}
+        currentCount={capacityLimitDialog.currentCount}
+        maxAllowed={capacityLimitDialog.maxAllowed}
+        plannedCount={capacityLimitDialog.plannedCount}
+      />
       </div>
     </Layout>
   );

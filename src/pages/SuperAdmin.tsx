@@ -84,8 +84,10 @@ export default function SuperAdmin() {
   const [capacityLimitDialog, setCapacityLimitDialog] = useState({
     open: false,
     type: 'manager' as 'manager' | 'worker',
-    planned: 0,
-    active: 0
+    planName: '',
+    currentCount: 0,
+    maxAllowed: null as number | null,
+    plannedCount: 0
   });
   
   const { checkCapacity } = useCapacityCheck();
@@ -413,8 +415,10 @@ export default function SuperAdmin() {
           setCapacityLimitDialog({
             open: true,
             type: 'manager',
-            planned: capacityCheck.capacity.planned,
-            active: capacityCheck.capacity.active
+            planName: capacityCheck.capacity.planName,
+            currentCount: capacityCheck.capacity.currentManagerCount,
+            maxAllowed: capacityCheck.capacity.maxManagers,
+            plannedCount: capacityCheck.capacity.plannedManagers
           });
         } else {
           toast.error(capacityCheck.error || 'Cannot add manager at this time');
@@ -1375,8 +1379,10 @@ Please change your password on first login for security.`;
         open={capacityLimitDialog.open}
         onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
         type={capacityLimitDialog.type}
-        planned={capacityLimitDialog.planned}
-        active={capacityLimitDialog.active}
+        planName={capacityLimitDialog.planName}
+        currentCount={capacityLimitDialog.currentCount}
+        maxAllowed={capacityLimitDialog.maxAllowed}
+        plannedCount={capacityLimitDialog.plannedCount}
       />
     </div>
   );
