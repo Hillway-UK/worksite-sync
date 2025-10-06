@@ -464,7 +464,7 @@ export default function SuperAdmin() {
             toast.success('Manager linked to existing user successfully!');
             setShowManagerDialog(false);
             setManagerForm({ email: '', name: '', organization_id: '' });
-            await fetchManagers();
+            await Promise.all([fetchManagers(), fetchOrganizations()]);
           }
           setCreatingManager(false);
           return;
@@ -502,7 +502,7 @@ export default function SuperAdmin() {
       setShowManagerDialog(false);
       setManagerForm({ email: '', name: '', organization_id: '' });
       setShowManagerSuccessModal(true);
-      await fetchManagers();
+      await Promise.all([fetchManagers(), fetchOrganizations()]);
       
     } catch (error: any) {
       toast.error(error.message || 'Failed to create manager');
