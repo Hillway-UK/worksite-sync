@@ -46,6 +46,8 @@ export default function SuperAdmin() {
     email: '',
     phone: '',
     address: '',
+    company_number: '',
+    vat_number: '',
     plannedManagers: 1,
     plannedWorkers: 0
   });
@@ -233,6 +235,8 @@ export default function SuperAdmin() {
           email: orgForm.email,
           phone: orgForm.phone || null,
           address: orgForm.address || null,
+          company_number: orgForm.company_number || null,
+          vat_number: orgForm.vat_number || null,
           subscription_status: 'active',
           max_workers: 50,
           max_managers: 5
@@ -268,7 +272,7 @@ export default function SuperAdmin() {
       }
       
       setShowOrgDialog(false);
-      setOrgForm({ name: '', email: '', phone: '', address: '', plannedManagers: 1, plannedWorkers: 0 });
+      setOrgForm({ name: '', email: '', phone: '', address: '', company_number: '', vat_number: '', plannedManagers: 1, plannedWorkers: 0 });
       await fetchOrganizations();
     } catch (err: any) {
       toast.error('An unexpected error occurred');
@@ -845,6 +849,24 @@ Please change your password on first login for security.`;
                 value={orgForm.address}
                 onChange={(e) => setOrgForm({...orgForm, address: e.target.value})}
                 placeholder="Enter address"
+              />
+            </div>
+            <div>
+              <Label htmlFor="org-company-number">Company Number</Label>
+              <Input
+                id="org-company-number"
+                value={orgForm.company_number}
+                onChange={(e) => setOrgForm({...orgForm, company_number: e.target.value})}
+                placeholder="Enter company number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="org-vat-number">VAT Number</Label>
+              <Input
+                id="org-vat-number"
+                value={orgForm.vat_number}
+                onChange={(e) => setOrgForm({...orgForm, vat_number: e.target.value})}
+                placeholder="Enter VAT number"
               />
             </div>
             <div>
