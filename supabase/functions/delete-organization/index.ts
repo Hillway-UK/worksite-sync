@@ -55,19 +55,23 @@ Deno.serve(async (req: Request) => {
 
     // --- AUTH / ROLE CHECK ---
 
-    // Read caller (uses the Authorization header the client sent)
-    const authed = createClient(SUPABASE_URL, SERVICE_ROLE, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
-    const { data: ures, error: uerr } = await authed.auth.getUser();
-
-    if (uerr || !ures?.user) {
-      console.error("[DELETE-ORGANIZATION] Auth failed:", uerr);
-      return forbid({ error: "Not authenticated" });
+    // Verify JWT token from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("[DELETE-ORGANIZATION] Missing or invalid Authorization header");
+      return forbid({ error: "Missing or invalid authorization token" });
     }
 
-    const user = ures.user;
-    console.log(`[DELETE-ORGANIZATION] User email: ${user.email}`);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: verifyError } = await admin.auth.getUser(token);
+
+    if (verifyError || !userData?.user) {
+      console.error("[DELETE-ORGANIZATION] Auth verification failed:", verifyError);
+      return forbid({ error: "Invalid or expired token" });
+    }
+
+    const user = userData.user;
+    console.log(`[DELETE-ORGANIZATION] User authenticated: ${user.email}`);
 
     // 1) Check app_metadata / user_metadata
     const am: any = user.app_metadata ?? {};
