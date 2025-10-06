@@ -27,7 +27,7 @@ import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
 import AdminAmendments from "./pages/AdminAmendments";
 import AdminProfile from "./pages/AdminProfile";
-import AdminPostcodes from "./pages/AdminPostcodes";
+
 import OrganizationDashboard from "./pages/OrganizationDashboard";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
@@ -176,14 +176,6 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="manager">
                   <AdminProfile />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/postcodes" 
-              element={
-                <ProtectedRoute requireRole="manager">
-                  <AdminPostcodes />
                 </ProtectedRoute>
               } 
             />
