@@ -183,6 +183,16 @@ Deno.serve(async (req: Request) => {
 
     // 2. Delete worker-related data
     if (worker_ids.length > 0) {
+      // Time amendments (must delete before clock_entries due to FK constraint)
+      const { error: taErr } = await admin
+        .from("time_amendments")
+        .delete()
+        .in("worker_id", worker_ids);
+      if (taErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
+        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
+      }
+
       // Clock entries
       const { error: ceErr } = await admin
         .from("clock_entries")
@@ -191,16 +201,6 @@ Deno.serve(async (req: Request) => {
       if (ceErr) {
         console.error("[DELETE-ORGANIZATION] Failed to delete clock_entries:", ceErr);
         return oops({ error: `Failed to delete clock entries: ${ceErr.message}` });
-      }
-
-      // Time amendments
-      const { error: taErr } = await admin
-        .from("time_amendments")
-        .delete()
-        .in("worker_id", worker_ids);
-      if (taErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
-        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
       }
 
       // Additional costs
