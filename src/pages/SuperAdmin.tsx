@@ -17,6 +17,55 @@ import { generateSecurePassword } from '@/lib/validation';
 import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
 
+const SUBSCRIPTION_PLANS = {
+  trial: {
+    label: 'Trial',
+    maxManagers: 1,
+    maxWorkers: 3,
+    plannedManagers: 1,
+    plannedWorkers: 3,
+    durationMonths: 1,
+    costPerManager: 0,
+    costPerWorker: 0,
+    isCustomizable: false
+  },
+  starter: {
+    label: 'Starter',
+    maxManagers: 2,
+    maxWorkers: 10,
+    plannedManagers: 2,
+    plannedWorkers: 10,
+    durationMonths: 1,
+    costPerManager: 25,
+    costPerWorker: 1.50,
+    isCustomizable: false
+  },
+  pro: {
+    label: 'Pro',
+    maxManagers: 5,
+    maxWorkers: 100,
+    plannedManagers: 5,
+    plannedWorkers: 100,
+    durationMonths: 1,
+    costPerManager: 25,
+    costPerWorker: 1.50,
+    isCustomizable: false
+  },
+  enterprise: {
+    label: 'Enterprise',
+    maxManagers: null,
+    maxWorkers: null,
+    plannedManagers: 1,
+    plannedWorkers: 0,
+    durationMonths: 1,
+    costPerManager: 25,
+    costPerWorker: 1.50,
+    isCustomizable: true
+  }
+} as const;
+
+type SubscriptionPlan = keyof typeof SUBSCRIPTION_PLANS;
+
 export default function SuperAdmin() {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
@@ -48,8 +97,9 @@ export default function SuperAdmin() {
     address: '',
     company_number: '',
     vat_number: '',
-    plannedManagers: 1,
-    plannedWorkers: 0
+    subscriptionPlan: 'starter' as SubscriptionPlan,
+    plannedManagers: 2,
+    plannedWorkers: 10
   });
 
   const [updateOrgForm, setUpdateOrgForm] = useState({
@@ -60,6 +110,7 @@ export default function SuperAdmin() {
     address: '',
     company_number: '',
     vat_number: '',
+    subscriptionPlan: 'starter' as SubscriptionPlan,
     plannedManagers: 1,
     plannedWorkers: 0,
     currentActive: { managers: 0, workers: 0 }
@@ -117,6 +168,45 @@ export default function SuperAdmin() {
     } catch (err) {
       setLoading(false);
     }
+  };
+
+  // Helper functions for subscription plans
+  const calculateSubscriptionDates = (plan: SubscriptionPlan) => {
+    const startDate = new Date();
+    const planConfig = SUBSCRIPTION_PLANS[plan];
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + planConfig.durationMonths);
+    
+    return {
+      subscription_start_date: startDate.toISOString().split('T')[0],
+      subscription_end_date: endDate.toISOString().split('T')[0],
+      trial_ends_at: plan === 'trial' ? endDate.toISOString().split('T')[0] : null
+    };
+  };
+
+  const calculateTotalCost = (plan: SubscriptionPlan, managers: number, workers: number) => {
+    const planConfig = SUBSCRIPTION_PLANS[plan];
+    return (managers * planConfig.costPerManager) + (workers * planConfig.costPerWorker);
+  };
+
+  const handlePlanChange = (plan: SubscriptionPlan) => {
+    const planConfig = SUBSCRIPTION_PLANS[plan];
+    setOrgForm({
+      ...orgForm,
+      subscriptionPlan: plan,
+      plannedManagers: planConfig.plannedManagers,
+      plannedWorkers: planConfig.plannedWorkers
+    });
+  };
+
+  const handleUpdatePlanChange = (plan: SubscriptionPlan) => {
+    const planConfig = SUBSCRIPTION_PLANS[plan];
+    setUpdateOrgForm({
+      ...updateOrgForm,
+      subscriptionPlan: plan,
+      plannedManagers: Math.max(planConfig.plannedManagers, updateOrgForm.currentActive.managers),
+      plannedWorkers: Math.max(planConfig.plannedWorkers, updateOrgForm.currentActive.workers)
+    });
   };
 
   const fetchOrganizations = async () => {
@@ -218,16 +308,32 @@ export default function SuperAdmin() {
         return;
       }
 
-      if (orgForm.plannedManagers < 1) {
-        toast.error('Planned managers must be at least 1');
-        return;
+      const planConfig = SUBSCRIPTION_PLANS[orgForm.subscriptionPlan];
+      
+      // Validation for non-enterprise plans
+      if (!planConfig.isCustomizable) {
+        if (orgForm.plannedManagers !== planConfig.plannedManagers || 
+            orgForm.plannedWorkers !== planConfig.plannedWorkers) {
+          toast.error(`${planConfig.label} plan requires exactly ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`);
+          return;
+        }
+      } else {
+        // Enterprise validation
+        if (orgForm.plannedManagers < 1) {
+          toast.error('Planned managers must be at least 1');
+          return;
+        }
+        if (orgForm.plannedWorkers < 0) {
+          toast.error('Planned workers cannot be negative');
+          return;
+        }
       }
 
-      if (orgForm.plannedWorkers < 0) {
-        toast.error('Planned workers cannot be negative');
-        return;
-      }
+      // Calculate dates
+      const dates = calculateSubscriptionDates(orgForm.subscriptionPlan);
+      const totalCost = calculateTotalCost(orgForm.subscriptionPlan, orgForm.plannedManagers, orgForm.plannedWorkers);
 
+      // Insert into organizations table
       const { data, error } = await supabase
         .from('organizations')
         .insert({
@@ -237,9 +343,12 @@ export default function SuperAdmin() {
           address: orgForm.address || null,
           company_number: orgForm.company_number || null,
           vat_number: orgForm.vat_number || null,
-          subscription_status: 'active',
-          max_workers: 50,
-          max_managers: 5
+          subscription_status: orgForm.subscriptionPlan === 'trial' ? 'trial' : 'active',
+          subscription_start_date: dates.subscription_start_date,
+          subscription_end_date: dates.subscription_end_date,
+          trial_ends_at: dates.trial_ends_at,
+          max_workers: planConfig.maxWorkers,
+          max_managers: planConfig.maxManagers
         })
         .select()
         .single();
@@ -250,12 +359,11 @@ export default function SuperAdmin() {
       }
 
       // Create subscription_usage record
-      const totalCost = (orgForm.plannedManagers * 25) + (orgForm.plannedWorkers * 1.50);
       const { error: usageError } = await supabase
         .from('subscription_usage')
         .insert({
           organization_id: data.id,
-          month: new Date().toISOString().split('T')[0],
+          month: dates.subscription_start_date,
           planned_number_of_managers: orgForm.plannedManagers,
           planned_number_of_workers: orgForm.plannedWorkers,
           total_cost: totalCost,
@@ -268,11 +376,22 @@ export default function SuperAdmin() {
         console.error('Failed to create subscription usage:', usageError);
         toast.error('Organization created but subscription tracking failed');
       } else {
-        toast.success(`Organization created with estimated cost: £${totalCost.toFixed(2)}/month`);
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free Trial';
+        toast.success(`Organization created with ${planConfig.label} plan (${costDisplay})`);
       }
       
       setShowOrgDialog(false);
-      setOrgForm({ name: '', email: '', phone: '', address: '', company_number: '', vat_number: '', plannedManagers: 1, plannedWorkers: 0 });
+      setOrgForm({ 
+        name: '', 
+        email: '', 
+        phone: '', 
+        address: '', 
+        company_number: '', 
+        vat_number: '', 
+        subscriptionPlan: 'starter',
+        plannedManagers: 2, 
+        plannedWorkers: 10 
+      });
       await fetchOrganizations();
     } catch (err: any) {
       toast.error('An unexpected error occurred');
@@ -428,6 +547,18 @@ Please change your password on first login for security.`;
         return;
       }
 
+      // Determine current plan based on subscription_status and limits
+      let currentPlan: SubscriptionPlan = 'starter';
+      if (org.subscription_status === 'trial') {
+        currentPlan = 'trial';
+      } else if (org.max_managers === 2 && org.max_workers === 10) {
+        currentPlan = 'starter';
+      } else if (org.max_managers === 5 && org.max_workers === 100) {
+        currentPlan = 'pro';
+      } else if (org.max_managers === null || org.max_managers > 5) {
+        currentPlan = 'enterprise';
+      }
+
       setUpdateOrgForm({
         organizationId: org.id,
         organizationName: org.name,
@@ -436,6 +567,7 @@ Please change your password on first login for security.`;
         address: org.address || '',
         company_number: org.company_number || '',
         vat_number: org.vat_number || '',
+        subscriptionPlan: currentPlan,
         plannedManagers: usageData?.planned_number_of_managers || 1,
         plannedWorkers: usageData?.planned_number_of_workers || 0,
         currentActive: {
@@ -456,37 +588,47 @@ Please change your password on first login for security.`;
         return;
       }
 
-      if (updateOrgForm.plannedManagers < 1) {
-        toast.error('Planned managers must be at least 1');
-        return;
+      const planConfig = SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan];
+
+      // Validation
+      if (!planConfig.isCustomizable) {
+        if (updateOrgForm.plannedManagers < planConfig.plannedManagers || 
+            updateOrgForm.plannedWorkers < planConfig.plannedWorkers) {
+          toast.error(`${planConfig.label} plan requires at least ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`);
+          return;
+        }
       }
 
-      if (updateOrgForm.plannedWorkers < 0) {
-        toast.error('Planned workers cannot be negative');
-        return;
-      }
-
-      // Check if planned numbers are less than active
       if (updateOrgForm.plannedManagers < updateOrgForm.currentActive.managers) {
-        toast.error(`Planned managers (${updateOrgForm.plannedManagers}) cannot be less than active managers (${updateOrgForm.currentActive.managers})`);
+        toast.error(`Cannot reduce managers below current active count (${updateOrgForm.currentActive.managers})`);
         return;
       }
 
       if (updateOrgForm.plannedWorkers < updateOrgForm.currentActive.workers) {
-        toast.error(`Planned workers (${updateOrgForm.plannedWorkers}) cannot be less than active workers (${updateOrgForm.currentActive.workers})`);
+        toast.error(`Cannot reduce workers below current active count (${updateOrgForm.currentActive.workers})`);
         return;
       }
 
-      // First update the organization details
+      // Calculate dates
+      const dates = calculateSubscriptionDates(updateOrgForm.subscriptionPlan);
+      const totalCost = calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers);
+
+      // Update organizations table
       const { error: orgError } = await supabase
         .from('organizations')
         .update({
           name: updateOrgForm.organizationName,
-          email: updateOrgForm.email || null,
-          phone: updateOrgForm.phone || null,
-          address: updateOrgForm.address || null,
-          company_number: updateOrgForm.company_number || null,
-          vat_number: updateOrgForm.vat_number || null
+          email: updateOrgForm.email,
+          phone: updateOrgForm.phone,
+          address: updateOrgForm.address,
+          company_number: updateOrgForm.company_number,
+          vat_number: updateOrgForm.vat_number,
+          subscription_status: updateOrgForm.subscriptionPlan === 'trial' ? 'trial' : 'active',
+          subscription_start_date: dates.subscription_start_date,
+          subscription_end_date: dates.subscription_end_date,
+          trial_ends_at: dates.trial_ends_at,
+          max_workers: planConfig.maxWorkers,
+          max_managers: planConfig.maxManagers
         })
         .eq('id', updateOrgForm.organizationId);
 
@@ -495,10 +637,9 @@ Please change your password on first login for security.`;
         return;
       }
 
-      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
-      const totalCost = (updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50);
-
-      // Update or insert subscription_usage for current month
+      // Update subscription_usage
+      const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7) + '-01';
+      
       const { error: usageError } = await supabase
         .from('subscription_usage')
         .upsert({
@@ -508,8 +649,7 @@ Please change your password on first login for security.`;
           planned_number_of_workers: updateOrgForm.plannedWorkers,
           total_cost: totalCost,
           active_managers: updateOrgForm.currentActive.managers,
-          active_workers: updateOrgForm.currentActive.workers,
-          billed: false
+          active_workers: updateOrgForm.currentActive.workers
         }, {
           onConflict: 'organization_id,month'
         });
@@ -519,7 +659,8 @@ Please change your password on first login for security.`;
         return;
       }
 
-      toast.success(`Organization updated! New estimated cost: £${totalCost.toFixed(2)}/month`);
+      const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
+      toast.success(`Organization updated successfully (${costDisplay})`);
       setShowUpdateOrgDialog(false);
       setUpdateOrgForm({
         organizationId: '',
@@ -529,6 +670,7 @@ Please change your password on first login for security.`;
         address: '',
         company_number: '',
         vat_number: '',
+        subscriptionPlan: 'starter',
         plannedManagers: 1,
         plannedWorkers: 0,
         currentActive: { managers: 0, workers: 0 }
@@ -869,6 +1011,39 @@ Please change your password on first login for security.`;
                 placeholder="Enter VAT number"
               />
             </div>
+            
+            <div>
+              <Label htmlFor="org-subscription-plan">Subscription Plan *</Label>
+              <select
+                id="org-subscription-plan"
+                className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                value={orgForm.subscriptionPlan}
+                onChange={(e) => handlePlanChange(e.target.value as SubscriptionPlan)}
+              >
+                <option value="trial">Trial (1 Manager, 3 Workers - Free for 1 month)</option>
+                <option value="starter">Starter (2 Managers, 10 Workers - £55/month)</option>
+                <option value="pro">Pro (5 Managers, 100 Workers - £275/month)</option>
+                <option value="enterprise">Enterprise (Custom capacity)</option>
+              </select>
+            </div>
+
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+              <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].label} Plan
+              </div>
+              <div className="text-blue-700 dark:text-blue-300 text-xs space-y-1">
+                {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable ? (
+                  <div>✓ Customizable capacity for managers and workers</div>
+                ) : (
+                  <>
+                    <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers} Manager{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers > 1 ? 's' : ''}</div>
+                    <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers} Worker{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers > 1 ? 's' : ''}</div>
+                  </>
+                )}
+                <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].durationMonths} month subscription</div>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="org-planned-managers">Planned Number of Managers *</Label>
               <Input
@@ -878,8 +1053,15 @@ Please change your password on first login for security.`;
                 value={orgForm.plannedManagers}
                 onChange={(e) => setOrgForm({...orgForm, plannedManagers: parseInt(e.target.value) || 1})}
                 placeholder="1"
+                disabled={!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable}
               />
+              {!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Fixed for {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].label} plan
+                </div>
+              )}
             </div>
+            
             <div>
               <Label htmlFor="org-planned-workers">Planned Number of Workers *</Label>
               <Input
@@ -889,16 +1071,27 @@ Please change your password on first login for security.`;
                 value={orgForm.plannedWorkers}
                 onChange={(e) => setOrgForm({...orgForm, plannedWorkers: parseInt(e.target.value) || 0})}
                 placeholder="0"
+                disabled={!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable}
               />
+              {!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Fixed for {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].label} plan
+                </div>
+              )}
             </div>
+            
             <div className="p-4 bg-muted rounded-lg">
-              <div className="text-sm font-medium mb-2">Estimated Monthly Cost</div>
+              <div className="text-sm font-medium mb-2">
+                {orgForm.subscriptionPlan === 'trial' ? 'Trial Period Cost' : 'Estimated Monthly Cost'}
+              </div>
               <div className="text-2xl font-bold text-primary">
-                £{((orgForm.plannedManagers * 25) + (orgForm.plannedWorkers * 1.50)).toFixed(2)}
+                {orgForm.subscriptionPlan === 'trial' ? 'FREE' : `£${calculateTotalCost(orgForm.subscriptionPlan, orgForm.plannedManagers, orgForm.plannedWorkers).toFixed(2)}`}
               </div>
-              <div className="text-xs text-muted-foreground mt-2">
-                ({orgForm.plannedManagers} × £25.00) + ({orgForm.plannedWorkers} × £1.50)
-              </div>
+              {orgForm.subscriptionPlan !== 'trial' && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  ({orgForm.plannedManagers} × £{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerManager.toFixed(2)}) + ({orgForm.plannedWorkers} × £{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerWorker.toFixed(2)})
+                </div>
+              )}
             </div>
             <Button onClick={createOrganization} className="w-full">
               Create Organization
@@ -982,11 +1175,44 @@ Please change your password on first login for security.`;
             {/* Subscription Capacity Section */}
             <div className="space-y-3 pt-3 border-t">
               <div className="text-sm font-semibold text-foreground">Subscription Capacity</div>
+              
+              <div>
+                <Label htmlFor="update-subscription-plan">Subscription Plan *</Label>
+                <select
+                  id="update-subscription-plan"
+                  className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                  value={updateOrgForm.subscriptionPlan}
+                  onChange={(e) => handleUpdatePlanChange(e.target.value as SubscriptionPlan)}
+                >
+                  <option value="trial">Trial (1 Manager, 3 Workers - Free)</option>
+                  <option value="starter">Starter (2 Managers, 10 Workers)</option>
+                  <option value="pro">Pro (5 Managers, 100 Workers)</option>
+                  <option value="enterprise">Enterprise (Custom capacity)</option>
+                </select>
+              </div>
+
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+                <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                  {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].label} Plan
+                </div>
+                <div className="text-blue-700 dark:text-blue-300 text-xs space-y-1">
+                  {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable ? (
+                    <div>✓ Customizable capacity</div>
+                  ) : (
+                    <>
+                      <div>✓ Max {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].maxManagers} Managers</div>
+                      <div>✓ Max {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].maxWorkers} Workers</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="p-3 bg-muted rounded-lg">
                 <div className="text-xs text-muted-foreground">
                   Active: {updateOrgForm.currentActive.managers} managers, {updateOrgForm.currentActive.workers} workers
                 </div>
               </div>
+
               <div>
                 <Label htmlFor="update-planned-managers">Planned Number of Managers *</Label>
                 <Input
@@ -996,11 +1222,14 @@ Please change your password on first login for security.`;
                   value={updateOrgForm.plannedManagers}
                   onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1})}
                   placeholder="1"
+                  disabled={!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable}
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  Minimum: {updateOrgForm.currentActive.managers} (current active managers)
+                  Minimum: {updateOrgForm.currentActive.managers} (current active)
+                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && ' • Fixed for this plan'}
                 </div>
               </div>
+              
               <div>
                 <Label htmlFor="update-planned-workers">Planned Number of Workers *</Label>
                 <Input
@@ -1010,21 +1239,29 @@ Please change your password on first login for security.`;
                   value={updateOrgForm.plannedWorkers}
                   onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0})}
                   placeholder="0"
+                  disabled={!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable}
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  Minimum: {updateOrgForm.currentActive.workers} (current active workers)
+                  Minimum: {updateOrgForm.currentActive.workers} (current active)
+                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && ' • Fixed for this plan'}
                 </div>
               </div>
+              
               <div className="p-4 bg-muted rounded-lg">
-                <div className="text-sm font-medium mb-2">Updated Monthly Cost</div>
+                <div className="text-sm font-medium mb-2">
+                  {updateOrgForm.subscriptionPlan === 'trial' ? 'Trial Period Cost' : 'Updated Monthly Cost'}
+                </div>
                 <div className="text-2xl font-bold text-primary">
-                  £{((updateOrgForm.plannedManagers * 25) + (updateOrgForm.plannedWorkers * 1.50)).toFixed(2)}
+                  {updateOrgForm.subscriptionPlan === 'trial' ? 'FREE' : `£${calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers).toFixed(2)}`}
                 </div>
-                <div className="text-xs text-muted-foreground mt-2">
-                  ({updateOrgForm.plannedManagers} × £25.00) + ({updateOrgForm.plannedWorkers} × £1.50)
-                </div>
+                {updateOrgForm.subscriptionPlan !== 'trial' && (
+                  <div className="text-xs text-muted-foreground mt-2">
+                    ({updateOrgForm.plannedManagers} × £{SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerManager.toFixed(2)}) + ({updateOrgForm.plannedWorkers} × £{SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerWorker.toFixed(2)})
+                  </div>
+                )}
               </div>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-100">
                 Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers, {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
               </div>
             </div>
