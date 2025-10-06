@@ -741,8 +741,9 @@ Please change your password on first login for security.`;
       toast.success(
         `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`
       );
-      // Optional: light refetch to ensure consistency
+      // Refresh both organizations and managers tables
       await fetchOrganizations();
+      await fetchManagers();
     } catch (e: any) {
       setOrganizations(prevOrganizations); // rollback
       console.error('Delete org unexpected error:', e);
