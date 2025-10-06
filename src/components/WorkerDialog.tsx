@@ -56,9 +56,10 @@ interface WorkerDialogProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onCapacityLimit?: (data: { currentCount: number; plannedCount: number; maxAllowed: number | null; planName: string }) => void;
 }
 
-export function WorkerDialog({ worker, onSave, trigger, open: controlledOpen, onOpenChange }: WorkerDialogProps) {
+export function WorkerDialog({ worker, onSave, trigger, open: controlledOpen, onOpenChange, onCapacityLimit }: WorkerDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -284,11 +285,22 @@ Please change your password on first login for security.`;
                 : orgData?.max_workers === 100 ? 'Pro'
                 : 'Enterprise';
               
-              toast({
-                title: "Worker Limit Reached",
-                description: `Your ${planName} plan allows ${plannedCount} workers. You currently have ${currentCount} active workers. Please upgrade your plan to add more workers.`,
-                variant: "destructive",
-              });
+              // Use callback if provided, otherwise show toast
+              if (onCapacityLimit) {
+                onCapacityLimit({
+                  currentCount,
+                  plannedCount,
+                  maxAllowed: orgData?.max_workers || null,
+                  planName
+                });
+                setOpen(false);
+              } else {
+                toast({
+                  title: "Worker Limit Reached",
+                  description: `Your ${planName} plan allows ${plannedCount} workers. You currently have ${currentCount} active workers. Please upgrade your plan to add more workers.`,
+                  variant: "destructive",
+                });
+              }
               return;
             }
           }

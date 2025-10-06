@@ -275,8 +275,19 @@ export default function AdminWorkers() {
     worker.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleWorkerCapacityLimit = (data: { currentCount: number; plannedCount: number; maxAllowed: number | null; planName: string }) => {
+    setCapacityLimitDialog({
+      open: true,
+      type: 'worker',
+      planName: data.planName,
+      currentCount: data.currentCount,
+      maxAllowed: data.maxAllowed,
+      plannedCount: data.plannedCount
+    });
+  };
+
   if (loading) {
-    return (
+  return (
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-8">
@@ -471,6 +482,7 @@ export default function AdminWorkers() {
                             <WorkerDialog 
                               worker={worker} 
                               onSave={fetchWorkers}
+                              onCapacityLimit={handleWorkerCapacityLimit}
                             />
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -527,6 +539,7 @@ export default function AdminWorkers() {
           open={workerDialogOpen}
           onOpenChange={setWorkerDialogOpen}
           onSave={fetchWorkers}
+          onCapacityLimit={handleWorkerCapacityLimit}
         />
 
         <PhotoModal
