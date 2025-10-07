@@ -360,7 +360,7 @@ export default function SuperAdmin() {
         return;
       }
 
-      // Create subscription_usage record
+      // Create subscription_usage record with new schema
       const { error: usageError } = await supabase
         .from('subscription_usage')
         .insert({
@@ -371,7 +371,12 @@ export default function SuperAdmin() {
           total_cost: totalCost,
           active_managers: 0,
           active_workers: 0,
-          billed: false
+          billed: false,
+          status: 'active',
+          effective_start_date: dates.subscription_start_date,
+          plan_type: orgForm.subscriptionPlan === 'trial' ? 'trial' : 
+                     orgForm.plannedManagers === 2 && orgForm.plannedWorkers === 10 ? 'starter' :
+                     orgForm.plannedManagers === 5 && orgForm.plannedWorkers === 100 ? 'pro' : 'custom'
         });
 
       if (usageError) {
@@ -698,6 +703,10 @@ Please change your password on first login for security.`;
           planned_number_of_workers: updateOrgForm.plannedWorkers,
           total_cost: totalCost,
           active_managers: updateOrgForm.currentActive.managers,
+          status: 'active',
+          effective_start_date: currentMonth,
+          plan_type: updateOrgForm.plannedManagers === 2 && updateOrgForm.plannedWorkers === 10 ? 'starter' :
+                     updateOrgForm.plannedManagers === 5 && updateOrgForm.plannedWorkers === 100 ? 'pro' : 'custom',
           active_workers: updateOrgForm.currentActive.workers
         }, {
           onConflict: 'organization_id,month'

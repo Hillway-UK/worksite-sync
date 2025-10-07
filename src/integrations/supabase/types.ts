@@ -716,11 +716,16 @@ export type Database = {
           active_workers: number | null
           billed: boolean | null
           created_at: string | null
+          effective_end_date: string | null
+          effective_start_date: string
           id: string
           month: string
           organization_id: string | null
+          plan_type: string | null
           planned_number_of_managers: number | null
           planned_number_of_workers: number | null
+          status: string
+          superseded_by: string | null
           total_cost: number | null
         }
         Insert: {
@@ -728,11 +733,16 @@ export type Database = {
           active_workers?: number | null
           billed?: boolean | null
           created_at?: string | null
+          effective_end_date?: string | null
+          effective_start_date: string
           id?: string
           month: string
           organization_id?: string | null
+          plan_type?: string | null
           planned_number_of_managers?: number | null
           planned_number_of_workers?: number | null
+          status?: string
+          superseded_by?: string | null
           total_cost?: number | null
         }
         Update: {
@@ -740,11 +750,16 @@ export type Database = {
           active_workers?: number | null
           billed?: boolean | null
           created_at?: string | null
+          effective_end_date?: string | null
+          effective_start_date?: string
           id?: string
           month?: string
           organization_id?: string | null
+          plan_type?: string | null
           planned_number_of_managers?: number | null
           planned_number_of_workers?: number | null
+          status?: string
+          superseded_by?: string | null
           total_cost?: number | null
         }
         Relationships: [
@@ -753,6 +768,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_usage_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "subscription_usage"
             referencedColumns: ["id"]
           },
         ]
@@ -965,6 +987,26 @@ export type Database = {
         Args: { p_org: string }
         Returns: undefined
       }
+      get_active_subscription_usage: {
+        Args: { p_org_id: string }
+        Returns: {
+          active_managers: number | null
+          active_workers: number | null
+          billed: boolean | null
+          created_at: string | null
+          effective_end_date: string | null
+          effective_start_date: string
+          id: string
+          month: string
+          organization_id: string | null
+          plan_type: string | null
+          planned_number_of_managers: number | null
+          planned_number_of_workers: number | null
+          status: string
+          superseded_by: string | null
+          total_cost: number | null
+        }
+      }
       get_clocked_in_workers: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1041,6 +1083,15 @@ export type Database = {
       is_super_admin_of_org: {
         Args: { org_id: string }
         Returns: boolean
+      }
+      upgrade_subscription_plan: {
+        Args: {
+          p_new_max_managers: number
+          p_new_max_workers: number
+          p_org_id: string
+          p_plan_type: string
+        }
+        Returns: string
       }
       user_is_manager_in_org: {
         Args: { check_org_id: string }

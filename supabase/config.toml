@@ -78,3 +78,6 @@ verify_jwt = true
 
 [functions.import-uk-postcodes]
 verify_jwt = true
+
+[functions.upgrade-subscription-plan]
+verify_jwt = true

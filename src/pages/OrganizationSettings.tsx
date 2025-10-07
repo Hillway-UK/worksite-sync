@@ -4,9 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building, Save, Plus, Minus } from 'lucide-react';
+import { Building, Save, Plus, Minus, TrendingUp, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { Layout } from '@/components/Layout';
+import { UpgradeSubscriptionDialog } from '@/components/UpgradeSubscriptionDialog';
+import { SubscriptionHistory } from '@/components/SubscriptionHistory';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 interface Organization {
   id: string;
@@ -18,12 +22,24 @@ interface Organization {
   email?: string;
   max_workers: number;
   max_managers: number;
+  subscription_status?: string;
+}
+
+interface ActiveSubscription {
+  plan_type: string;
+  active_managers: number;
+  active_workers: number;
+  planned_number_of_managers: number;
+  planned_number_of_workers: number;
+  effective_start_date: string;
 }
 
 export default function OrganizationSettings() {
   const [organization, setOrganization] = useState<Organization | null>(null);
+  const [activeSubscription, setActiveSubscription] = useState<ActiveSubscription | null>(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchOrganization();
@@ -38,6 +54,20 @@ export default function OrganizationSettings() {
       
       if (error) throw error;
       setOrganization(data);
+
+      // Fetch active subscription
+      const { data: subData, error: subError } = await supabase
+        .from('subscription_usage')
+        .select('*')
+        .eq('organization_id', data.id)
+        .eq('status', 'active')
+        .single();
+
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+      } else {
+        setActiveSubscription(subData);
+      }
     } catch (error: any) {
       console.error('Error fetching organization:', error);
       toast.error('Failed to load organization settings');
@@ -113,7 +143,7 @@ export default function OrganizationSettings() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6">
         <div className="text-center mb-8">
           <Building className="h-16 w-16 text-black mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground mb-2">Organisation Settings</h1>
@@ -121,9 +151,16 @@ export default function OrganizationSettings() {
             Manage your organisation details and subscription
           </p>
         </div>
-        
-        {/* Company Details */}
-        <Card className="mb-6">
+
+        <Tabs defaultValue="details" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Company Details</TabsTrigger>
+            <TabsTrigger value="subscription">Subscription</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details">
+            <Card>
           <CardHeader>
             <CardTitle>Company Details</CardTitle>
           </CardHeader>
@@ -188,9 +225,53 @@ export default function OrganizationSettings() {
             </Button>
           </CardContent>
         </Card>
+          </TabsContent>
 
-        {/* Subscription Management */}
-        <Card>
+          <TabsContent value="subscription">
+            <div className="space-y-6">
+              {activeSubscription && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Current Plan</span>
+                      <Badge className="text-sm">
+                        {activeSubscription.plan_type.toUpperCase()}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Active Managers</div>
+                        <div className="text-2xl font-bold">
+                          {activeSubscription.active_managers} / {activeSubscription.planned_number_of_managers}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Active Workers</div>
+                        <div className="text-2xl font-bold">
+                          {activeSubscription.active_workers} / {activeSubscription.planned_number_of_workers}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      <span>Started: {new Date(activeSubscription.effective_start_date).toLocaleDateString()}</span>
+                    </div>
+
+                    <Button 
+                      onClick={() => setUpgradeDialogOpen(true)}
+                      className="w-full"
+                    >
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Upgrade Plan
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
           <CardHeader>
             <CardTitle>Subscription Management</CardTitle>
           </CardHeader>
@@ -252,9 +333,28 @@ export default function OrganizationSettings() {
                   £{((organization.max_managers * 25) + (organization.max_workers * 1.5)).toFixed(2)}
                 </span>
               </div>
+              </div>
+            </CardContent>
+          </Card>
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            {organization && <SubscriptionHistory organizationId={organization.id} />}
+          </TabsContent>
+        </Tabs>
+
+        {organization && activeSubscription && (
+          <UpgradeSubscriptionDialog
+            open={upgradeDialogOpen}
+            onOpenChange={setUpgradeDialogOpen}
+            organizationId={organization.id}
+            currentPlan={activeSubscription.plan_type}
+            currentManagers={activeSubscription.active_managers}
+            currentWorkers={activeSubscription.active_workers}
+            onUpgradeComplete={fetchOrganization}
+          />
+        )}
       </div>
     </Layout>
   );
