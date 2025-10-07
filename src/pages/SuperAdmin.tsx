@@ -444,7 +444,8 @@ export default function SuperAdmin() {
           emailRedirectTo: "https://autotime.hillwayco.uk/login",
           data: {
             name: managerForm.name,
-            role: 'manager'
+            role: 'manager',
+            organization_id: managerForm.organization_id
           }
         }
       });
