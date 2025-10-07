@@ -18,15 +18,20 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get Supabase env
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get authorization header
+    // Get authorization header from the request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Missing authorization header');
     }
+
+    // Create a Supabase client that forwards the user's JWT to PostgREST
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     // Verify user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser(
