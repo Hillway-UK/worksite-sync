@@ -586,13 +586,12 @@ Please change your password on first login for security.`;
   const openUpdateOrgDialog = async (org: any) => {
     try {
       // Fetch current subscription usage
-      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
       const { data: usageData, error: usageError } = await supabase
         .from('subscription_usage')
         .select('*')
         .eq('organization_id', org.id)
-        .gte('month', currentMonth)
-        .order('month', { ascending: false })
+        .eq('status', 'active')
+        .order('effective_start_date', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -668,6 +667,7 @@ Please change your password on first login for security.`;
       const totalCost = calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers);
 
       // Update organizations table
+      // Update org metadata only (subscription handled via edge function)
       const { error: orgError } = await supabase
         .from('organizations')
         .update({
@@ -676,13 +676,7 @@ Please change your password on first login for security.`;
           phone: updateOrgForm.phone,
           address: updateOrgForm.address,
           company_number: updateOrgForm.company_number,
-          vat_number: updateOrgForm.vat_number,
-          subscription_status: updateOrgForm.subscriptionPlan === 'trial' ? 'trial' : 'active',
-          subscription_start_date: dates.subscription_start_date,
-          subscription_end_date: dates.subscription_end_date,
-          trial_ends_at: dates.trial_ends_at,
-          max_workers: planConfig.maxWorkers,
-          max_managers: planConfig.maxManagers
+          vat_number: updateOrgForm.vat_number
         })
         .eq('id', updateOrgForm.organizationId);
 
@@ -691,29 +685,18 @@ Please change your password on first login for security.`;
         return;
       }
 
-      // Update subscription_usage
-      const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7) + '-01';
-      
-      const { error: usageError } = await supabase
-        .from('subscription_usage')
-        .upsert({
-          organization_id: updateOrgForm.organizationId,
-          month: currentMonth,
-          planned_number_of_managers: updateOrgForm.plannedManagers,
-          planned_number_of_workers: updateOrgForm.plannedWorkers,
-          total_cost: totalCost,
-          active_managers: updateOrgForm.currentActive.managers,
-          status: 'active',
-          effective_start_date: currentMonth,
-          plan_type: updateOrgForm.plannedManagers === 2 && updateOrgForm.plannedWorkers === 10 ? 'starter' :
-                     updateOrgForm.plannedManagers === 5 && updateOrgForm.plannedWorkers === 100 ? 'pro' : 'custom',
-          active_workers: updateOrgForm.currentActive.workers
-        }, {
-          onConflict: 'organization_id,month'
-        });
+      // Perform mid-cycle upgrade via edge function
+      const { data: upgradeData, error: upgradeError } = await supabase.functions.invoke('upgrade-subscription-plan', {
+        body: {
+          organizationId: updateOrgForm.organizationId,
+          newMaxManagers: updateOrgForm.plannedManagers,
+          newMaxWorkers: updateOrgForm.plannedWorkers,
+          planType: updateOrgForm.subscriptionPlan
+        }
+      });
 
-      if (usageError) {
-        toast.error(`Failed to update subscription: ${usageError.message}`);
+      if (upgradeError) {
+        toast.error(`Failed to update subscription: ${upgradeError.message}`);
         return;
       }
 
