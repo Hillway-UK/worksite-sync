@@ -619,16 +619,15 @@ Please change your password on first login for security.`;
         return;
       }
 
-      // Determine current plan based on subscription_status and limits
-      let currentPlan: SubscriptionPlan = 'starter';
-      if (org.subscription_status === 'trial') {
+      // Determine current plan from subscription_usage data
+      let currentPlan: SubscriptionPlan = 'starter'; // default fallback
+
+      if (usageData?.plan_type) {
+        // Use the actual plan_type from subscription_usage
+        currentPlan = usageData.plan_type as SubscriptionPlan;
+      } else if (org.subscription_status === 'trial') {
+        // Fallback: if no usage data but status is trial
         currentPlan = 'trial';
-      } else if (org.max_managers === 2 && org.max_workers === 10) {
-        currentPlan = 'starter';
-      } else if (org.max_managers === 5 && org.max_workers === 100) {
-        currentPlan = 'pro';
-      } else if (org.max_managers === null || org.max_managers > 5) {
-        currentPlan = 'enterprise';
       }
 
       setUpdateOrgForm({
