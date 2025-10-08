@@ -962,6 +962,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      can_manage_organization: {
+        Args: { target_org_id: string }
+        Returns: boolean
+      }
       check_capacity_with_plan: {
         Args: { org_id: string }
         Returns: {

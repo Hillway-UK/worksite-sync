@@ -46,12 +46,12 @@ Deno.serve(async (req) => {
 
     console.log(`Upgrading subscription for organization ${organizationId} to ${planType} plan`);
 
-    // Verify user is super admin of the organization
-    const { data: isSuperAdmin, error: permError } = await supabase
-      .rpc('is_super_admin_of_org', { org_id: organizationId });
+    // Verify user can manage this organization (super admin or org manager)
+    const { data: canManage, error: permError } = await supabase
+      .rpc('can_manage_organization', { target_org_id: organizationId });
 
-    if (permError || !isSuperAdmin) {
-      throw new Error('Only super admins can upgrade subscription plans');
+    if (permError || !canManage) {
+      throw new Error('You do not have permission to manage this organization');
     }
 
     // Call the upgrade_subscription_plan function
