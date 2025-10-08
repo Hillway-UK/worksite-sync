@@ -625,9 +625,10 @@ Please change your password on first login for security.`;
       if (usageData?.plan_type) {
         // Use the actual plan_type from subscription_usage
         // Map 'custom' to 'enterprise' for the dropdown
-        currentPlan = usageData.plan_type === 'custom' 
+        const planType = usageData.plan_type.toLowerCase().trim();
+        currentPlan = (planType === 'custom') 
           ? 'enterprise' 
-          : usageData.plan_type as SubscriptionPlan;
+          : planType as SubscriptionPlan;
       } else if (org.subscription_status === 'trial') {
         // Fallback: if no usage data but status is trial
         currentPlan = 'trial';
