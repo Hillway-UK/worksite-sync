@@ -108,7 +108,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/super-admin' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/super-admin')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/super-admin' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <Building className="mr-2 h-4 w-4" />
                 Organizations
@@ -129,7 +129,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/admin' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/admin' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <LayoutDashboard className="mr-2 h-4 w-4" />
                 Dashboard
@@ -137,7 +137,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/admin/workers' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/workers')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/admin/workers' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <Users className="mr-2 h-4 w-4" />
                 Workers
@@ -145,7 +145,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/admin/jobs' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/jobs')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/admin/jobs' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <Briefcase className="mr-2 h-4 w-4" />
                 Jobs
@@ -153,7 +153,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/admin/amendments' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/amendments')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/admin/amendments' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <Clock className="mr-2 h-4 w-4" />
                 Amendments
@@ -161,7 +161,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/admin/reports' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/reports')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/admin/reports' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Reports
@@ -182,7 +182,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/clock' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/clock')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/clock' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <Clock className="mr-2 h-4 w-4" />
                 Clock In/Out
@@ -190,7 +190,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/timesheets' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/timesheets')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/timesheets' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Timesheets
@@ -198,7 +198,7 @@ export const Navigation: React.FC = () => {
               <Button
                 variant={location.pathname === '/profile' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/profile')}
-                className="text-white hover:bg-gray-800"
+                className={location.pathname === '/profile' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:bg-gray-800'}
               >
                 <User className="mr-2 h-4 w-4" />
                 Profile
