@@ -103,17 +103,69 @@ export default function AdminReports() {
       const weekStart = new Date(selectedWeek);
       const weekEnd = addDays(weekStart, 6);
 
-      // Fetch workers and their data
+      // Get manager's organization first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        throw new Error("User not authenticated");
+      }
+
+      const { data: manager } = await supabase
+        .from("managers")
+        .select("organization_id")
+        .eq("email", user.email)
+        .single();
+
+      if (!manager?.organization_id) {
+        // Check if super_admin
+        const { data: superAdmin } = await supabase
+          .from("super_admins")
+          .select("organization_id")
+          .eq("email", user.email)
+          .single();
+
+        if (!superAdmin?.organization_id) {
+          throw new Error("No organization found for user");
+        }
+        
+        // Use super admin's organization
+        const { data: workers, error: workersError } = await supabase
+          .from("workers")
+          .select("id, name, email, hourly_rate")
+          .eq("is_active", true)
+          .eq("organization_id", superAdmin.organization_id);
+
+        if (workersError) throw workersError;
+
+        await processWorkersData(workers || [], weekStart, weekEnd);
+        return;
+      }
+
+      // Fetch workers from manager's organization only
       const { data: workers, error: workersError } = await supabase
         .from("workers")
         .select("id, name, email, hourly_rate")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("organization_id", manager.organization_id);
 
       if (workersError) throw workersError;
 
-      const reportData: WeeklyData[] = [];
+      await processWorkersData(workers || [], weekStart, weekEnd);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      for (const worker of workers || []) {
+  const processWorkersData = async (workers: any[], weekStart: Date, weekEnd: Date) => {
+    const reportData: WeeklyData[] = [];
+
+    for (const worker of workers) {
         // Unified hour calculation: Get clock entries with joined job data for this worker during the week
         // Date filtering: weekStart (inclusive) to weekStart + 7 days (exclusive)
         // Only include completed entries (non-null clock_out) for weekly summary
@@ -201,19 +253,9 @@ export default function AdminReports() {
           total_amount: totalHours * worker.hourly_rate + additionalCosts,
           profile_photo: photoData?.[0]?.clock_in_photo || undefined,
         });
-      }
-
-      setWeeklyData(reportData);
-    } catch (error) {
-      console.error("Error generating report:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate report",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
+
+    setWeeklyData(reportData);
   };
 
   const generateDetailedReport = async () => {
