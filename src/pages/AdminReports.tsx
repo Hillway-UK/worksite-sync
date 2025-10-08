@@ -67,7 +67,7 @@ interface DetailedEntry {
 export default function AdminReports() {
   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
   const [detailedData, setDetailedData] = useState<DetailedEntry[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 6 }), 'yyyy-MM-dd'));
+  const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
   const [loading, setLoading] = useState(false);
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
