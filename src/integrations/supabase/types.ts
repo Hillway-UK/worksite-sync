@@ -1084,6 +1084,17 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      reconcile_subscription_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          new_managers: number
+          new_workers: number
+          old_managers: number
+          old_workers: number
+          org_id: string
+          org_name: string
+        }[]
+      }
       upgrade_subscription_plan: {
         Args: {
           p_new_max_managers: number
