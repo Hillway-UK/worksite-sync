@@ -12,6 +12,7 @@ export const Navigation: React.FC = () => {
   const { user, userRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
+  const [organizationLogo, setOrganizationLogo] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrganizationName();
@@ -31,12 +32,13 @@ export const Navigation: React.FC = () => {
         if (manager?.organization_id) {
           const { data: org } = await supabase
             .from('organizations')
-            .select('name')
+            .select('name, logo_url')
             .eq('id', manager.organization_id)
             .single();
           
-          if (org?.name) {
-            setOrganizationName(org.name);
+          if (org) {
+            setOrganizationName(org.name || '');
+            setOrganizationLogo(org.logo_url);
           }
         }
       } else if (userRole === 'worker') {
@@ -49,12 +51,13 @@ export const Navigation: React.FC = () => {
         if (worker?.organization_id) {
           const { data: org } = await supabase
             .from('organizations')
-            .select('name')
+            .select('name, logo_url')
             .eq('id', worker.organization_id)
             .single();
           
-          if (org?.name) {
-            setOrganizationName(org.name);
+          if (org) {
+            setOrganizationName(org.name || '');
+            setOrganizationLogo(org.logo_url);
           }
         }
       }
@@ -95,10 +98,21 @@ export const Navigation: React.FC = () => {
             <span className="font-bold text-xl text-white hover:text-gray-200">
               AutoTime
             </span>
-            {organizationName && (
-              <span className="ml-3 text-sm text-gray-300 border-l border-gray-500 pl-3">
-                {organizationName}
-              </span>
+            {(organizationLogo || organizationName) && (
+              <div className="ml-3 flex items-center border-l border-gray-500 pl-3">
+                {organizationLogo ? (
+                  <img 
+                    src={organizationLogo} 
+                    alt={organizationName || 'Organization logo'}
+                    className="h-10 w-auto max-w-[200px] object-contain"
+                    onError={() => setOrganizationLogo(null)}
+                  />
+                ) : (
+                  <span className="text-sm text-gray-300">
+                    {organizationName}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 

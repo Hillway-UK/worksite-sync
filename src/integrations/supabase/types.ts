@@ -624,6 +624,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          logo_url: string | null
           name: string
           phone: string | null
           stripe_customer_id: string | null
@@ -641,6 +642,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          logo_url?: string | null
           name: string
           phone?: string | null
           stripe_customer_id?: string | null
@@ -658,6 +660,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
           phone?: string | null
           stripe_customer_id?: string | null

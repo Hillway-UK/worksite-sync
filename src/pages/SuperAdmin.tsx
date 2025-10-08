@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { generateSecurePassword } from '@/lib/validation';
 import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
+import { OrganizationLogoUpload } from '@/components/OrganizationLogoUpload';
 
 const SUBSCRIPTION_PLANS = {
   trial: {
@@ -98,6 +99,8 @@ export default function SuperAdmin() {
     phone: '',
     address: '',
     company_number: '',
+    logo_url: null as string | null,
+    organizationId: null as string | null,
     vat_number: '',
     subscriptionPlan: 'starter' as SubscriptionPlan,
     plannedManagers: 2,
@@ -112,6 +115,7 @@ export default function SuperAdmin() {
     address: '',
     company_number: '',
     vat_number: '',
+    logo_url: null as string | null,
     subscriptionPlan: 'starter' as SubscriptionPlan,
     plannedManagers: 1,
     plannedWorkers: 0,
@@ -392,6 +396,8 @@ export default function SuperAdmin() {
         phone: '', 
         address: '', 
         company_number: '', 
+        logo_url: null,
+        organizationId: null,
         vat_number: '', 
         subscriptionPlan: 'starter',
         plannedManagers: 2, 
@@ -619,6 +625,7 @@ Please change your password on first login for security.`;
         address: org.address || '',
         company_number: org.company_number || '',
         vat_number: org.vat_number || '',
+        logo_url: org.logo_url || null,
         subscriptionPlan: currentPlan,
         plannedManagers: usageData?.planned_number_of_managers || 1,
         plannedWorkers: usageData?.planned_number_of_workers || 0,
@@ -710,6 +717,7 @@ Please change your password on first login for security.`;
         address: '',
         company_number: '',
         vat_number: '',
+        logo_url: null,
         subscriptionPlan: 'starter',
         plannedManagers: 1,
         plannedWorkers: 0,
@@ -1052,6 +1060,15 @@ Please change your password on first login for security.`;
                 placeholder="Enter VAT number"
               />
             </div>
+
+            {orgForm.organizationId && (
+              <OrganizationLogoUpload
+                organizationId={orgForm.organizationId}
+                currentLogoUrl={orgForm.logo_url}
+                onUploadComplete={(logoUrl) => setOrgForm({...orgForm, logo_url: logoUrl})}
+                onDeleteComplete={() => setOrgForm({...orgForm, logo_url: null})}
+              />
+            )}
             
             <div>
               <Label htmlFor="org-subscription-plan">Subscription Plan *</Label>
@@ -1211,6 +1228,17 @@ Please change your password on first login for security.`;
                   placeholder="Enter VAT number"
                 />
               </div>
+            </div>
+
+            {/* Logo Upload Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <div className="text-sm font-semibold text-foreground">Organization Logo</div>
+              <OrganizationLogoUpload
+                organizationId={updateOrgForm.organizationId}
+                currentLogoUrl={updateOrgForm.logo_url}
+                onUploadComplete={(logoUrl) => setUpdateOrgForm({...updateOrgForm, logo_url: logoUrl})}
+                onDeleteComplete={() => setUpdateOrgForm({...updateOrgForm, logo_url: null})}
+              />
             </div>
 
             {/* Subscription Capacity Section */}
