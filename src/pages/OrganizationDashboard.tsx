@@ -166,9 +166,6 @@ export default function OrganizationDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalWorkers}</div>
-              <p className="text-xs text-muted-foreground">
-                Limit: {organization?.max_workers || 10}
-              </p>
             </CardContent>
           </Card>
 
@@ -179,9 +176,6 @@ export default function OrganizationDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalManagers}</div>
-              <p className="text-xs text-muted-foreground">
-                Limit: {organization?.max_managers || 2}
-              </p>
             </CardContent>
           </Card>
 
@@ -303,7 +297,7 @@ export default function OrganizationDashboard() {
                     <div className="p-4 border rounded-lg">
                       <h4 className="font-medium mb-2">Workers</h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {stats.totalWorkers} / {organization?.max_workers || 10} active
+                        {stats.totalWorkers} active
                       </p>
                       <Button size="sm" variant="outline" disabled>
                         Manage Workers
@@ -312,7 +306,7 @@ export default function OrganizationDashboard() {
                     <div className="p-4 border rounded-lg">
                       <h4 className="font-medium mb-2">Managers</h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {stats.totalManagers} / {organization?.max_managers || 2} active
+                        {stats.totalManagers} active
                       </p>
                       <Button size="sm" variant="outline" disabled>
                         Manage Managers

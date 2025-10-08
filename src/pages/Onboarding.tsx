@@ -136,7 +136,7 @@ export default function Onboarding() {
 
       if (authError) throw authError;
 
-      // Create organization
+      // Create organization (without max_workers/max_managers)
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
@@ -144,8 +144,6 @@ export default function Onboarding() {
           address: orgData.address || null,
           phone: orgData.phone || null,
           email: orgData.admin_email,
-          max_workers: orgData.workerCount,
-          max_managers: orgData.managerCount,
           subscription_status: 'pending_payment'
         })
         .select()

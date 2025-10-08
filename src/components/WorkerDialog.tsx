@@ -291,28 +291,16 @@ Please change your password on first login for security.`;
               const currentCount = parseInt(match[1]);
               const plannedCount = parseInt(match[2]);
 
-              // Get organization capacity info for display
-              const { data: orgData } = await supabase
-                .from("organizations")
-                .select("max_workers, subscription_status")
-                .eq("id", managerData.organization_id)
-                .single();
-
-              const planName =
-                orgData?.subscription_status === "trial"
-                  ? "Trial"
-                  : orgData?.max_workers === 10
-                    ? "Starter"
-                    : orgData?.max_workers === 100
-                      ? "Pro"
-                      : "Enterprise";
+              // Use capacity limit from error message
+              const planName = 'Current Plan';
+              const maxAllowed = plannedCount; // Use plannedCount as the limit
 
               // Use callback if provided, otherwise show toast
               if (onCapacityLimit) {
                 onCapacityLimit({
                   currentCount,
                   plannedCount,
-                  maxAllowed: orgData?.max_workers || null,
+                  maxAllowed,
                   planName,
                 });
                 setOpen(false);

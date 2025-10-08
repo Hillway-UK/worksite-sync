@@ -12,8 +12,8 @@ export interface OrganizationSetupData {
   address?: string;
   adminEmail: string;
   adminName: string;
-  maxWorkers?: number;
-  maxManagers?: number;
+  plannedWorkers?: number;
+  plannedManagers?: number;
 }
 
 /**
@@ -22,7 +22,7 @@ export interface OrganizationSetupData {
  */
 export const createOrganization = async (data: OrganizationSetupData): Promise<string> => {
   try {
-    // Create organization
+    // Create organization (capacity managed via subscription_usage)
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .insert({
@@ -30,14 +30,29 @@ export const createOrganization = async (data: OrganizationSetupData): Promise<s
         email: data.email,
         phone: data.phone,
         address: data.address,
-        subscription_status: 'active',
-        max_workers: data.maxWorkers || 10,
-        max_managers: data.maxManagers || 2,
+        subscription_status: 'active'
       })
       .select()
       .single();
 
     if (orgError) throw orgError;
+
+    // Create initial subscription_usage record
+    const { error: subError } = await supabase
+      .from('subscription_usage')
+      .insert({
+        organization_id: org.id,
+        month: new Date().toISOString().split('T')[0],
+        planned_number_of_managers: data.plannedManagers || 2,
+        planned_number_of_workers: data.plannedWorkers || 10,
+        active_managers: 0,
+        active_workers: 0,
+        status: 'active',
+        effective_start_date: new Date().toISOString().split('T')[0],
+        plan_type: 'starter'
+      });
+
+    if (subError) console.error('Error creating subscription:', subError);
 
     return org.id;
   } catch (error) {
@@ -85,21 +100,39 @@ INSERT INTO public.organizations (
   email, 
   phone, 
   address, 
-  subscription_status,
-  max_workers,
-  max_managers
+  subscription_status
 ) VALUES (
   '${data.name}',
   '${data.email}',
   ${data.phone ? `'${data.phone}'` : 'NULL'},
   ${data.address ? `'${data.address}'` : 'NULL'},
-  'active',
-  ${data.maxWorkers || 10},
-  ${data.maxManagers || 2}
+  'active'
 ) RETURNING id;
 
--- Step 2: Create Manager (run after creating auth user)
--- Replace ORGANIZATION_ID_FROM_ABOVE with the ID returned from step 1
+-- Step 2: Create subscription_usage record
+INSERT INTO public.subscription_usage (
+  organization_id,
+  month,
+  planned_number_of_managers,
+  planned_number_of_workers,
+  active_managers,
+  active_workers,
+  status,
+  effective_start_date,
+  plan_type
+) VALUES (
+  'ORGANIZATION_ID_FROM_ABOVE',
+  CURRENT_DATE,
+  ${data.plannedManagers || 2},
+  ${data.plannedWorkers || 10},
+  0,
+  0,
+  'active',
+  CURRENT_DATE,
+  'starter'
+);
+
+-- Step 3: Create Manager (run after creating auth user)
 INSERT INTO public.managers (
   email,
   name,
@@ -140,12 +173,12 @@ export const validateOrganizationData = (data: Partial<OrganizationSetupData>): 
     errors.push('Admin name is required');
   }
 
-  if (data.maxWorkers !== undefined && data.maxWorkers < 1) {
-    errors.push('Max workers must be at least 1');
+  if (data.plannedWorkers !== undefined && data.plannedWorkers < 0) {
+    errors.push('Planned workers must be at least 0');
   }
 
-  if (data.maxManagers !== undefined && data.maxManagers < 1) {
-    errors.push('Max managers must be at least 1');
+  if (data.plannedManagers !== undefined && data.plannedManagers < 1) {
+    errors.push('Planned managers must be at least 1');
   }
 
   return errors;

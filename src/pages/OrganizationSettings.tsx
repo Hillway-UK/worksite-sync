@@ -20,8 +20,6 @@ interface Organization {
   address?: string;
   phone?: string;
   email?: string;
-  max_workers: number;
-  max_managers: number;
   subscription_status?: string;
 }
 
@@ -102,7 +100,7 @@ export default function OrganizationSettings() {
   };
 
   const updateSubscription = async (newManagerCount: number, newWorkerCount: number) => {
-    if (!organization) return;
+    if (!organization || !activeSubscription) return;
     
     setUpdating(true);
     try {
@@ -116,11 +114,8 @@ export default function OrganizationSettings() {
 
       if (error) throw error;
 
-      setOrganization(prev => prev ? {
-        ...prev,
-        max_managers: newManagerCount,
-        max_workers: newWorkerCount
-      } : null);
+      // Refresh subscription data
+      await fetchOrganization();
 
       toast.success('Subscription updated successfully');
     } catch (error: any) {
@@ -276,64 +271,68 @@ export default function OrganizationSettings() {
             <CardTitle>Subscription Management</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <Label>Manager Licenses</Label>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => updateSubscription(Math.max(1, organization.max_managers - 1), organization.max_workers)}
-                    disabled={updating || organization.max_managers <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-16 text-center font-semibold">{organization.max_managers}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => updateSubscription(organization.max_managers + 1, organization.max_workers)}
-                    disabled={updating}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-gray-600 mt-1">£25/month per manager</p>
-              </div>
+            {activeSubscription && (
+              <>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Manager Licenses</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateSubscription(Math.max(1, activeSubscription.planned_number_of_managers - 1), activeSubscription.planned_number_of_workers)}
+                        disabled={updating || activeSubscription.planned_number_of_managers <= 1}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="w-16 text-center font-semibold">{activeSubscription.planned_number_of_managers}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateSubscription(activeSubscription.planned_number_of_managers + 1, activeSubscription.planned_number_of_workers)}
+                        disabled={updating}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">£25/month per manager</p>
+                  </div>
 
-              <div>
-                <Label>Worker Licenses</Label>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => updateSubscription(organization.max_managers, Math.max(0, organization.max_workers - 1))}
-                    disabled={updating || organization.max_workers <= 0}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-16 text-center font-semibold">{organization.max_workers}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => updateSubscription(organization.max_managers, organization.max_workers + 1)}
-                    disabled={updating}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <div>
+                    <Label>Worker Licenses</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateSubscription(activeSubscription.planned_number_of_managers, Math.max(0, activeSubscription.planned_number_of_workers - 1))}
+                        disabled={updating || activeSubscription.planned_number_of_workers <= 0}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="w-16 text-center font-semibold">{activeSubscription.planned_number_of_workers}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => updateSubscription(activeSubscription.planned_number_of_managers, activeSubscription.planned_number_of_workers + 1)}
+                        disabled={updating}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">£1.50/month per worker</p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">£1.50/month per worker</p>
-              </div>
-            </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">Current Monthly Cost:</span>
-                <span className="text-xl font-bold text-black">
-                  £{((organization.max_managers * 25) + (organization.max_workers * 1.5)).toFixed(2)}
-                </span>
-              </div>
-              </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Current Monthly Cost:</span>
+                    <span className="text-xl font-bold text-black">
+                      £{((activeSubscription.planned_number_of_managers * 25) + (activeSubscription.planned_number_of_workers * 1.5)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             </CardContent>
           </Card>
             </div>

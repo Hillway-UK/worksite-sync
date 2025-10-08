@@ -335,7 +335,7 @@ export default function SuperAdmin() {
       const dates = calculateSubscriptionDates(orgForm.subscriptionPlan);
       const totalCost = calculateTotalCost(orgForm.subscriptionPlan, orgForm.plannedManagers, orgForm.plannedWorkers);
 
-      // Insert into organizations table
+      // Insert into organizations table (without max_managers/max_workers)
       const { data, error } = await supabase
         .from('organizations')
         .insert({
@@ -348,9 +348,7 @@ export default function SuperAdmin() {
           subscription_status: orgForm.subscriptionPlan === 'trial' ? 'trial' : 'active',
           subscription_start_date: dates.subscription_start_date,
           subscription_end_date: dates.subscription_end_date,
-          trial_ends_at: dates.trial_ends_at,
-          max_workers: planConfig.maxWorkers,
-          max_managers: planConfig.maxManagers
+          trial_ends_at: dates.trial_ends_at
         })
         .select()
         .single();

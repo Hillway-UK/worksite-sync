@@ -624,8 +624,6 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
-          max_managers: number | null
-          max_workers: number | null
           name: string
           phone: string | null
           stripe_customer_id: string | null
@@ -643,8 +641,6 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
-          max_managers?: number | null
-          max_workers?: number | null
           name: string
           phone?: string | null
           stripe_customer_id?: string | null
@@ -662,8 +658,6 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
-          max_managers?: number | null
-          max_workers?: number | null
           name?: string
           phone?: string | null
           stripe_customer_id?: string | null
@@ -1022,13 +1016,6 @@ export type Database = {
           is_manager: boolean
           is_super_admin: boolean
           organization_id: string
-        }[]
-      }
-      get_plan_limits: {
-        Args: { p_month: string; p_org: string }
-        Returns: {
-          planned_managers: number
-          planned_workers: number
         }[]
       }
       get_recent_activity: {
