@@ -360,7 +360,7 @@ Please change your password on first login for security.`;
         <DialogTrigger asChild>
           {trigger || defaultTrigger}
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto pr-12">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto pr-12 pl-12">
           <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
             <DialogTitle>
               {worker ? 'Edit Worker' : 'Add New Worker'}
