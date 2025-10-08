@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { generateSecurePassword } from '@/lib/validation';
 import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
-import { OrganizationLogoUpload } from '@/components/OrganizationLogoUpload';
+import { OrganizationLogoUpload, OrganizationLogoUploadRef } from '@/components/OrganizationLogoUpload';
 
 const SUBSCRIPTION_PLANS = {
   trial: {
@@ -99,13 +99,14 @@ export default function SuperAdmin() {
     phone: '',
     address: '',
     company_number: '',
-    logo_url: null as string | null,
-    organizationId: null as string | null,
     vat_number: '',
     subscriptionPlan: 'starter' as SubscriptionPlan,
     plannedManagers: 2,
     plannedWorkers: 10
   });
+
+  const [stagedLogoFile, setStagedLogoFile] = useState<File | null>(null);
+  const logoUploadRef = useRef<OrganizationLogoUploadRef>(null);
 
   const [updateOrgForm, setUpdateOrgForm] = useState({
     organizationId: '',
@@ -362,6 +363,19 @@ export default function SuperAdmin() {
         return;
       }
 
+      // Upload staged logo if present
+      let logoUrl: string | null = null;
+      if (stagedLogoFile && logoUploadRef.current) {
+        logoUrl = await logoUploadRef.current.uploadStagedFile(data.id);
+        
+        if (logoUrl) {
+          await supabase
+            .from('organizations')
+            .update({ logo_url: logoUrl })
+            .eq('id', data.id);
+        }
+      }
+
       // Create subscription_usage record with new schema
       const { error: usageError } = await supabase
         .from('subscription_usage')
@@ -386,7 +400,8 @@ export default function SuperAdmin() {
         toast.error('Organization created but subscription tracking failed');
       } else {
         const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free Trial';
-        toast.success(`Organization created with ${planConfig.label} plan (${costDisplay})`);
+        const logoMessage = logoUrl ? ' with logo' : '';
+        toast.success(`Organization created${logoMessage} with ${planConfig.label} plan (${costDisplay})`);
       }
       
       setShowOrgDialog(false);
@@ -396,13 +411,12 @@ export default function SuperAdmin() {
         phone: '', 
         address: '', 
         company_number: '', 
-        logo_url: null,
-        organizationId: null,
         vat_number: '', 
         subscriptionPlan: 'starter',
         plannedManagers: 2, 
         plannedWorkers: 10 
       });
+      setStagedLogoFile(null);
       await fetchOrganizations();
     } catch (err: any) {
       toast.error('An unexpected error occurred');
@@ -999,7 +1013,12 @@ Please change your password on first login for security.`;
       </Card>
 
       {/* Organization Dialog */}
-      <Dialog open={showOrgDialog} onOpenChange={setShowOrgDialog}>
+        <Dialog open={showOrgDialog} onOpenChange={(open) => {
+          if (!open) {
+            setStagedLogoFile(null);
+          }
+          setShowOrgDialog(open);
+        }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Organization</DialogTitle>
@@ -1061,14 +1080,15 @@ Please change your password on first login for security.`;
               />
             </div>
 
-            {orgForm.organizationId && (
+            <div className="space-y-4">
               <OrganizationLogoUpload
-                organizationId={orgForm.organizationId}
-                currentLogoUrl={orgForm.logo_url}
-                onUploadComplete={(logoUrl) => setOrgForm({...orgForm, logo_url: logoUrl})}
-                onDeleteComplete={() => setOrgForm({...orgForm, logo_url: null})}
+                ref={logoUploadRef}
+                mode="staged"
+                onFileSelected={(file) => setStagedLogoFile(file)}
+                currentLogoUrl={null}
+                onUploadComplete={() => {}}
               />
-            )}
+            </div>
             
             <div>
               <Label htmlFor="org-subscription-plan">Subscription Plan *</Label>

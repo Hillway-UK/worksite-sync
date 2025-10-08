@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -6,24 +6,33 @@ import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 interface OrganizationLogoUploadProps {
-  organizationId: string;
+  organizationId?: string;
   currentLogoUrl?: string | null;
   onUploadComplete: (logoUrl: string) => void;
   onDeleteComplete?: () => void;
+  mode?: 'immediate' | 'staged';
+  onFileSelected?: (file: File | null) => void;
+}
+
+export interface OrganizationLogoUploadRef {
+  uploadStagedFile: (orgId: string) => Promise<string | null>;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 
-export function OrganizationLogoUpload({
+export const OrganizationLogoUpload = forwardRef<OrganizationLogoUploadRef, OrganizationLogoUploadProps>(({
   organizationId,
   currentLogoUrl,
   onUploadComplete,
   onDeleteComplete,
-}: OrganizationLogoUploadProps) {
+  mode = 'immediate',
+  onFileSelected,
+}, ref) => {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentLogoUrl || null);
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
@@ -45,6 +54,25 @@ export function OrganizationLogoUpload({
       toast({
         title: "Invalid File",
         description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Staged mode: just store the file and preview
+    if (mode === 'staged') {
+      const previewUrl = URL.createObjectURL(file);
+      setPreviewUrl(previewUrl);
+      setStagedFile(file);
+      onFileSelected?.(file);
+      return;
+    }
+
+    // Immediate mode: upload right away
+    if (!organizationId) {
+      toast({
+        title: "Error",
+        description: "Organization ID is required for upload",
         variant: "destructive",
       });
       return;
@@ -107,8 +135,52 @@ export function OrganizationLogoUpload({
     }
   };
 
+  const uploadStagedFile = async (orgId: string): Promise<string | null> => {
+    if (!stagedFile) return null;
+
+    try {
+      const fileExt = stagedFile.name.split(".").pop();
+      const filePath = `${orgId}/logo.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("organization-logos")
+        .upload(filePath, stagedFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("organization-logos")
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error: any) {
+      console.error("Error uploading staged logo:", error);
+      toast({
+        title: "Logo Upload Failed",
+        description: "Organization created but logo upload failed. You can upload it from Edit.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    uploadStagedFile,
+  }));
+
   const handleDelete = async () => {
-    if (!currentLogoUrl) return;
+    // In staged mode, just clear the preview
+    if (mode === 'staged') {
+      setPreviewUrl(null);
+      setStagedFile(null);
+      onFileSelected?.(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    if (!currentLogoUrl || !organizationId) return;
 
     setDeleting(true);
 
@@ -215,4 +287,4 @@ export function OrganizationLogoUpload({
       </div>
     </div>
   );
-}
+});
