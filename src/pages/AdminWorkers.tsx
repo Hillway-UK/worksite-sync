@@ -540,6 +540,7 @@ export default function AdminWorkers() {
           onOpenChange={setWorkerDialogOpen}
           onSave={fetchWorkers}
           onCapacityLimit={handleWorkerCapacityLimit}
+          trigger={<div />}
         />
 
         <PhotoModal
