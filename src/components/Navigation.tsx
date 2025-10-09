@@ -10,64 +10,32 @@ import { WorkerNotifications } from '@/components/WorkerNotifications';
 export const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, userRole } = useAuth();
+  const { user, userRole, organization } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [organizationName, setOrganizationName] = useState<string>('');
-  const [organizationLogo, setOrganizationLogo] = useState<string | null>(null);
   const [workerId, setWorkerId] = useState<string | null>(null);
 
+  // Fetch workerId only for workers (needed for notifications)
   useEffect(() => {
-    fetchOrganizationName();
-  }, [user, userRole]);
-
-  const fetchOrganizationName = async () => {
-    if (!user?.email) return;
-    
-    try {
-      if (userRole === 'manager') {
-        const { data: manager } = await supabase
-          .from('managers')
-          .select('organization_id')
-          .eq('email', user.email)
-          .single();
-        
-        if (manager?.organization_id) {
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('name, logo_url')
-            .eq('id', manager.organization_id)
-            .single();
-          
-          if (org) {
-            setOrganizationName(org.name || '');
-            setOrganizationLogo(org.logo_url);
-          }
-        }
-      } else if (userRole === 'worker') {
+    const fetchWorkerId = async () => {
+      if (!user?.email || userRole !== 'worker') return;
+      
+      try {
         const { data: worker } = await supabase
           .from('workers')
-          .select('id, organization_id')
+          .select('id')
           .eq('email', user.email)
           .single();
         
-        if (worker?.organization_id) {
+        if (worker) {
           setWorkerId(worker.id);
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('name, logo_url')
-            .eq('id', worker.organization_id)
-            .single();
-          
-          if (org) {
-            setOrganizationName(org.name || '');
-            setOrganizationLogo(org.logo_url);
-          }
         }
+      } catch (error) {
+        console.error('Error fetching worker ID:', error);
       }
-    } catch (error) {
-      console.error('Error fetching organization:', error);
-    }
-  };
+    };
+
+    fetchWorkerId();
+  }, [user?.email, userRole]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -101,18 +69,17 @@ export const Navigation: React.FC = () => {
             <span className="font-bold text-xl text-white hover:text-gray-200">
               AutoTime
             </span>
-            {(organizationLogo || organizationName) && (
+            {(organization?.logo_url || organization?.name) && (
               <div className="ml-3 flex items-center border-l border-gray-500 pl-3">
-                {organizationLogo ? (
+                {organization?.logo_url ? (
                   <img 
-                    src={organizationLogo} 
-                    alt={organizationName || 'Organization logo'}
+                    src={organization.logo_url} 
+                    alt={organization.name || 'Organization logo'}
                     className="h-10 w-auto max-w-[200px] object-contain"
-                    onError={() => setOrganizationLogo(null)}
                   />
                 ) : (
                   <span className="text-sm text-gray-300">
-                    {organizationName}
+                    {organization?.name}
                   </span>
                 )}
               </div>
