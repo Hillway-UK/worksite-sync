@@ -61,40 +61,143 @@ export default function AdminAmendments() {
   };
 
   const handleApproval = async (amendmentId: string, status: 'approved' | 'rejected') => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'Not authenticated',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: manager } = await supabase
+      // Step 1: Get manager details
+      const { data: manager, error: managerError } = await supabase
         .from('managers')
-        .select('name')
-        .eq('email', user?.email)
+        .select('id, name, email')
+        .eq('email', user.email)
         .single();
 
-      const { error } = await supabase
+      if (managerError || !manager) {
+        throw new Error('Manager not found');
+      }
+
+      // Step 2: Get full amendment details including clock entry info
+      const { data: amendment, error: amendmentFetchError } = await supabase
+        .from('time_amendments')
+        .select(`
+          *,
+          clock_entries:clock_entry_id(
+            id,
+            clock_in,
+            clock_out,
+            total_hours,
+            worker_id
+          )
+        `)
+        .eq('id', amendmentId)
+        .single();
+
+      if (amendmentFetchError || !amendment) {
+        throw new Error('Amendment not found');
+      }
+
+      console.log('[AMENDMENT-APPROVAL] Processing amendment:', {
+        amendmentId,
+        status,
+        workerId: amendment.worker_id,
+        currentClockIn: amendment.clock_entries?.clock_in,
+        requestedClockIn: amendment.requested_clock_in,
+        currentClockOut: amendment.clock_entries?.clock_out,
+        requestedClockOut: amendment.requested_clock_out
+      });
+
+      // Step 3: Update amendment status
+      // The database trigger will automatically update clock_entries if status='approved'
+      const { error: updateError } = await supabase
         .from('time_amendments')
         .update({
           status,
           manager_notes: managerNotes,
           processed_at: new Date().toISOString(),
-          approved_by: manager?.name || user?.email,
-          approved_at: status === 'approved' ? new Date().toISOString() : null
+          approved_by: manager.name,
+          approved_at: status === 'approved' ? new Date().toISOString() : null,
+          manager_id: manager.id
         })
         .eq('id', amendmentId);
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('[AMENDMENT-APPROVAL] Failed to update amendment:', updateError);
+        throw new Error(`Failed to ${status} amendment: ${updateError.message}`);
+      }
 
-      toast({
-        title: `Amendment ${status}`,
-        description: `Time amendment has been ${status}.`,
+      console.log('[AMENDMENT-APPROVAL] Amendment updated successfully');
+
+      // Step 4: Verify clock entry was updated (for approved amendments)
+      if (status === 'approved') {
+        const { data: updatedClockEntry, error: verifyError } = await supabase
+          .from('clock_entries')
+          .select('clock_in, clock_out, total_hours')
+          .eq('id', amendment.clock_entry_id)
+          .single();
+
+        if (verifyError) {
+          console.error('[AMENDMENT-APPROVAL] Failed to verify clock entry update:', verifyError);
+          // Rollback amendment approval
+          await supabase
+            .from('time_amendments')
+            .update({ 
+              status: 'pending',
+              processed_at: null,
+              approved_by: null,
+              approved_at: null
+            })
+            .eq('id', amendmentId);
+          
+          throw new Error('Clock entry update failed - amendment reverted to pending');
+        }
+
+        console.log('[AMENDMENT-APPROVAL] Clock entry verified:', updatedClockEntry);
+      }
+
+      // Step 5: Send notification (non-blocking)
+      supabase.functions.invoke('send-amendment-notification', {
+        body: {
+          worker_id: amendment.worker_id,
+          amendment_id: amendmentId,
+          status,
+          manager_name: manager.name,
+          requested_clock_in: amendment.requested_clock_in,
+          requested_clock_out: amendment.requested_clock_out,
+          manager_notes: managerNotes
+        }
+      }).then(({ error: notifError }) => {
+        if (notifError) {
+          console.error('[AMENDMENT-APPROVAL] Notification failed:', notifError);
+        } else {
+          console.log('[AMENDMENT-APPROVAL] Notification sent');
+        }
       });
 
+      // Step 6: Show success message
+      toast({
+        title: `Amendment ${status}`,
+        description: status === 'approved' 
+          ? 'Time amendment approved and clock entry updated. Worker has been notified.'
+          : 'Time amendment rejected. Worker has been notified.',
+      });
+
+      // Step 7: Close dialog and refresh
       setSelectedAmendment(null);
       setManagerNotes('');
       fetchAmendments();
+
     } catch (error) {
-      console.error('Error updating amendment:', error);
+      console.error('[AMENDMENT-APPROVAL] Error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update amendment.',
+        description: error.message || 'Failed to process amendment.',
         variant: 'destructive',
       });
     }

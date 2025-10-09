@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { WorkerNotifications } from '@/components/WorkerNotifications';
 
 export const Navigation: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export const Navigation: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [organizationLogo, setOrganizationLogo] = useState<string | null>(null);
+  const [workerId, setWorkerId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrganizationName();
@@ -44,11 +46,12 @@ export const Navigation: React.FC = () => {
       } else if (userRole === 'worker') {
         const { data: worker } = await supabase
           .from('workers')
-          .select('organization_id')
+          .select('id, organization_id')
           .eq('email', user.email)
           .single();
         
         if (worker?.organization_id) {
+          setWorkerId(worker.id);
           const { data: org } = await supabase
             .from('organizations')
             .select('name, logo_url')
@@ -193,6 +196,7 @@ export const Navigation: React.FC = () => {
 
           {userRole === 'worker' && (
             <div className="hidden md:flex items-center space-x-2">
+              {workerId && <WorkerNotifications workerId={workerId} />}
               <Button
                 variant={location.pathname === '/clock' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/clock')}

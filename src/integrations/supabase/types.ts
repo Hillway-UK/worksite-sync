@@ -281,6 +281,72 @@ export type Database = {
           },
         ]
       }
+      clock_entry_history: {
+        Row: {
+          amendment_id: string | null
+          change_type: string
+          changed_at: string
+          changed_by: string
+          clock_entry_id: string
+          id: string
+          metadata: Json | null
+          new_clock_in: string | null
+          new_clock_out: string | null
+          new_total_hours: number | null
+          notes: string | null
+          old_clock_in: string | null
+          old_clock_out: string | null
+          old_total_hours: number | null
+        }
+        Insert: {
+          amendment_id?: string | null
+          change_type: string
+          changed_at?: string
+          changed_by: string
+          clock_entry_id: string
+          id?: string
+          metadata?: Json | null
+          new_clock_in?: string | null
+          new_clock_out?: string | null
+          new_total_hours?: number | null
+          notes?: string | null
+          old_clock_in?: string | null
+          old_clock_out?: string | null
+          old_total_hours?: number | null
+        }
+        Update: {
+          amendment_id?: string | null
+          change_type?: string
+          changed_at?: string
+          changed_by?: string
+          clock_entry_id?: string
+          id?: string
+          metadata?: Json | null
+          new_clock_in?: string | null
+          new_clock_out?: string | null
+          new_total_hours?: number | null
+          notes?: string | null
+          old_clock_in?: string | null
+          old_clock_out?: string | null
+          old_total_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clock_entry_history_amendment_id_fkey"
+            columns: ["amendment_id"]
+            isOneToOne: false
+            referencedRelation: "time_amendments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_entry_history_clock_entry_id_fkey"
+            columns: ["clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           admin_users: number | null

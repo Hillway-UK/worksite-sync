@@ -81,3 +81,6 @@ verify_jwt = true
 
 [functions.upgrade-subscription-plan]
 verify_jwt = true
+
+[functions.send-amendment-notification]
+verify_jwt = false
