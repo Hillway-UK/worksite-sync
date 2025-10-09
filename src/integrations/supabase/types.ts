@@ -1226,6 +1226,10 @@ export type Database = {
         Args: { check_worker_id: string }
         Returns: boolean
       }
+      user_is_worker_in_org: {
+        Args: { check_org_id: string }
+        Returns: boolean
+      }
       validate_subscription_counts: {
         Args: Record<PropertyKey, never>
         Returns: {

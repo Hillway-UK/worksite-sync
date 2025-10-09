@@ -175,9 +175,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setOrganizationId(orgId);
 
         if (orgId) {
+          // Workers should only see basic organization info, not financial data
+          const selectFields = userRole === 'worker' 
+            ? 'id, name, logo_url, created_at'
+            : '*';
+          
           const { data: org } = await supabase
             .from('organizations')
-            .select('*')
+            .select(selectFields)
             .eq('id', orgId)
             .maybeSingle();
           if (!mounted) return;
