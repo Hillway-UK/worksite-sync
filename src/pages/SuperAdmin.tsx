@@ -862,17 +862,45 @@ Please change your password on first login for security.`;
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
-        <Button 
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/login');
-          }}
-          variant="outline"
-          className="border-black hover:bg-gray-100"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase.functions.invoke('reconcile-subscription', {
+                  body: { reason: 'manual_admin_trigger' }
+                });
+                
+                if (error) throw error;
+                
+                if (data.reconciled?.length > 0) {
+                  toast.success(`Reconciled ${data.reconciled.length} organization(s)`);
+                } else {
+                  toast.success('No discrepancies found');
+                }
+                
+                await fetchOrganizations();
+              } catch (error: any) {
+                toast.error('Reconciliation failed: ' + error.message);
+              }
+            }}
+            variant="outline"
+            className="border-primary hover:bg-primary/10"
+          >
+            <AlertCircle className="mr-2 h-4 w-4" />
+            Reconcile Subscriptions
+          </Button>
+          <Button 
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate('/login');
+            }}
+            variant="outline"
+            className="border-black hover:bg-gray-100"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
       <div className="mb-4 p-3 bg-muted rounded-lg">
         <p className="text-sm text-muted-foreground">

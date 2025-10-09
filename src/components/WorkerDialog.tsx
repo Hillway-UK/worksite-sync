@@ -299,8 +299,38 @@ Please change your password on first login for security.`;
           return;
         }
 
+        // Pre-insert capacity check
+        const { data: preCheck } = await supabase
+          .rpc('check_capacity_with_plan', { org_id: workerData.organization_id });
+        
+        const preInsertCount = preCheck?.[0]?.current_worker_count || 0;
+
         // Create worker database record
         const { error: workerError } = await supabase.from("workers").insert(workerData);
+
+        if (!workerError) {
+          // Post-insert verification
+          const { data: postCheck } = await supabase
+            .rpc('check_capacity_with_plan', { org_id: workerData.organization_id });
+          
+          const postInsertCount = postCheck?.[0]?.current_worker_count || 0;
+          const expectedCount = preInsertCount + 1;
+          
+          // Verify counter was incremented correctly
+          if (postInsertCount !== expectedCount) {
+            console.error('Worker count mismatch detected after insert', {
+              expected: expectedCount,
+              actual: postInsertCount,
+              preCount: preInsertCount,
+              workerEmail: workerData.email
+            });
+            
+            // Trigger reconciliation
+            await supabase.functions.invoke('reconcile-subscription', {
+              body: { organization_id: workerData.organization_id, reason: 'post_insert_mismatch' }
+            });
+          }
+        }
 
         if (workerError) {
           // Check if this is a capacity limit error from the database trigger

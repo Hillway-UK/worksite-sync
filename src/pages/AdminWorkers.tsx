@@ -16,6 +16,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 interface Worker {
   id: string;
@@ -27,6 +29,50 @@ interface Worker {
   created_at: string;
   profile_photo?: string;
 }
+
+const WorkerCapacityBadge = () => {
+  const { data: capacity, isLoading } = useQuery({
+    queryKey: ['worker-capacity'],
+    queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user?.user?.email) return null;
+
+      const { data: manager } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', user.user.email)
+        .single();
+
+      if (!manager?.organization_id) return null;
+
+      const { data } = await supabase
+        .rpc('check_capacity_with_plan', { org_id: manager.organization_id });
+
+      return data?.[0];
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  if (isLoading || !capacity) return null;
+
+  const current = capacity.current_worker_count;
+  const planned = capacity.planned_workers;
+  const isFull = planned !== 999999 && current >= planned;
+  const isNearLimit = planned !== 999999 && current >= planned * 0.8;
+
+  return (
+    <Badge 
+      variant={isFull ? "destructive" : isNearLimit ? "outline" : "secondary"}
+      className="ml-2"
+    >
+      {isFull && <AlertTriangle className="h-3 w-3 mr-1" />}
+      {!isFull && !isNearLimit && <CheckCircle2 className="h-3 w-3 mr-1" />}
+      {current}/{planned === 999999 ? '∞' : planned}
+      {isFull && " (Full)"}
+      {isNearLimit && !isFull && " (Near Limit)"}
+    </Badge>
+  );
+};
 
 export default function AdminWorkers() {
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -365,7 +411,10 @@ export default function AdminWorkers() {
 
         <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Workers ({workers.length})</CardTitle>
+            <div className="flex items-center gap-4">
+              <CardTitle>Workers ({workers.length})</CardTitle>
+              <WorkerCapacityBadge />
+            </div>
             <div className="flex gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

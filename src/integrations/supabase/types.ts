@@ -707,6 +707,47 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_audit_log: {
+        Row: {
+          action: string
+          after_count: number | null
+          before_count: number | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          trigger_source: string
+        }
+        Insert: {
+          action: string
+          after_count?: number | null
+          before_count?: number | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          trigger_source: string
+        }
+        Update: {
+          action?: string
+          after_count?: number | null
+          before_count?: number | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          trigger_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_usage: {
         Row: {
           active_managers: number | null
@@ -1118,6 +1159,19 @@ export type Database = {
       user_is_worker: {
         Args: { check_worker_id: string }
         Returns: boolean
+      }
+      validate_subscription_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          expected_managers: number
+          expected_workers: number
+          manager_discrepancy: number
+          organization_id: string
+          organization_name: string
+          recorded_managers: number
+          recorded_workers: number
+          worker_discrepancy: number
+        }[]
       }
     }
     Enums: {
