@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from '@/hooks/use-toast';
 import { Clock, Edit, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import moment from 'moment';
+import { formatUKTime } from '@/lib/timezone-utils';
 
 interface ClockEntry {
   id: string;
@@ -193,7 +194,7 @@ export default function Amendments() {
                       <p className="font-medium">Amendment Request</p>
                       <p className="text-sm text-muted-foreground">{amendment.reason}</p>
                       <p className="text-xs text-muted-foreground">
-                        Submitted {moment(amendment.created_at).format('MMM D, YYYY h:mm A')}
+                        Submitted {formatUKTime(amendment.created_at, 'MMM D, YYYY h:mm A')}
                       </p>
                       {amendment.manager_notes && (
                         <p className="text-sm text-muted-foreground mt-1">

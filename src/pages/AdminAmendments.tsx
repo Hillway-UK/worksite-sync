@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import moment from 'moment';
 import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
+import { formatUKTime } from '@/lib/timezone-utils';
 
 interface Amendment {
   id: string;
@@ -273,12 +274,12 @@ export default function AdminAmendments() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <div>Submitted: {moment(amendment.created_at).format('MMM D, h:mm A')}</div>
+                          <div>Submitted: {formatUKTime(amendment.created_at)}</div>
                           {amendment.requested_clock_in && (
-                            <div>In: {moment(amendment.requested_clock_in).format('MMM D, h:mm A')}</div>
+                            <div>In: {formatUKTime(amendment.requested_clock_in)}</div>
                           )}
                           {amendment.requested_clock_out && (
-                            <div>Out: {moment(amendment.requested_clock_out).format('MMM D, h:mm A')}</div>
+                            <div>Out: {formatUKTime(amendment.requested_clock_out)}</div>
                           )}
                         </div>
                       </TableCell>
