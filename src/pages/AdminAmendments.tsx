@@ -274,12 +274,12 @@ export default function AdminAmendments() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <div>Submitted: {moment(amendment.created_at).format('MMM D, h:mm A')}</div>
+                          <div>Submitted: {formatUKTime(amendment.created_at)}</div>
                           {amendment.requested_clock_in && (
-                            <div>In: {moment(amendment.requested_clock_in).format('MMM D, h:mm A')}</div>
+                            <div>In: {formatUKTime(amendment.requested_clock_in)}</div>
                           )}
                           {amendment.requested_clock_out && (
-                            <div>Out: {moment(amendment.requested_clock_out).format('MMM D, h:mm A')}</div>
+                            <div>Out: {formatUKTime(amendment.requested_clock_out)}</div>
                           )}
                         </div>
                       </TableCell>

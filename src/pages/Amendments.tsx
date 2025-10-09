@@ -194,7 +194,7 @@ export default function Amendments() {
                       <p className="font-medium">Amendment Request</p>
                       <p className="text-sm text-muted-foreground">{amendment.reason}</p>
                       <p className="text-xs text-muted-foreground">
-                        Submitted {moment(amendment.created_at).format('MMM D, YYYY h:mm A')}
+                        Submitted {formatUKTime(amendment.created_at, 'MMM D, YYYY h:mm A')}
                       </p>
                       {amendment.manager_notes && (
                         <p className="text-sm text-muted-foreground mt-1">
