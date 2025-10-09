@@ -898,6 +898,9 @@ export type Database = {
           organization_id: string
           phone: string | null
           photo_url: string | null
+          shift_days: number[] | null
+          shift_end: string | null
+          shift_start: string | null
           updated_at: string | null
         }
         Insert: {
@@ -916,6 +919,9 @@ export type Database = {
           organization_id: string
           phone?: string | null
           photo_url?: string | null
+          shift_days?: number[] | null
+          shift_end?: string | null
+          shift_start?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -934,6 +940,9 @@ export type Database = {
           organization_id?: string
           phone?: string | null
           photo_url?: string | null
+          shift_days?: number[] | null
+          shift_end?: string | null
+          shift_start?: string | null
           updated_at?: string | null
         }
         Relationships: [

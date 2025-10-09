@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -43,6 +44,9 @@ const workerSchema = z.object({
   address: z.string().trim().max(500, "Address must be less than 500 characters").optional(),
   emergency_contact: z.string().trim().max(200, "Emergency contact must be less than 200 characters").optional(),
   date_started: z.string().optional(),
+  shift_start: z.string().optional(),
+  shift_end: z.string().optional(),
+  shift_days: z.array(z.number()).optional(),
 });
 
 type WorkerFormData = z.infer<typeof workerSchema>;
@@ -57,6 +61,9 @@ interface Worker {
   address?: string | null;
   emergency_contact?: string | null;
   date_started?: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
+  shift_days?: number[] | null;
 }
 
 interface WorkerDialogProps {
@@ -126,6 +133,8 @@ Please change your password on first login for security.`;
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
+    setValue,
   } = useForm<WorkerFormData>({
     resolver: zodResolver(workerSchema),
     defaultValues: worker
@@ -137,6 +146,9 @@ Please change your password on first login for security.`;
           address: worker.address || "",
           emergency_contact: worker.emergency_contact || "",
           date_started: worker.date_started || "",
+          shift_start: worker.shift_start || "07:00",
+          shift_end: worker.shift_end || "15:00",
+          shift_days: worker.shift_days || [1, 2, 3, 4, 5],
         }
       : {
           name: "",
@@ -146,8 +158,13 @@ Please change your password on first login for security.`;
           address: "",
           emergency_contact: "",
           date_started: new Date().toISOString().split("T")[0],
+          shift_start: "07:00",
+          shift_end: "15:00",
+          shift_days: [1, 2, 3, 4, 5],
         },
   });
+
+  const selectedShiftDays = watch("shift_days") || [];
 
   const onSubmit = async (data: WorkerFormData) => {
     setLoading(true);
@@ -228,6 +245,9 @@ Please change your password on first login for security.`;
         organization_id: managerData.organization_id,
         hourly_rate: data.hourly_rate,
         is_active: true,
+        shift_start: data.shift_start || null,
+        shift_end: data.shift_end || null,
+        shift_days: data.shift_days || null,
       };
 
       if (worker) {
@@ -441,6 +461,63 @@ Please change your password on first login for security.`;
             <div>
               <Label htmlFor="date_started">Start Date</Label>
               <Input id="date_started" type="date" {...register("date_started")} />
+            </div>
+
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="text-sm font-semibold">Worker Schedule</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="shift_start">Shift Start Time</Label>
+                  <Input id="shift_start" type="time" {...register("shift_start")} />
+                  {errors.shift_start && <p className="text-sm text-destructive mt-1">{errors.shift_start.message}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="shift_end">Shift End Time</Label>
+                  <Input id="shift_end" type="time" {...register("shift_end")} />
+                  {errors.shift_end && <p className="text-sm text-destructive mt-1">{errors.shift_end.message}</p>}
+                </div>
+              </div>
+
+              <div>
+                <Label>Working Days</Label>
+                <div className="flex flex-wrap gap-3 mt-2">
+                  {[
+                    { value: 1, label: "Mon" },
+                    { value: 2, label: "Tue" },
+                    { value: 3, label: "Wed" },
+                    { value: 4, label: "Thu" },
+                    { value: 5, label: "Fri" },
+                    { value: 6, label: "Sat" },
+                    { value: 7, label: "Sun" },
+                  ].map((day) => (
+                    <div key={day.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`day-${day.value}`}
+                        checked={selectedShiftDays.includes(day.value)}
+                        onCheckedChange={(checked) => {
+                          const currentDays = selectedShiftDays;
+                          if (checked) {
+                            setValue("shift_days", [...currentDays, day.value].sort());
+                          } else {
+                            setValue("shift_days", currentDays.filter((d) => d !== day.value));
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor={`day-${day.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {day.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Select the days this worker typically works. Used for notifications and auto-clockout.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">
