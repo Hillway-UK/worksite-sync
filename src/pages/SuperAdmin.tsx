@@ -65,6 +65,13 @@ const SUBSCRIPTION_PLANS = {
   }
 } as const;
 
+const PLAN_DISPLAY_NAMES: Record<SubscriptionPlan, string> = {
+  trial: 'Trial (1 Manager, 3 Workers - Free)',
+  starter: 'Starter (2 Managers, 10 Workers)',
+  pro: 'Pro (5 Managers, 100 Workers)',
+  enterprise: 'Enterprise (Custom capacity)'
+} as const;
+
 type SubscriptionPlan = keyof typeof SUBSCRIPTION_PLANS;
 
 export default function SuperAdmin() {
@@ -121,6 +128,12 @@ export default function SuperAdmin() {
     plannedManagers: 1,
     plannedWorkers: 0,
     currentActive: { managers: 0, workers: 0 }
+  });
+
+  const [originalSubscription, setOriginalSubscription] = useState({
+    plan: 'starter' as SubscriptionPlan,
+    plannedManagers: 1,
+    plannedWorkers: 0
   });
   
   const [managerForm, setManagerForm] = useState({
@@ -208,12 +221,24 @@ export default function SuperAdmin() {
 
   const handleUpdatePlanChange = (plan: SubscriptionPlan) => {
     const planConfig = SUBSCRIPTION_PLANS[plan];
-    setUpdateOrgForm({
-      ...updateOrgForm,
-      subscriptionPlan: plan,
-      plannedManagers: Math.max(planConfig.plannedManagers, updateOrgForm.currentActive.managers),
-      plannedWorkers: Math.max(planConfig.plannedWorkers, updateOrgForm.currentActive.workers)
-    });
+    
+    // If switching TO a non-customizable plan, use its defaults
+    if (!planConfig.isCustomizable) {
+      setUpdateOrgForm({
+        ...updateOrgForm,
+        subscriptionPlan: plan,
+        plannedManagers: Math.max(planConfig.plannedManagers, updateOrgForm.currentActive.managers),
+        plannedWorkers: Math.max(planConfig.plannedWorkers, updateOrgForm.currentActive.workers)
+      });
+    } else {
+      // For Enterprise (customizable), preserve current values unless they're below active counts
+      setUpdateOrgForm({
+        ...updateOrgForm,
+        subscriptionPlan: plan,
+        plannedManagers: Math.max(updateOrgForm.plannedManagers, updateOrgForm.currentActive.managers),
+        plannedWorkers: Math.max(updateOrgForm.plannedWorkers, updateOrgForm.currentActive.workers)
+      });
+    }
   };
 
   const fetchOrganizations = async () => {
@@ -634,6 +659,9 @@ Please change your password on first login for security.`;
         currentPlan = 'trial';
       }
 
+      const plannedManagers = usageData?.planned_number_of_managers || 1;
+      const plannedWorkers = usageData?.planned_number_of_workers || 0;
+
       setUpdateOrgForm({
         organizationId: org.id,
         organizationName: org.name,
@@ -644,13 +672,21 @@ Please change your password on first login for security.`;
         vat_number: org.vat_number || '',
         logo_url: org.logo_url || null,
         subscriptionPlan: currentPlan,
-        plannedManagers: usageData?.planned_number_of_managers || 1,
-        plannedWorkers: usageData?.planned_number_of_workers || 0,
+        plannedManagers: plannedManagers,
+        plannedWorkers: plannedWorkers,
         currentActive: {
           managers: usageData?.active_managers || 0,
           workers: usageData?.active_workers || 0
         }
       });
+
+      // Store original subscription for change detection
+      setOriginalSubscription({
+        plan: currentPlan,
+        plannedManagers: plannedManagers,
+        plannedWorkers: plannedWorkers
+      });
+
       setShowUpdateOrgDialog(true);
     } catch (err: any) {
       toast.error('Failed to load organization data');
@@ -685,46 +721,74 @@ Please change your password on first login for security.`;
         return;
       }
 
-      // Calculate dates
-      const dates = calculateSubscriptionDates(updateOrgForm.subscriptionPlan);
-      const totalCost = calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers);
+      // Find the organization in the current list
+      const currentOrg = organizations.find(o => o.id === updateOrgForm.organizationId);
 
-      // Update organizations table
-      // Update org metadata only (subscription handled via edge function)
-      const { error: orgError } = await supabase
-        .from('organizations')
-        .update({
-          name: updateOrgForm.organizationName,
-          email: updateOrgForm.email,
-          phone: updateOrgForm.phone,
-          address: updateOrgForm.address,
-          company_number: updateOrgForm.company_number,
-          vat_number: updateOrgForm.vat_number
-        })
-        .eq('id', updateOrgForm.organizationId);
+      // Detect what changed
+      const companyDetailsChanged = 
+        updateOrgForm.organizationName !== currentOrg?.name ||
+        updateOrgForm.email !== (currentOrg?.email || '') ||
+        updateOrgForm.phone !== (currentOrg?.phone || '') ||
+        updateOrgForm.address !== (currentOrg?.address || '') ||
+        updateOrgForm.company_number !== (currentOrg?.company_number || '') ||
+        updateOrgForm.vat_number !== (currentOrg?.vat_number || '');
 
-      if (orgError) {
-        toast.error(`Failed to update organization: ${orgError.message}`);
-        return;
-      }
+      const subscriptionChanged = 
+        updateOrgForm.subscriptionPlan !== originalSubscription.plan ||
+        updateOrgForm.plannedManagers !== originalSubscription.plannedManagers ||
+        updateOrgForm.plannedWorkers !== originalSubscription.plannedWorkers;
 
-      // Perform mid-cycle upgrade via edge function
-      const { data: upgradeData, error: upgradeError } = await supabase.functions.invoke('upgrade-subscription-plan', {
-        body: {
-          organizationId: updateOrgForm.organizationId,
-          newMaxManagers: updateOrgForm.plannedManagers,
-          newMaxWorkers: updateOrgForm.plannedWorkers,
-          planType: updateOrgForm.subscriptionPlan
+      // Update company details if changed
+      if (companyDetailsChanged) {
+        const { error: orgError } = await supabase
+          .from('organizations')
+          .update({
+            name: updateOrgForm.organizationName,
+            email: updateOrgForm.email,
+            phone: updateOrgForm.phone,
+            address: updateOrgForm.address,
+            company_number: updateOrgForm.company_number,
+            vat_number: updateOrgForm.vat_number
+          })
+          .eq('id', updateOrgForm.organizationId);
+
+        if (orgError) {
+          toast.error(`Failed to update organization: ${orgError.message}`);
+          return;
         }
-      });
-
-      if (upgradeError) {
-        toast.error(`Failed to update subscription: ${upgradeError.message}`);
-        return;
       }
 
-      const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
-      toast.success(`Organization updated successfully (${costDisplay})`);
+      // Only update subscription if it actually changed
+      if (subscriptionChanged) {
+        const { data: upgradeData, error: upgradeError } = await supabase.functions.invoke('upgrade-subscription-plan', {
+          body: {
+            organizationId: updateOrgForm.organizationId,
+            newMaxManagers: updateOrgForm.plannedManagers,
+            newMaxWorkers: updateOrgForm.plannedWorkers,
+            planType: updateOrgForm.subscriptionPlan
+          }
+        });
+
+        if (upgradeError) {
+          toast.error(`Failed to update subscription: ${upgradeError.message}`);
+          return;
+        }
+      }
+
+      // Success message based on what was updated
+      const totalCost = calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers);
+      if (companyDetailsChanged && subscriptionChanged) {
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
+        toast.success(`Organization and subscription updated successfully (${costDisplay})`);
+      } else if (companyDetailsChanged) {
+        toast.success('Organization details updated successfully');
+      } else if (subscriptionChanged) {
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
+        toast.success(`Subscription updated successfully (${costDisplay})`);
+      } else {
+        toast.info('No changes detected');
+      }
+
       setShowUpdateOrgDialog(false);
       setUpdateOrgForm({
         organizationId: '',
@@ -1304,10 +1368,10 @@ Please change your password on first login for security.`;
                   value={updateOrgForm.subscriptionPlan}
                   onChange={(e) => handleUpdatePlanChange(e.target.value as SubscriptionPlan)}
                 >
-                  <option value="trial">Trial (1 Manager, 3 Workers - Free)</option>
-                  <option value="starter">Starter (2 Managers, 10 Workers)</option>
-                  <option value="pro">Pro (5 Managers, 100 Workers)</option>
-                  <option value="enterprise">Enterprise (Custom capacity)</option>
+                  <option value="trial">{PLAN_DISPLAY_NAMES.trial}</option>
+                  <option value="starter">{PLAN_DISPLAY_NAMES.starter}</option>
+                  <option value="pro">{PLAN_DISPLAY_NAMES.pro}</option>
+                  <option value="enterprise">{PLAN_DISPLAY_NAMES.enterprise}</option>
                 </select>
               </div>
 
