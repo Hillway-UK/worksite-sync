@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -165,6 +165,38 @@ Please change your password on first login for security.`;
   });
 
   const selectedShiftDays = watch("shift_days") || [];
+
+  // Reset form when dialog opens or worker data changes
+  useEffect(() => {
+    if (open && worker) {
+      reset({
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone || "",
+        hourly_rate: worker.hourly_rate,
+        address: worker.address || "",
+        emergency_contact: worker.emergency_contact || "",
+        date_started: worker.date_started || "",
+        shift_start: worker.shift_start || "07:00",
+        shift_end: worker.shift_end || "15:00",
+        shift_days: worker.shift_days || [1, 2, 3, 4, 5],
+      });
+    } else if (open && !worker) {
+      // Reset to defaults for new worker
+      reset({
+        name: "",
+        email: "",
+        phone: "",
+        hourly_rate: 25,
+        address: "",
+        emergency_contact: "",
+        date_started: new Date().toISOString().split("T")[0],
+        shift_start: "07:00",
+        shift_end: "15:00",
+        shift_days: [1, 2, 3, 4, 5],
+      });
+    }
+  }, [open, worker, reset]);
 
   const onSubmit = async (data: WorkerFormData) => {
     setLoading(true);
