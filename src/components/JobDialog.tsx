@@ -13,7 +13,7 @@ import { Plus, Edit, MapPin } from 'lucide-react';
 import { LeafletMap } from './LeafletMap';
 import { validatePostcode, geocodePostcode, formatLegacyAddress, formatPostcode } from '@/lib/postcode-utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { ManagerTourGate } from './onboarding/ManagerTourGate';
+import { OnboardingTour } from './onboarding/OnboardingTour';
 import { addJobSteps } from '@/config/onboarding';
 import { hasSeenAddJobTutorial, markAddJobTutorialSeen } from '@/lib/supabase/manager-tutorial';
 
@@ -297,12 +297,15 @@ const handleTutorialEnd = async () => {
     </Button>
   );
 
-  return (
+  return (<>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || defaultTrigger}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => showTutorial && e.preventDefault()}
+        onEscapeKeyDown={(e) => showTutorial && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {job ? 'Edit Job' : 'Add New Job'}
@@ -470,13 +473,12 @@ const handleTutorialEnd = async () => {
         </form>
       </DialogContent>
       
-      {/* Add Job Tutorial */}
-      <ManagerTourGate
-        steps={addJobSteps}
-        autoRun={false}
-        forceRun={showTutorial}
-        onTourEnd={handleTutorialEnd}
-      />
     </Dialog>
-  );
+    <OnboardingTour
+      steps={addJobSteps}
+      run={showTutorial}
+      onComplete={handleTutorialEnd}
+      onSkip={handleTutorialEnd}
+    />
+    </>);
 }
