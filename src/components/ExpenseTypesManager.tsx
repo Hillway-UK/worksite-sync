@@ -215,7 +215,7 @@ export function ExpenseTypesManager() {
               setPresetData(undefined);
               setDialogOpen(true);
             }}
-            className="hover:bg-primary/90"
+            className="hover:bg-primary/90 expense-add-button"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Expense Type
@@ -225,7 +225,7 @@ export function ExpenseTypesManager() {
       
       <CardContent className="space-y-6">
         {/* Quick Actions */}
-        <div className="space-y-4">
+        <div className="space-y-4 expense-quick-add">
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -251,7 +251,7 @@ export function ExpenseTypesManager() {
           </div>
 
           {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 expense-search">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -288,6 +288,7 @@ export function ExpenseTypesManager() {
         </div>
 
         {filteredExpenseTypes.length > 0 ? (
+          <div className="expense-table">
           <Table>
             <TableHeader>
               <TableRow>
@@ -348,6 +349,7 @@ export function ExpenseTypesManager() {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">

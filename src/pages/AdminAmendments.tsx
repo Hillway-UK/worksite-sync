@@ -13,13 +13,13 @@ import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import moment from 'moment';
 import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
 import { formatUKTime } from '@/lib/timezone-utils';
-import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
-import { amendmentsSteps } from '@/config/onboarding';
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
+import { expenseTypesSteps, timeAmendmentsSteps } from '@/config/onboarding';
 import {
-  shouldAutoContinueAmendmentsPage,
-  setAutoContinueAmendmentsPage,
+  getPageTutorialStatus,
   markPageTutorialComplete,
 } from '@/lib/supabase/manager-tutorial';
+import { useNavigate } from 'react-router-dom';
 
 interface Amendment {
   id: string;
@@ -36,32 +36,47 @@ interface Amendment {
 }
 
 export default function AdminAmendments() {
+  const navigate = useNavigate();
   const [amendments, setAmendments] = useState<Amendment[]>([]);
   const [selectedAmendment, setSelectedAmendment] = useState<Amendment | null>(null);
   const [managerNotes, setManagerNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showExpenseTour, setShowExpenseTour] = useState(false);
   const [showAmendmentsTour, setShowAmendmentsTour] = useState(false);
+  const [activeTab, setActiveTab] = useState('expenses');
 
   useEffect(() => {
     fetchAmendments();
   }, []);
 
-  // Check if should auto-run tutorial from Jobs page
+  // Check if tutorial should run for Expense Types tab
   useEffect(() => {
-    const checkAutoRun = async () => {
-      const shouldRun = await shouldAutoContinueAmendmentsPage();
-      if (shouldRun) {
-        setTimeout(() => setShowAmendmentsTour(true), 800);
-        await setAutoContinueAmendmentsPage(false);
+    const checkTutorial = async () => {
+      const hasSeenExpense = await getPageTutorialStatus('amendments');
+      if (!hasSeenExpense && activeTab === 'expenses') {
+        setTimeout(() => setShowExpenseTour(true), 500);
       }
     };
-    checkAutoRun();
-  }, []);
+    checkTutorial();
+  }, [activeTab]);
+
+  const handleExpenseTourEnd = async () => {
+    setShowExpenseTour(false);
+    // Auto-switch to amendments tab after expense tour
+    setActiveTab('amendments');
+    setTimeout(() => setShowAmendmentsTour(true), 500);
+  };
 
   const handleAmendmentsTourEnd = async () => {
     setShowAmendmentsTour(false);
     await markPageTutorialComplete('amendments');
+    // Navigate to Reports page
+    toast({
+      title: "Tutorial Complete!",
+      description: "Let's move on to the Reports page.",
+    });
+    setTimeout(() => navigate('/reports'), 1000);
   };
 
   const fetchAmendments = async () => {
@@ -248,7 +263,7 @@ export default function AdminAmendments() {
           <p className="text-muted-foreground">Manage time amendments and expense types</p>
         </div>
 
-        <Tabs defaultValue="expenses" className="w-full" id="status-filter-tabs">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" id="status-filter-tabs">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="expenses">Expense Types</TabsTrigger>
             <TabsTrigger id="amendments-tab" value="amendments">Time Amendments</TabsTrigger>
@@ -259,6 +274,7 @@ export default function AdminAmendments() {
           </TabsContent>
           
           <TabsContent value="amendments" className="space-y-6">
+            <div className="amendments-table">
             <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -324,7 +340,7 @@ export default function AdminAmendments() {
                            <Button
                              size="sm"
                              variant="outline"
-                             className="hover:bg-secondary/80"
+                             className="hover:bg-secondary/80 review-amendment-button"
                              onClick={() => setSelectedAmendment(amendment)}
                            >
                              Review
@@ -336,9 +352,10 @@ export default function AdminAmendments() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-          </Card>
-          </TabsContent>
+           </CardContent>
+           </Card>
+           </div>
+           </TabsContent>
         </Tabs>
 
         {selectedAmendment && (
@@ -380,12 +397,20 @@ export default function AdminAmendments() {
         )}
       </div>
 
-      {/* Amendments Tutorial */}
-      <ManagerTourGate
-        steps={amendmentsSteps}
-        autoRun={false}
-        forceRun={showAmendmentsTour}
-        onTourEnd={handleAmendmentsTourEnd}
+      {/* Expense Types Tutorial */}
+      <OnboardingTour
+        steps={expenseTypesSteps}
+        run={showExpenseTour}
+        onComplete={handleExpenseTourEnd}
+        onSkip={handleExpenseTourEnd}
+      />
+
+      {/* Time Amendments Tutorial */}
+      <OnboardingTour
+        steps={timeAmendmentsSteps}
+        run={showAmendmentsTour}
+        onComplete={handleAmendmentsTourEnd}
+        onSkip={handleAmendmentsTourEnd}
       />
     </Layout>
   );
