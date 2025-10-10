@@ -14,12 +14,18 @@ interface CompletionModalProps {
   open: boolean;
   onReplay: () => void;
   onClose: () => void;
+  title?: string;
+  description?: string;
+  exploreButtonText?: string;
 }
 
 export const CompletionModal: React.FC<CompletionModalProps> = ({
   open,
   onReplay,
   onClose,
+  title = "🎉 You're all set!",
+  description = "You now know the essentials of your Manager Portal. If you want a refresher later, just click the \"Tutorial\" button on this page.",
+  exploreButtonText = "Explore Dashboard",
 }) => {
   useEffect(() => {
     if (open) {
@@ -56,11 +62,10 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl text-center">
-            🎉 You're all set!
+            {title}
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-4">
-            You now know the essentials of your Manager Portal. If you want a refresher later,
-            just click the "Run Tutorial" button on your dashboard.
+            {description}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:justify-center pt-4">
@@ -68,7 +73,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             Replay Tutorial
           </Button>
           <Button onClick={onClose} className="w-full sm:w-auto">
-            Explore Dashboard
+            {exploreButtonText}
           </Button>
         </DialogFooter>
       </DialogContent>

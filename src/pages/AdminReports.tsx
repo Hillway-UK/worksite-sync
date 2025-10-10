@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfWeek, endOfWeek, addDays, getWeek, getYear } from "date-fns";
 import moment from "moment";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { CompletionModal } from "@/components/onboarding/CompletionModal";
 import { reportsSteps } from "@/config/onboarding";
 import { getPageTutorialStatus, markPageTutorialComplete } from "@/lib/supabase/manager-tutorial";
 
@@ -74,6 +75,7 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(false);
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
     prefix: "INV",
     startingNumber: 1001,
@@ -113,11 +115,17 @@ export default function AdminReports() {
 
   const handleTutorialEnd = async () => {
     setShowTutorial(false);
+    setShowCompletionModal(true);
     await markPageTutorialComplete('reports');
   };
 
   const handleTutorialReplay = () => {
+    setShowCompletionModal(false);
     setShowTutorial(true);
+  };
+
+  const handleCompletionClose = () => {
+    setShowCompletionModal(false);
   };
 
   const generateReport = async () => {
@@ -1112,6 +1120,14 @@ export default function AdminReports() {
         run={showTutorial}
         onComplete={handleTutorialEnd}
         onSkip={handleTutorialEnd}
+      />
+      
+      <CompletionModal
+        open={showCompletionModal}
+        onReplay={handleTutorialReplay}
+        onClose={handleCompletionClose}
+        description="You now know how to generate and manage reports! If you want a refresher later, just click the 'Tutorial' button on this page."
+        exploreButtonText="Explore Reports"
       />
     </Layout>
   );
