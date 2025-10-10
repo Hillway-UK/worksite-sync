@@ -8,27 +8,42 @@ export const reportsSteps: Step[] = [
   },
   {
     target: '#week-selector',
-    content: '📅 Select the week you want to generate reports for. Click "Generate Report" to load the data.',
+    content: '📅 Select the week you want to generate reports for.',
+    placement: 'bottom',
+  },
+  {
+    target: '.generate-report-button',
+    content: '🔄 Click "Generate Report" to load worker data for the selected week.',
+    placement: 'bottom',
+  },
+  {
+    target: '.download-csv-button',
+    content: '💾 Download a CSV file for easy importing into spreadsheets or accounting software.',
     placement: 'bottom',
   },
   {
     target: '.reports-tabs',
-    content: '📑 Switch between Weekly Summary (payroll view) and Detailed Timesheet (daily breakdown).',
+    content: '📑 Switch between Weekly Summary (payroll overview) and Detailed Timesheet (daily breakdown with photos).',
     placement: 'bottom',
   },
   {
     target: '#export-xero-btn',
-    content: '💾 Export your reports to Xero for accounting! You can also download as CSV.',
+    content: '💼 Export directly to Xero format for seamless accounting integration!',
     placement: 'left',
   },
   {
     target: '#timesheet-table',
-    content: '👥 This table shows each worker\'s hours, jobs worked, and total amounts for the selected week.',
+    content: '👥 This table shows each worker\'s total hours, hourly rate, additional costs, and amounts for the week.',
     placement: 'top',
   },
   {
     target: '.row-expand-btn',
-    content: '🔎 Click the expand icon to drill down into daily entries and see detailed clock times.',
+    content: '🔎 Click to expand and see detailed daily entries with exact clock in/out times.',
     placement: 'left',
+  },
+  {
+    target: 'body',
+    content: '📸 In the Detailed Timesheet tab, you can view workers\' actual clock in and clock out photos to verify their attendance!',
+    placement: 'center',
   },
 ];

@@ -857,10 +857,10 @@ export default function AdminReports() {
                 onChange={(e) => setSelectedWeek(e.target.value)} 
               />
             </div>
-            <Button onClick={generateReport} disabled={loading}>
+            <Button onClick={generateReport} disabled={loading} className="generate-report-button">
               {loading ? "Generating..." : "Generate Report"}
             </Button>
-            <Button onClick={generateCSV} disabled={weeklyData.length === 0} variant="outline">
+            <Button onClick={generateCSV} disabled={weeklyData.length === 0} variant="outline" className="download-csv-button">
               <Download className="h-4 w-4 mr-2" />
               Download CSV
             </Button>
