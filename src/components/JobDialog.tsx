@@ -111,10 +111,8 @@ const watchedPostcode = watch('postcode');
 useEffect(() => {
   const checkTutorial = async () => {
     if (open && !job) {
-      const hasSeenTutorial = await hasSeenAddJobTutorial();
-      if (!hasSeenTutorial) {
-        setTimeout(() => setShowTutorial(true), 500);
-      }
+      // Temporarily always show tutorial for testing
+      setTimeout(() => setShowTutorial(true), 500);
     }
   };
   checkTutorial();
