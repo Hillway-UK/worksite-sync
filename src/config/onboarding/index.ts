@@ -8,3 +8,4 @@ export { workersSteps } from './manager-workers-steps';
 export { amendmentsSteps } from './manager-amendments-steps';
 export { reportsSteps } from './manager-reports-steps';
 export { jobsSteps } from './manager-jobs-steps';
+export { addWorkerSteps } from './manager-add-worker-steps';

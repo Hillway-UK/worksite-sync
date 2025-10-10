@@ -20,6 +20,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, CheckCircle, Copy } from "lucide-react";
 import { generateSecurePassword } from "@/lib/validation";
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
+import { addWorkerSteps } from '@/config/onboarding';
+import { hasSeenAddWorkerTutorial, markAddWorkerTutorialSeen } from '@/lib/supabase/manager-tutorial';
 
 // Enhanced validation schema with better security
 const workerSchema = z.object({
@@ -93,6 +96,7 @@ export function WorkerDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showAddWorkerTour, setShowAddWorkerTour] = useState(false);
   const [workerCredentials, setWorkerCredentials] = useState<{
     name: string;
     email: string;
@@ -199,6 +203,31 @@ Please change your password on first login for security.`;
       });
     }
   }, [open, worker, reset]);
+
+  // Check if Add Worker tutorial should run
+  useEffect(() => {
+    const checkTutorial = async () => {
+      // Only run for NEW workers (not editing)
+      if (open && !worker) {
+        const hasSeen = await hasSeenAddWorkerTutorial();
+        if (!hasSeen) {
+          // Delay to let modal fully render
+          setTimeout(() => setShowAddWorkerTour(true), 500);
+        }
+      }
+    };
+    checkTutorial();
+  }, [open, worker]);
+
+  const handleAddWorkerTourComplete = async () => {
+    setShowAddWorkerTour(false);
+    await markAddWorkerTutorialSeen();
+  };
+
+  const handleAddWorkerTourSkip = async () => {
+    setShowAddWorkerTour(false);
+    await markAddWorkerTutorialSeen();
+  };
 
   const onSubmit = async (data: WorkerFormData) => {
     setLoading(true);
@@ -460,8 +489,9 @@ Please change your password on first login for security.`;
             <DialogTitle>{worker ? "Edit Worker" : "Add New Worker"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pb-4">
-            <div>
-              <Label htmlFor="name">Full Name</Label>
+            <div className="worker-details-section space-y-4">
+              <div>
+                <Label htmlFor="name">Full Name</Label>
               <Input id="name" {...register("name")} placeholder="Enter worker's full name" maxLength={100} />
               {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
             </div>
@@ -526,12 +556,13 @@ Please change your password on first login for security.`;
               )}
             </div>
 
-            <div>
-              <Label htmlFor="date_started">Start Date</Label>
-              <Input id="date_started" type="date" {...register("date_started")} />
+              <div>
+                <Label htmlFor="date_started">Start Date</Label>
+                <Input id="date_started" type="date" {...register("date_started")} />
+              </div>
             </div>
 
-            <div className="border-t pt-4 space-y-4">
+            <div className="border-t pt-4 space-y-4 worker-schedule-section">
               <h3 className="text-sm font-semibold">Worker Schedule</h3>
               
               <div className="grid grid-cols-2 gap-4">
@@ -592,7 +623,7 @@ Please change your password on first login for security.`;
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="worker-submit-button">
                 {loading ? "Saving..." : worker ? "Update" : "Create"}
               </Button>
             </div>
@@ -646,6 +677,16 @@ Please change your password on first login for security.`;
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Worker Tutorial - only shows first time */}
+      {open && !worker && (
+        <OnboardingTour
+          steps={addWorkerSteps}
+          run={showAddWorkerTour}
+          onComplete={handleAddWorkerTourComplete}
+          onSkip={handleAddWorkerTourSkip}
+        />
+      )}
     </>
   );
 }

@@ -109,3 +109,19 @@ export async function setAutoContinueJobsPage(value: boolean): Promise<void> {
     localStorage.removeItem('tutorial-auto-continue-jobs');
   }
 }
+
+/**
+ * Check if Add Worker modal tutorial has been seen
+ * @returns true if tutorial has been completed
+ */
+export async function hasSeenAddWorkerTutorial(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-add-worker-seen');
+  return flag === 'true';
+}
+
+/**
+ * Mark Add Worker modal tutorial as seen
+ */
+export async function markAddWorkerTutorialSeen(): Promise<void> {
+  localStorage.setItem('tutorial-add-worker-seen', 'true');
+}
