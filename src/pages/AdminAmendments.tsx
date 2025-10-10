@@ -417,16 +417,22 @@ export default function AdminAmendments() {
       <Dialog open={showCompletionDialog} onOpenChange={setShowCompletionDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">🎉 Tutorial Complete!</DialogTitle>
+            <DialogTitle className="text-center text-xl">🎉 You're all set!</DialogTitle>
           </DialogHeader>
           <div className="py-6">
             <p className="text-center text-muted-foreground">
-              📊 You now know how to manage expense types and time amendments! Feel free to explore more or click Reports in the navigation to generate detailed reports.
+              You now know how to manage expense types and time amendments! If you want a refresher later, just click the "Tutorial" button on this page.
             </p>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleTutorialReplay}
+            >
+              Replay Tutorial
+            </Button>
             <Button onClick={() => setShowCompletionDialog(false)}>
-              Got it!
+              Explore Amendments
             </Button>
           </div>
         </DialogContent>

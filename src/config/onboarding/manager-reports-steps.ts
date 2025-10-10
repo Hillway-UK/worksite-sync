@@ -2,23 +2,33 @@ import { Step } from 'react-joyride';
 
 export const reportsSteps: Step[] = [
   {
+    target: 'body',
+    content: '📊 Welcome to Reports! Generate detailed time and expense reports for your team.',
+    placement: 'center',
+  },
+  {
     target: '#week-selector',
-    content: '📅 Pick the week you\'d like to review or export.',
+    content: '📅 Select the week you want to generate reports for. Click "Generate Report" to load the data.',
     placement: 'bottom',
   },
   {
+    target: '.reports-tabs',
+    content: '📑 Switch between Weekly Summary (payroll view) and Detailed Timesheet (daily breakdown).',
+    placement: 'bottom',
+  },
+  {
+    target: '#export-xero-btn',
+    content: '💾 Export your reports to Xero for accounting! You can also download as CSV.',
+    placement: 'left',
+  },
+  {
     target: '#timesheet-table',
-    content: '📋 See everyone\'s worked hours per job and per day.',
+    content: '👥 This table shows each worker\'s hours, jobs worked, and total amounts for the selected week.',
     placement: 'top',
   },
   {
     target: '.row-expand-btn',
-    content: '🔎 Click a row to drill down into daily entries.',
-    placement: 'left',
-  },
-  {
-    target: '#export-xero-btn',
-    content: '💾 All set? Export a Xero-ready CSV in one click.',
+    content: '🔎 Click the expand icon to drill down into daily entries and see detailed clock times.',
     placement: 'left',
   },
 ];

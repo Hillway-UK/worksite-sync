@@ -12,10 +12,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PhotoModal } from "@/components/PhotoModal";
 import { XeroSettingsModal } from "@/components/XeroSettingsModal";
 import { toast } from "@/hooks/use-toast";
-import { FileText, Download, ChevronDown, Camera } from "lucide-react";
+import { FileText, Download, ChevronDown, Camera, HelpCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfWeek, endOfWeek, addDays, getWeek, getYear } from "date-fns";
 import moment from "moment";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { reportsSteps } from "@/config/onboarding";
+import { getPageTutorialStatus, markPageTutorialComplete } from "@/lib/supabase/manager-tutorial";
 
 interface WeeklyData {
   worker_id: string;
@@ -70,6 +73,7 @@ export default function AdminReports() {
   const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [loading, setLoading] = useState(false);
   const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
+  const [showTutorial, setShowTutorial] = useState(false);
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
     prefix: "INV",
     startingNumber: 1001,
@@ -95,6 +99,26 @@ export default function AdminReports() {
     generateReport();
     generateDetailedReport();
   }, [selectedWeek]);
+
+  // Check if tutorial should run
+  useEffect(() => {
+    const checkTutorial = async () => {
+      const hasSeenReport = await getPageTutorialStatus('reports');
+      if (!hasSeenReport) {
+        setTimeout(() => setShowTutorial(true), 500);
+      }
+    };
+    checkTutorial();
+  }, []);
+
+  const handleTutorialEnd = async () => {
+    setShowTutorial(false);
+    await markPageTutorialComplete('reports');
+  };
+
+  const handleTutorialReplay = () => {
+    setShowTutorial(true);
+  };
 
   const generateReport = async () => {
     setLoading(true);
@@ -800,10 +824,23 @@ export default function AdminReports() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <FileText className="h-16 w-16 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground mb-2">Weekly Reports</h1>
-          <p className="text-muted-foreground">Generate Xero-compatible payroll reports</p>
+        <div className="text-center mb-8 flex items-center justify-center gap-4 relative">
+          <div className="flex-1" />
+          <div className="flex flex-col items-center">
+            <FileText className="h-16 w-16 text-primary mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-foreground mb-2">Weekly Reports</h1>
+            <p className="text-muted-foreground">Generate Xero-compatible payroll reports</p>
+          </div>
+          <div className="flex-1 flex justify-end">
+            <Button
+              variant="outline"
+              onClick={handleTutorialReplay}
+              className="flex items-center gap-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Tutorial
+            </Button>
+          </div>
         </div>
 
         <Card className="mb-6">
@@ -830,7 +867,7 @@ export default function AdminReports() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="summary" className="space-y-4">
+        <Tabs defaultValue="summary" className="space-y-4 reports-tabs">
           <TabsList>
             <TabsTrigger value="summary">Weekly Summary</TabsTrigger>
             <TabsTrigger value="detailed">Detailed Timesheet</TabsTrigger>
@@ -1068,6 +1105,14 @@ export default function AdminReports() {
           jobName={photoModal.jobName}
         />
       </div>
+
+      {/* Reports Tutorial */}
+      <OnboardingTour
+        steps={reportsSteps}
+        run={showTutorial}
+        onComplete={handleTutorialEnd}
+        onSkip={handleTutorialEnd}
+      />
     </Layout>
   );
 }
