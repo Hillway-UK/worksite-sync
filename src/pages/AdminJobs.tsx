@@ -274,15 +274,6 @@ export default function AdminJobs() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Jobs ({jobs.length})</CardTitle>
             <div className="flex gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowJobsTour(true)}
-                className="gap-2"
-              >
-                <HelpCircle className="h-4 w-4" />
-                Tutorial
-              </Button>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -293,6 +284,15 @@ export default function AdminJobs() {
                   className="pl-9 w-64"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowJobsTour(true)}
+                className="gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                Tutorial
+              </Button>
               <JobDialog onSave={fetchJobs} triggerClassName="btn-add-job" />
             </div>
           </CardHeader>
