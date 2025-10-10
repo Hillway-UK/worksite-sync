@@ -54,17 +54,30 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         tooltip: {
           borderRadius: 8,
           fontSize: 15,
+          zIndex: 10001,
+        },
+        overlay: {
+          zIndex: 9999,
         },
         buttonNext: {
           backgroundColor: 'hsl(var(--primary))',
           borderRadius: 6,
           padding: '8px 16px',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
         },
         buttonBack: {
           color: 'hsl(var(--muted-foreground))',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
         },
         buttonSkip: {
           color: 'hsl(var(--muted-foreground))',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+        },
+        spotlight: {
+          zIndex: 9998,
         },
       }}
       locale={{
