@@ -8,33 +8,33 @@ export const dashboardSteps: Step[] = [
     disableBeacon: true,
   },
   {
-    target: '#recent-activity-card',
-    content: '🔔 This shows all recent workers who are auto clocked-out',
-    placement: 'top',
+    target: '#clocked-in-card',
+    content: '👷 Here you can see how many workers are currently on-site',
+    placement: 'bottom',
+  },
+  {
+    target: '#total-hours-card',
+    content: '⏰ Track the total hours logged by your team today',
+    placement: 'bottom',
+  },
+  {
+    target: '#pending-amendments-card',
+    content: '🕒 See time change requests that need your review',
+    placement: 'bottom',
   },
   {
     target: '#active-workers-card',
-    content: '👥 Here you can see all of your team workers who are currently active',
+    content: '👥 View your total active workforce at a glance',
     placement: 'bottom',
   },
   {
-    target: '#clocked-in-card',
-    content: '👷 Here you can see all of your team workers who are currently on-site',
-    placement: 'bottom',
+    target: '#workers-on-site-section',
+    content: '👔 See detailed info about who\'s clocked in right now',
+    placement: 'top',
   },
   {
-    target: '#quick-nav-workers',
-    content: '👷 Need to add or check a worker? Tap here to go to Workers.',
-    placement: 'bottom',
-  },
-  {
-    target: '#quick-nav-amendments',
-    content: '🕒 If someone requested a time change, you\'ll review it here.',
-    placement: 'bottom',
-  },
-  {
-    target: '#quick-nav-reports',
-    content: '📈 Want to see who worked where and when? Reports are right here.',
-    placement: 'bottom',
+    target: '#recent-activity-card',
+    content: '🔔 This shows all recent workers who are auto clocked-out',
+    placement: 'top',
   },
 ];

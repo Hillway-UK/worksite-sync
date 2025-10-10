@@ -265,7 +265,7 @@ export default function Admin() {
             title="Click to view today's reports"
             style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
-            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-green-50 to-green-100 group-hover:from-green-100 group-hover:to-green-200 relative">
+            <Card id="total-hours-card" className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-green-50 to-green-100 group-hover:from-green-100 group-hover:to-green-200 relative">
               <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">Total Hours Today</CardTitle>
@@ -292,7 +292,7 @@ export default function Admin() {
             title="Click to review amendments"
             style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
-            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-orange-50 to-orange-100 group-hover:from-orange-100 group-hover:to-orange-200 relative">
+            <Card id="pending-amendments-card" className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-orange-50 to-orange-100 group-hover:from-orange-100 group-hover:to-orange-200 relative">
               <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">Pending Amendments</CardTitle>
@@ -341,7 +341,7 @@ export default function Admin() {
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Currently Clocked In Workers */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+          <Card id="workers-on-site-section" className="shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader>
               <CardTitle>Workers On Site</CardTitle>
             </CardHeader>
