@@ -47,4 +47,9 @@ export const jobsSteps: Step[] = [
     content: '🗑️ Remove old job sites permanently when no longer needed.',
     placement: 'left',
   },
+  {
+    target: '#nav-amendments-button',
+    content: '📝 Ready to manage time and expense amendments? Click here to review and approve worker submissions!',
+    placement: 'bottom',
+  },
 ];
