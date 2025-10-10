@@ -480,9 +480,17 @@ Please change your password on first login for security.`;
     onSave();
   };
 
+  const handleDialogOpenChange = (newOpenState: boolean) => {
+    // Prevent closing the dialog while tutorial is running
+    if (showAddWorkerTour && !newOpenState) {
+      return; // Don't close if tutorial is active
+    }
+    setOpen(newOpenState);
+  };
+
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto pr-12 pl-12">
           <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
