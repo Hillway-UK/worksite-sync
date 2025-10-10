@@ -34,22 +34,7 @@ export const workersSteps: Step[] = [
   },
   {
     target: '.worker-edit-button',
-    content: '✏️ Click the edit icon to update a worker\'s details like rate or contact info.',
-    placement: 'left',
-  },
-  {
-    target: '.worker-actions-menu',
-    content: '⋮ Click this menu to access more options for the worker.',
-    placement: 'left',
-  },
-  {
-    target: '.worker-toggle-active',
-    content: '⚙️ Toggle this switch to activate or deactivate a worker. Inactive workers can\'t clock in.',
-    placement: 'left',
-  },
-  {
-    target: '.worker-delete-button',
-    content: '🗑️ Use this option to delete a worker if they\'ve left the company.',
+    content: '✏️ Click the edit icon to update a worker\'s details, activate/deactivate them, or remove them from the system.',
     placement: 'left',
   },
   {
