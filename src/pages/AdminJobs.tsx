@@ -9,8 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { JobDialog } from '@/components/JobDialog';
 import { AddressDisplay } from '@/components/AddressDisplay';
 import { toast } from '@/hooks/use-toast';
-import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight, Plus } from 'lucide-react';
+import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight, Plus, HelpCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
+import { jobsSteps } from '@/config/onboarding';
+import {
+  shouldAutoContinueJobsPage,
+  setAutoContinueJobsPage,
+  markPageTutorialComplete,
+} from '@/lib/supabase/manager-tutorial';
 
 interface Job {
   id: string;
@@ -34,10 +41,27 @@ export default function AdminJobs() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [workerCounts, setWorkerCounts] = useState<Record<string, number>>({});
+  const [showJobsTour, setShowJobsTour] = useState(false);
 
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    const checkAutoRun = async () => {
+      const shouldRun = await shouldAutoContinueJobsPage();
+      if (shouldRun) {
+        setTimeout(() => setShowJobsTour(true), 800);
+        await setAutoContinueJobsPage(false);
+      }
+    };
+    checkAutoRun();
+  }, []);
+
+  const handleJobsTourEnd = async () => {
+    setShowJobsTour(false);
+    await markPageTutorialComplete('jobs');
+  };
 
   const fetchJobs = async () => {
     try {
@@ -250,16 +274,26 @@ export default function AdminJobs() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Jobs ({jobs.length})</CardTitle>
             <div className="flex gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowJobsTour(true)}
+                className="gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                Tutorial
+              </Button>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  id="job-search"
                   placeholder="Search jobs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 w-64"
                 />
               </div>
-              <JobDialog onSave={fetchJobs} />
+              <JobDialog onSave={fetchJobs} triggerClassName="btn-add-job" />
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -314,7 +348,7 @@ export default function AdminJobs() {
                   ) : (
                     filteredJobs.map((job) => (
                       <TableRow key={job.id}>
-                <TableCell className="font-medium">{job.code}</TableCell>
+                <TableCell className="font-medium job-code-cell">{job.code}</TableCell>
                 <TableCell>{job.name}</TableCell>
                 <TableCell className="max-w-xs">
                   <AddressDisplay
@@ -327,14 +361,17 @@ export default function AdminJobs() {
                     className="text-sm"
                   />
                 </TableCell>
-                        <TableCell>
+                        <TableCell className="geofence-cell">
                           <div className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {job.geofence_radius}m
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={workerCounts[job.id] > 0 ? "default" : "secondary"}>
+                          <Badge 
+                            variant={workerCounts[job.id] > 0 ? "default" : "secondary"}
+                            className="workers-on-site-badge"
+                          >
                             {workerCounts[job.id] || 0}
                           </Badge>
                         </TableCell>
@@ -348,11 +385,12 @@ export default function AdminJobs() {
                             <JobDialog 
                               job={job} 
                               onSave={fetchJobs}
+                              triggerClassName="job-edit-button"
                             />
                             <Button
                               variant="outline"
                               size="sm"
-                              className="hover:bg-secondary/80 hover:scale-105 transition-transform duration-200"
+                              className="hover:bg-secondary/80 hover:scale-105 transition-transform duration-200 job-toggle-button"
                               onClick={() => toggleJobStatus(job.id, job.is_active)}
                             >
                               {job.is_active ? (
@@ -364,7 +402,7 @@ export default function AdminJobs() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="text-red-600 hover:bg-red-50"
+                              className="text-red-600 hover:bg-red-50 job-delete-button"
                               onClick={() => handleDeleteJob(job.id)}
                             >
                               Delete
@@ -378,8 +416,15 @@ export default function AdminJobs() {
               </Table>
             </div>
           </CardContent>
-        </Card>
-      </div>
-    </Layout>
-  );
-}
+          </Card>
+        </div>
+
+        <ManagerTourGate
+          steps={jobsSteps}
+          autoRun={false}
+          forceRun={showJobsTour}
+          onTourEnd={handleJobsTourEnd}
+        />
+      </Layout>
+    );
+  }

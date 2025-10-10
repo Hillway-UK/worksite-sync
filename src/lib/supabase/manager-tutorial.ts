@@ -54,7 +54,7 @@ export async function resetManagerTutorial(): Promise<void> {
  * @param page - The page identifier
  * @returns true if page tutorial has been completed
  */
-export async function getPageTutorialStatus(page: 'dashboard' | 'workers' | 'amendments' | 'reports'): Promise<boolean> {
+export async function getPageTutorialStatus(page: 'dashboard' | 'workers' | 'amendments' | 'reports' | 'jobs'): Promise<boolean> {
   const key = `tutorial-${page}-completed`;
   return localStorage.getItem(key) === 'true';
 }
@@ -63,7 +63,7 @@ export async function getPageTutorialStatus(page: 'dashboard' | 'workers' | 'ame
  * Mark specific page tutorial as complete
  * @param page - The page identifier
  */
-export async function markPageTutorialComplete(page: 'dashboard' | 'workers' | 'amendments' | 'reports'): Promise<void> {
+export async function markPageTutorialComplete(page: 'dashboard' | 'workers' | 'amendments' | 'reports' | 'jobs'): Promise<void> {
   const key = `tutorial-${page}-completed`;
   localStorage.setItem(key, 'true');
 }
@@ -86,5 +86,26 @@ export async function setAutoContinueWorkersPage(value: boolean): Promise<void> 
     localStorage.setItem('tutorial-auto-continue-workers', 'true');
   } else {
     localStorage.removeItem('tutorial-auto-continue-workers');
+  }
+}
+
+/**
+ * Check if jobs page tutorial should auto-continue
+ * @returns true if should auto-run jobs tutorial
+ */
+export async function shouldAutoContinueJobsPage(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-auto-continue-jobs');
+  return flag === 'true';
+}
+
+/**
+ * Set flag for jobs page auto-continuation
+ * @param value - Whether to auto-continue
+ */
+export async function setAutoContinueJobsPage(value: boolean): Promise<void> {
+  if (value) {
+    localStorage.setItem('tutorial-auto-continue-jobs', 'true');
+  } else {
+    localStorage.removeItem('tutorial-auto-continue-jobs');
   }
 }

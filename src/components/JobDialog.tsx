@@ -52,9 +52,10 @@ interface JobDialogProps {
   job?: Job;
   onSave: () => void;
   trigger?: React.ReactNode;
+  triggerClassName?: string;
 }
 
-export function JobDialog({ job, onSave, trigger }: JobDialogProps) {
+export function JobDialog({ job, onSave, trigger, triggerClassName }: JobDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
@@ -266,7 +267,11 @@ const watchedPostcode = watch('postcode');
   };
 
   const defaultTrigger = (
-    <Button variant={job ? "outline" : "default"} size={job ? "sm" : "default"}>
+    <Button 
+      variant={job ? "outline" : "default"} 
+      size={job ? "sm" : "default"}
+      className={triggerClassName}
+    >
       {job ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4 mr-2" />}
       {job ? '' : 'Add New Job'}
     </Button>

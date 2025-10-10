@@ -20,7 +20,12 @@ import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
 import { workersSteps } from '@/config/onboarding';
-import { shouldAutoContinueWorkersPage, setAutoContinueWorkersPage } from '@/lib/supabase/manager-tutorial';
+import {
+  shouldAutoContinueWorkersPage,
+  setAutoContinueWorkersPage,
+  setAutoContinueJobsPage,
+  markPageTutorialComplete,
+} from '@/lib/supabase/manager-tutorial';
 
 interface Worker {
   id: string;
@@ -218,6 +223,18 @@ export default function AdminWorkers() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleWorkersTourEnd = async () => {
+    setShowWorkersTour(false);
+    await markPageTutorialComplete('workers');
+  };
+
+  const handleWorkersStepChange = async (stepIndex: number) => {
+    // If user reaches the Jobs navigation step (step 10), set flag
+    if (stepIndex === 10) {
+      await setAutoContinueJobsPage(true);
     }
   };
 
@@ -502,7 +519,7 @@ export default function AdminWorkers() {
                   ) : (
                     filteredWorkers.map((worker) => (
                       <TableRow key={worker.id}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium worker-name-cell">
                           <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10">
                               {worker.profile_photo ? (
@@ -549,7 +566,10 @@ export default function AdminWorkers() {
                           {weeklyHours[worker.id]?.toFixed(1) || '0.0'}h
                         </TableCell>
                         <TableCell>
-                          <Badge variant={worker.is_active ? "default" : "secondary"}>
+                          <Badge 
+                            variant={worker.is_active ? "default" : "secondary"}
+                            className="worker-status-badge"
+                          >
                             {worker.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
@@ -566,7 +586,7 @@ export default function AdminWorkers() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="hover:bg-secondary/80"
+                                  className="hover:bg-secondary/80 worker-actions-menu"
                                   disabled={operationLoading[worker.id]}
                                 >
                                   <MoreVertical className="h-4 w-4" />
@@ -667,7 +687,8 @@ export default function AdminWorkers() {
           steps={workersSteps}
           autoRun={false}
           forceRun={showWorkersTour}
-          onTourEnd={() => setShowWorkersTour(false)}
+          onTourEnd={handleWorkersTourEnd}
+          onStepChange={handleWorkersStepChange}
         />
       </div>
     </Layout>

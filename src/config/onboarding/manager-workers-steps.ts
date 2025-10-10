@@ -18,13 +18,18 @@ export const workersSteps: Step[] = [
     placement: 'bottom',
   },
   {
-    target: '.worker-toggle-active',
-    content: '⚙️ Toggle this switch to activate or deactivate a worker. Inactive workers can\'t clock in.',
-    placement: 'left',
+    target: '.worker-name-cell',
+    content: '👤 Each row shows a worker\'s basic information.',
+    placement: 'top',
   },
   {
     target: '.weekly-hours-cell',
     content: '⏱️ See each worker\'s total hours for the current week at a glance.',
+    placement: 'top',
+  },
+  {
+    target: '.worker-status-badge',
+    content: '✅ Green badge means active, gray means inactive.',
     placement: 'top',
   },
   {
@@ -33,8 +38,23 @@ export const workersSteps: Step[] = [
     placement: 'left',
   },
   {
-    target: '.worker-delete-button',
-    content: '🗑️ Use the menu to delete a worker if they\'ve left the company.',
+    target: '.worker-actions-menu',
+    content: '⋮ Click this menu to access more options for the worker.',
     placement: 'left',
+  },
+  {
+    target: '.worker-toggle-active',
+    content: '⚙️ Toggle this switch to activate or deactivate a worker. Inactive workers can\'t clock in.',
+    placement: 'left',
+  },
+  {
+    target: '.worker-delete-button',
+    content: '🗑️ Use this option to delete a worker if they\'ve left the company.',
+    placement: 'left',
+  },
+  {
+    target: '#nav-jobs-button',
+    content: '🏗️ Ready to manage job sites? Click here to see the Jobs page and continue the tour!',
+    placement: 'bottom',
   },
 ];
