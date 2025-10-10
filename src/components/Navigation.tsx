@@ -66,24 +66,21 @@ export const Navigation: React.FC = () => {
             className="flex items-center cursor-pointer" 
             onClick={handleLogoClick}
           >
+            {organization?.logo_url ? (
+              <img 
+                src={organization.logo_url} 
+                alt={organization.name || 'Organization logo'}
+                className="h-10 w-auto max-w-[120px] object-contain mr-3"
+              />
+            ) : organization?.name ? (
+              <span className="text-sm text-gray-300 font-medium mr-3">
+                {organization.name}
+              </span>
+            ) : null}
+            
             <span className="font-bold text-xl text-white hover:text-gray-200">
               AutoTime
             </span>
-            {(organization?.logo_url || organization?.name) && (
-              <div className="ml-3 flex items-center border-l border-gray-500 pl-3">
-                {organization?.logo_url ? (
-                  <img 
-                    src={organization.logo_url} 
-                    alt={organization.name || 'Organization logo'}
-                    className="h-10 w-auto max-w-[200px] object-contain"
-                  />
-                ) : (
-                  <span className="text-sm text-gray-300">
-                    {organization?.name}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Desktop Navigation */}
