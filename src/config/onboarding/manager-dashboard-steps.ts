@@ -37,4 +37,9 @@ export const dashboardSteps: Step[] = [
     content: '🔔 This shows all recent workers who are auto clocked-out',
     placement: 'top',
   },
+  {
+    target: '#nav-workers-button',
+    content: '👷 Ready to manage your team? Click here to see the Workers page and continue the tour!',
+    placement: 'bottom',
+  },
 ];

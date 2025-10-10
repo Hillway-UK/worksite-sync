@@ -1,6 +1,7 @@
 /**
  * Manager Tutorial API
  * Manages tutorial status using managers.first_login_completed field
+ * and localStorage for multi-page tutorial flows
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -46,4 +47,44 @@ export async function resetManagerTutorial(): Promise<void> {
     .from('managers')
     .update({ first_login_completed: false })
     .eq('email', user.email);
+}
+
+/**
+ * Check if specific page tutorial has been seen
+ * @param page - The page identifier
+ * @returns true if page tutorial has been completed
+ */
+export async function getPageTutorialStatus(page: 'dashboard' | 'workers' | 'amendments' | 'reports'): Promise<boolean> {
+  const key = `tutorial-${page}-completed`;
+  return localStorage.getItem(key) === 'true';
+}
+
+/**
+ * Mark specific page tutorial as complete
+ * @param page - The page identifier
+ */
+export async function markPageTutorialComplete(page: 'dashboard' | 'workers' | 'amendments' | 'reports'): Promise<void> {
+  const key = `tutorial-${page}-completed`;
+  localStorage.setItem(key, 'true');
+}
+
+/**
+ * Check if workers page tutorial should auto-continue
+ * @returns true if should auto-run workers tutorial
+ */
+export async function shouldAutoContinueWorkersPage(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-auto-continue-workers');
+  return flag === 'true';
+}
+
+/**
+ * Set flag for workers page auto-continuation
+ * @param value - Whether to auto-continue
+ */
+export async function setAutoContinueWorkersPage(value: boolean): Promise<void> {
+  if (value) {
+    localStorage.setItem('tutorial-auto-continue-workers', 'true');
+  } else {
+    localStorage.removeItem('tutorial-auto-continue-workers');
+  }
 }

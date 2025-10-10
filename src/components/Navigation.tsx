@@ -116,6 +116,7 @@ export const Navigation: React.FC = () => {
                 Dashboard
               </Button>
               <Button
+                id="nav-workers-button"
                 variant={location.pathname === '/admin/workers' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/workers')}
                 className={location.pathname === '/admin/workers' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:text-white hover:bg-gray-800'}

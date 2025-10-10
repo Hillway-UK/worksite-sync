@@ -14,6 +14,7 @@ interface ManagerTourGateProps {
   autoRun?: boolean; // Auto-run on first login
   forceRun?: boolean; // Manual replay
   onTourEnd?: () => void;
+  onStepChange?: (stepIndex: number) => void; // Callback when step changes
 }
 
 export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
@@ -21,6 +22,7 @@ export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
   autoRun = true,
   forceRun = false,
   onTourEnd,
+  onStepChange,
 }) => {
   const [runTour, setRunTour] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -80,6 +82,7 @@ export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
         run={runTour}
         onComplete={handleComplete}
         onSkip={handleSkip}
+        onStepChange={onStepChange}
       />
       <CompletionModal
         open={showCompletionModal}

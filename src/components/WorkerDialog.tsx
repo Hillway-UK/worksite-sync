@@ -78,6 +78,7 @@ interface WorkerDialogProps {
     maxAllowed: number | null;
     planName: string;
   }) => void;
+  triggerClassName?: string;
 }
 
 export function WorkerDialog({
@@ -87,6 +88,7 @@ export function WorkerDialog({
   open: controlledOpen,
   onOpenChange,
   onCapacityLimit,
+  triggerClassName,
 }: WorkerDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -431,7 +433,11 @@ Please change your password on first login for security.`;
   };
 
   const defaultTrigger = (
-    <Button variant={worker ? "outline" : "default"} size={worker ? "sm" : "default"}>
+    <Button 
+      variant={worker ? "outline" : "default"} 
+      size={worker ? "sm" : "default"}
+      className={triggerClassName}
+    >
       {worker ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4 mr-2" />}
       {worker ? "" : "Add New Worker"}
     </Button>

@@ -1,11 +1,12 @@
 import React from 'react';
-import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
+import Joyride, { Step, CallBackProps, STATUS, ACTIONS } from 'react-joyride';
 
 interface OnboardingTourProps {
   steps: Step[];
   run: boolean;
   onComplete: () => void;
   onSkip: () => void;
+  onStepChange?: (stepIndex: number) => void;
 }
 
 export const OnboardingTour: React.FC<OnboardingTourProps> = ({
@@ -13,10 +14,16 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
   run,
   onComplete,
   onSkip,
+  onStepChange,
 }) => {
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status, action } = data;
+    const { status, action, index } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+
+    // Track step changes
+    if ((action === ACTIONS.NEXT || action === ACTIONS.PREV) && onStepChange) {
+      onStepChange(index);
+    }
 
     if (finishedStatuses.includes(status)) {
       if (action === 'skip' || status === STATUS.SKIPPED) {

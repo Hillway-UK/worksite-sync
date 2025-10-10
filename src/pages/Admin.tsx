@@ -13,6 +13,7 @@ import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import { RecentActivityCard } from '@/components/RecentActivityCard';
 import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
 import { dashboardSteps } from '@/config/onboarding';
+import { setAutoContinueWorkersPage } from '@/lib/supabase/manager-tutorial';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -412,6 +413,12 @@ export default function Admin() {
         autoRun={true}
         forceRun={showTutorial}
         onTourEnd={() => setShowTutorial(false)}
+        onStepChange={async (stepIndex) => {
+          // When user reaches the Workers navigation step (last step), set flag
+          if (stepIndex === dashboardSteps.length - 1) {
+            await setAutoContinueWorkersPage(true);
+          }
+        }}
       />
     </Layout>
   );

@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WorkerDialog } from '@/components/WorkerDialog';
 import { PhotoModal } from '@/components/PhotoModal';
 import { toast } from '@/hooks/use-toast';
-import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Trash2, MoreVertical } from 'lucide-react';
+import { Users, Search, ToggleLeft, ToggleRight, Camera, Users2, Plus, Trash2, MoreVertical, HelpCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -18,6 +18,9 @@ import { useCapacityCheck } from '@/hooks/useCapacityCheck';
 import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
+import { workersSteps } from '@/config/onboarding';
+import { shouldAutoContinueWorkersPage, setAutoContinueWorkersPage } from '@/lib/supabase/manager-tutorial';
 
 interface Worker {
   id: string;
@@ -79,6 +82,7 @@ export default function AdminWorkers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [weeklyHours, setWeeklyHours] = useState<Record<string, number>>({});
+  const [showWorkersTour, setShowWorkersTour] = useState(false);
   const [photoModal, setPhotoModal] = useState<{
     isOpen: boolean;
     photoUrl: string;
@@ -109,6 +113,18 @@ export default function AdminWorkers() {
   });
   
   const { checkCapacity } = useCapacityCheck();
+
+  // Check if should auto-run tutorial from dashboard
+  useEffect(() => {
+    const checkAutoRun = async () => {
+      const shouldRun = await shouldAutoContinueWorkersPage();
+      if (shouldRun) {
+        setTimeout(() => setShowWorkersTour(true), 800);
+        await setAutoContinueWorkersPage(false);
+      }
+    };
+    checkAutoRun();
+  }, []);
 
   useEffect(() => {
     fetchWorkers();
@@ -426,6 +442,15 @@ export default function AdminWorkers() {
                   className="pl-9 w-64"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowWorkersTour(true)}
+                className="gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                Tutorial
+              </Button>
               <Button 
                 id="btn-add-worker"
                 onClick={() => handleAddWorker()}
@@ -534,6 +559,7 @@ export default function AdminWorkers() {
                               worker={worker} 
                               onSave={fetchWorkers}
                               onCapacityLimit={handleWorkerCapacityLimit}
+                              triggerClassName="worker-edit-button"
                             />
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -567,7 +593,7 @@ export default function AdminWorkers() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => setDeleteDialog({ isOpen: true, worker })}
-                                  className="text-destructive"
+                                  className="text-destructive worker-delete-button"
                                   disabled={operationLoading[worker.id]}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -626,15 +652,23 @@ export default function AdminWorkers() {
         </AlertDialog>
 
         {/* Capacity Limit Dialog */}
-      <CapacityLimitDialog
-        open={capacityLimitDialog.open}
-        onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
-        type={capacityLimitDialog.type}
-        planName={capacityLimitDialog.planName}
-        currentCount={capacityLimitDialog.currentCount}
-        maxAllowed={capacityLimitDialog.maxAllowed}
-        plannedCount={capacityLimitDialog.plannedCount}
-      />
+        <CapacityLimitDialog
+          open={capacityLimitDialog.open}
+          onClose={() => setCapacityLimitDialog({ ...capacityLimitDialog, open: false })}
+          type={capacityLimitDialog.type}
+          planName={capacityLimitDialog.planName}
+          currentCount={capacityLimitDialog.currentCount}
+          maxAllowed={capacityLimitDialog.maxAllowed}
+          plannedCount={capacityLimitDialog.plannedCount}
+        />
+
+        {/* Workers Tutorial */}
+        <ManagerTourGate
+          steps={workersSteps}
+          autoRun={false}
+          forceRun={showWorkersTour}
+          onTourEnd={() => setShowWorkersTour(false)}
+        />
       </div>
     </Layout>
   );
