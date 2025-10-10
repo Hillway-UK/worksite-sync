@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, HelpCircle } from 'lucide-react';
 import moment from 'moment';
 import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
 import { formatUKTime } from '@/lib/timezone-utils';
@@ -45,6 +45,7 @@ export default function AdminAmendments() {
   const [showExpenseTour, setShowExpenseTour] = useState(false);
   const [showAmendmentsTour, setShowAmendmentsTour] = useState(false);
   const [activeTab, setActiveTab] = useState('expenses');
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
   useEffect(() => {
     fetchAmendments();
@@ -71,12 +72,22 @@ export default function AdminAmendments() {
   const handleAmendmentsTourEnd = async () => {
     setShowAmendmentsTour(false);
     await markPageTutorialComplete('amendments');
-    // Navigate to Reports page
+    // Show completion dialog
+    setShowCompletionDialog(true);
+  };
+
+  const handleTutorialReplay = () => {
+    setActiveTab('expenses');
+    setTimeout(() => setShowExpenseTour(true), 300);
+  };
+
+  const handleFinishTutorial = () => {
+    setShowCompletionDialog(false);
     toast({
-      title: "Tutorial Complete!",
-      description: "Let's move on to the Reports page.",
+      title: "Great job!",
+      description: "Navigating to Reports page...",
     });
-    setTimeout(() => navigate('/reports'), 1000);
+    setTimeout(() => navigate('/reports'), 500);
   };
 
   const fetchAmendments = async () => {
@@ -258,9 +269,19 @@ export default function AdminAmendments() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Admin Management</h1>
-          <p className="text-muted-foreground">Manage time amendments and expense types</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Admin Management</h1>
+            <p className="text-muted-foreground">Manage time amendments and expense types</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleTutorialReplay}
+            className="flex items-center gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Tutorial
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" id="status-filter-tabs">
@@ -396,6 +417,31 @@ export default function AdminAmendments() {
           </Dialog>
         )}
       </div>
+
+      {/* Completion Dialog */}
+      <Dialog open={showCompletionDialog} onOpenChange={setShowCompletionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">🎉 Tutorial Complete!</DialogTitle>
+          </DialogHeader>
+          <div className="py-6">
+            <p className="text-center text-muted-foreground">
+              📊 Ready to manage time and expense amendments? Click here to review and approve worker submissions!
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCompletionDialog(false)}
+            >
+              Back
+            </Button>
+            <Button onClick={handleFinishTutorial}>
+              Finish
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Expense Types Tutorial */}
       <OnboardingTour
