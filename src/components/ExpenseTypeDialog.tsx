@@ -11,6 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { z } from 'zod';
+import { OnboardingTour } from './onboarding/OnboardingTour';
+import { addExpenseTypeSteps } from '@/config/onboarding';
+import { hasSeenAddExpenseTypeTutorial, markAddExpenseTypeTutorialSeen } from '@/lib/supabase/manager-tutorial';
 
 interface ExpenseType {
   id: string;
@@ -45,6 +48,7 @@ type ExpenseTypeForm = z.infer<typeof expenseTypeSchema>;
 export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, presetData }: ExpenseTypeDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showTutorial, setShowTutorial] = useState(false);
   const [formData, setFormData] = useState<ExpenseTypeForm>({
     name: '',
     amount: 0,
@@ -96,6 +100,24 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
     }
     setErrors({});
   }, [expenseType, presetData, open]);
+
+  // Check if tutorial should be shown when dialog opens (only for new expense types)
+  useEffect(() => {
+    const checkTutorial = async () => {
+      if (open && !expenseType) {
+        const hasSeenTutorial = await hasSeenAddExpenseTypeTutorial();
+        if (!hasSeenTutorial) {
+          setTimeout(() => setShowTutorial(true), 500);
+        }
+      }
+    };
+    checkTutorial();
+  }, [open, expenseType]);
+
+  const handleTutorialEnd = async () => {
+    setShowTutorial(false);
+    await markAddExpenseTypeTutorialSeen();
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseTypeForm) => {
@@ -262,8 +284,13 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
   const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent 
+        className="sm:max-w-[500px]"
+        onInteractOutside={(e) => showTutorial && e.preventDefault()}
+        onEscapeKeyDown={(e) => showTutorial && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {expenseType ? 'Edit Expense Type' : 'Create Expense Type'}
@@ -376,7 +403,7 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading} className="expense-submit-button">
                 {expenseType ? 'Update' : 'Create'}
               </Button>
             </div>
@@ -384,5 +411,13 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
         </form>
       </DialogContent>
     </Dialog>
+
+    <OnboardingTour
+      steps={addExpenseTypeSteps}
+      run={showTutorial}
+      onComplete={handleTutorialEnd}
+      onSkip={handleTutorialEnd}
+    />
+    </>
   );
 }

@@ -11,3 +11,4 @@ export { addWorkerSteps } from './manager-add-worker-steps';
 export { addJobSteps } from './manager-add-job-steps';
 export { expenseTypesSteps } from './manager-expense-types-steps';
 export { timeAmendmentsSteps } from './manager-time-amendments-steps';
+export { addExpenseTypeSteps } from './manager-add-expense-type-steps';

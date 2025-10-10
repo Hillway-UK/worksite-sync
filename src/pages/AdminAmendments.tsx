@@ -83,11 +83,6 @@ export default function AdminAmendments() {
 
   const handleFinishTutorial = () => {
     setShowCompletionDialog(false);
-    toast({
-      title: "Great job!",
-      description: "Navigating to Reports page...",
-    });
-    setTimeout(() => navigate('/reports'), 500);
   };
 
   const fetchAmendments = async () => {
@@ -426,18 +421,12 @@ export default function AdminAmendments() {
           </DialogHeader>
           <div className="py-6">
             <p className="text-center text-muted-foreground">
-              📊 Ready to manage time and expense amendments? Click here to review and approve worker submissions!
+              📊 You now know how to manage expense types and time amendments! Feel free to explore more or click Reports in the navigation to generate detailed reports.
             </p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowCompletionDialog(false)}
-            >
-              Back
-            </Button>
-            <Button onClick={handleFinishTutorial}>
-              Finish
+            <Button onClick={() => setShowCompletionDialog(false)}>
+              Got it!
             </Button>
           </div>
         </DialogContent>

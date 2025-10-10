@@ -162,3 +162,19 @@ export async function hasSeenAddJobTutorial(): Promise<boolean> {
 export async function markAddJobTutorialSeen(): Promise<void> {
   localStorage.setItem('tutorial-add-job-seen', 'true');
 }
+
+/**
+ * Check if Add Expense Type modal tutorial has been seen
+ * @returns true if tutorial has been completed
+ */
+export async function hasSeenAddExpenseTypeTutorial(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-add-expense-type-seen');
+  return flag === 'true';
+}
+
+/**
+ * Mark Add Expense Type modal tutorial as seen
+ */
+export async function markAddExpenseTypeTutorialSeen(): Promise<void> {
+  localStorage.setItem('tutorial-add-expense-type-seen', 'true');
+}
