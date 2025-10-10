@@ -13,6 +13,13 @@ import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import moment from 'moment';
 import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
 import { formatUKTime } from '@/lib/timezone-utils';
+import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
+import { amendmentsSteps } from '@/config/onboarding';
+import {
+  shouldAutoContinueAmendmentsPage,
+  setAutoContinueAmendmentsPage,
+  markPageTutorialComplete,
+} from '@/lib/supabase/manager-tutorial';
 
 interface Amendment {
   id: string;
@@ -34,10 +41,28 @@ export default function AdminAmendments() {
   const [managerNotes, setManagerNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showAmendmentsTour, setShowAmendmentsTour] = useState(false);
 
   useEffect(() => {
     fetchAmendments();
   }, []);
+
+  // Check if should auto-run tutorial from Jobs page
+  useEffect(() => {
+    const checkAutoRun = async () => {
+      const shouldRun = await shouldAutoContinueAmendmentsPage();
+      if (shouldRun) {
+        setTimeout(() => setShowAmendmentsTour(true), 800);
+        await setAutoContinueAmendmentsPage(false);
+      }
+    };
+    checkAutoRun();
+  }, []);
+
+  const handleAmendmentsTourEnd = async () => {
+    setShowAmendmentsTour(false);
+    await markPageTutorialComplete('amendments');
+  };
 
   const fetchAmendments = async () => {
     try {
@@ -354,6 +379,14 @@ export default function AdminAmendments() {
           </Dialog>
         )}
       </div>
+
+      {/* Amendments Tutorial */}
+      <ManagerTourGate
+        steps={amendmentsSteps}
+        autoRun={false}
+        forceRun={showAmendmentsTour}
+        onTourEnd={handleAmendmentsTourEnd}
+      />
     </Layout>
   );
 }

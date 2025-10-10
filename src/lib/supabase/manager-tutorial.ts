@@ -111,6 +111,27 @@ export async function setAutoContinueJobsPage(value: boolean): Promise<void> {
 }
 
 /**
+ * Check if amendments page tutorial should auto-continue
+ * @returns true if should auto-run amendments tutorial
+ */
+export async function shouldAutoContinueAmendmentsPage(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-auto-continue-amendments');
+  return flag === 'true';
+}
+
+/**
+ * Set flag for amendments page auto-continuation
+ * @param value - Whether to auto-continue
+ */
+export async function setAutoContinueAmendmentsPage(value: boolean): Promise<void> {
+  if (value) {
+    localStorage.setItem('tutorial-auto-continue-amendments', 'true');
+  } else {
+    localStorage.removeItem('tutorial-auto-continue-amendments');
+  }
+}
+
+/**
  * Check if Add Worker modal tutorial has been seen
  * @returns true if tutorial has been completed
  */

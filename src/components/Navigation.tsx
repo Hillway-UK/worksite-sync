@@ -134,6 +134,7 @@ export const Navigation: React.FC = () => {
                 Jobs
               </Button>
               <Button
+                id="nav-amendments-button"
                 variant={location.pathname === '/admin/amendments' ? 'secondary' : 'ghost'}
                 onClick={() => navigate('/admin/amendments')}
                 className={location.pathname === '/admin/amendments' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:text-white hover:bg-gray-800'}

@@ -16,6 +16,7 @@ import { jobsSteps } from '@/config/onboarding';
 import {
   shouldAutoContinueJobsPage,
   setAutoContinueJobsPage,
+  setAutoContinueAmendmentsPage,
   markPageTutorialComplete,
 } from '@/lib/supabase/manager-tutorial';
 
@@ -61,6 +62,13 @@ export default function AdminJobs() {
   const handleJobsTourEnd = async () => {
     setShowJobsTour(false);
     await markPageTutorialComplete('jobs');
+  };
+
+  const handleJobsStepChange = async (stepIndex: number) => {
+    // If user reaches the Amendments navigation step (step 10), set flag
+    if (stepIndex === 10) {
+      await setAutoContinueAmendmentsPage(true);
+    }
   };
 
   const fetchJobs = async () => {
@@ -424,6 +432,7 @@ export default function AdminJobs() {
           autoRun={false}
           forceRun={showJobsTour}
           onTourEnd={handleJobsTourEnd}
+          onStepChange={handleJobsStepChange}
         />
       </Layout>
     );
