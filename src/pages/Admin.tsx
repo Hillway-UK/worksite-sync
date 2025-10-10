@@ -10,6 +10,7 @@ import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, A
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
+import { RecentActivityCard } from '@/components/RecentActivityCard';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -374,15 +375,13 @@ export default function Admin() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity - Temporarily Hidden */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500">Activity tracking coming soon</p>
-            </CardContent>
-          </Card>
+          {/* Recent Activity - Auto Clockouts */}
+          <div className="md:col-span-2">
+            <RecentActivityCard 
+              maxItems={20}
+              maxHeight="24rem"
+            />
+          </div>
         </div>
       </div>
 
