@@ -318,7 +318,7 @@ export default function Admin() {
             title="Click to manage workers"
             style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
-            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-purple-50 to-purple-100 group-hover:from-purple-100 group-hover:to-purple-200 relative">
+            <Card id="active-workers-card" className="transition-all duration-200 hover:scale-105 hover:shadow-lg group-hover:border-primary/20 bg-gradient-to-br from-purple-50 to-purple-100 group-hover:from-purple-100 group-hover:to-purple-200 relative">
               <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">Active Workers</CardTitle>

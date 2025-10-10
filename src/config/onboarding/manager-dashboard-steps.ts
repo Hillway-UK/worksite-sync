@@ -8,14 +8,19 @@ export const dashboardSteps: Step[] = [
     disableBeacon: true,
   },
   {
-    target: '#clocked-in-card',
-    content: '👷 Here you can see who\'s currently clocked in — live and in real-time.',
+    target: '#recent-activity-card',
+    content: '🔔 This shows all recent workers who are auto clocked-out',
+    placement: 'top',
+  },
+  {
+    target: '#active-workers-card',
+    content: '👥 Here you can see all of your team workers who are currently active',
     placement: 'bottom',
   },
   {
-    target: '#recent-activity-card',
-    content: '🔔 This feed shows your team\'s latest clock-ins and auto clock-outs.',
-    placement: 'top',
+    target: '#clocked-in-card',
+    content: '👷 Here you can see all of your team workers who are currently on-site',
+    placement: 'bottom',
   },
   {
     target: '#quick-nav-workers',
