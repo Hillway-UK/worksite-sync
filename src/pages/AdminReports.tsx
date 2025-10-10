@@ -812,8 +812,13 @@ export default function AdminReports() {
           </CardHeader>
           <CardContent className="flex gap-4 items-end">
             <div>
-              <Label htmlFor="week">Week Starting (Monday)</Label>
-              <Input id="week" type="date" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} />
+              <Label htmlFor="week-selector">Week Starting (Monday)</Label>
+              <Input 
+                id="week-selector" 
+                type="date" 
+                value={selectedWeek} 
+                onChange={(e) => setSelectedWeek(e.target.value)} 
+              />
             </div>
             <Button onClick={generateReport} disabled={loading}>
               {loading ? "Generating..." : "Generate Report"}
@@ -838,7 +843,12 @@ export default function AdminReports() {
                   <CardTitle>Weekly Summary</CardTitle>
                   <div className="flex items-center gap-2">
                     <XeroSettingsModal onSettingsChange={setXeroSettings} />
-                    <Button onClick={generateXeroCSV} disabled={weeklyData.length === 0 || loading} variant="outline">
+                    <Button 
+                      id="export-xero-btn"
+                      onClick={generateXeroCSV} 
+                      disabled={weeklyData.length === 0 || loading} 
+                      variant="outline"
+                    >
                       <Download className="h-4 w-4 mr-2" />
                       Export to Xero
                     </Button>
@@ -846,7 +856,7 @@ export default function AdminReports() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table id="timesheet-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Worker</TableHead>
@@ -947,7 +957,7 @@ export default function AdminReports() {
                       return (
                         <Collapsible key={workerId}>
                           <CollapsibleTrigger
-                            className="flex items-center justify-between w-full p-4 bg-muted rounded-lg hover:bg-muted/80"
+                            className="row-expand-btn flex items-center justify-between w-full p-4 bg-muted rounded-lg hover:bg-muted/80"
                             onClick={() => toggleWorkerExpansion(workerId)}
                           >
                             <div className="flex items-center gap-3">

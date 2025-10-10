@@ -419,6 +419,7 @@ export default function AdminWorkers() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  id="worker-search"
                   placeholder="Search workers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -426,6 +427,7 @@ export default function AdminWorkers() {
                 />
               </div>
               <Button 
+                id="btn-add-worker"
                 onClick={() => handleAddWorker()}
                 className="bg-black hover:bg-gray-800"
               >
@@ -518,7 +520,7 @@ export default function AdminWorkers() {
                         <TableCell>{worker.email}</TableCell>
                         <TableCell>{worker.phone || '-'}</TableCell>
                         <TableCell>£{worker.hourly_rate.toFixed(2)}</TableCell>
-                        <TableCell>
+                        <TableCell className="weekly-hours-cell">
                           {weeklyHours[worker.id]?.toFixed(1) || '0.0'}h
                         </TableCell>
                         <TableCell>
@@ -548,6 +550,7 @@ export default function AdminWorkers() {
                                 <DropdownMenuItem
                                   onClick={() => toggleWorkerStatus(worker.id, worker.is_active)}
                                   disabled={operationLoading[worker.id]}
+                                  className="worker-toggle-active"
                                 >
                                   {worker.is_active ? (
                                     <>

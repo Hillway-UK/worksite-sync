@@ -6,11 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight, KeyRound } from 'lucide-react';
+import { Briefcase, Users, Clock, FileText, AlertTriangle, TrendingUp, Users2, ArrowRight, KeyRound, HelpCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import { RecentActivityCard } from '@/components/RecentActivityCard';
+import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
+import { dashboardSteps } from '@/config/onboarding';
 
 interface CllockedInWorker {
   worker_id: string;
@@ -41,6 +43,7 @@ export default function Admin() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>('');
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const fetchOrganization = async () => {
@@ -197,8 +200,17 @@ export default function Admin() {
             AutoTime - Manager Console
           </p>
           
-          {/* Change Password Button */}
-          <div className="flex justify-center mt-4">
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-3 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTutorial(true)}
+              className="gap-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Run Tutorial
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -220,12 +232,13 @@ export default function Admin() {
         {/* Statistics Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <div 
+            id="quick-nav-workers"
             onClick={() => { setIsNavigating(true); navigate('/admin/workers'); }}
             className="cursor-pointer group active:scale-95"
             title="Click to view all workers"
             style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
-            <Card className="transition-all duration-200 hover:scale-105 hover:shadow-xl group-hover:border-primary/20 bg-gradient-to-br from-primary to-primary/90 group-hover:from-primary/90 group-hover:to-primary relative">
+            <Card id="clocked-in-card" className="transition-all duration-200 hover:scale-105 hover:shadow-xl group-hover:border-primary/20 bg-gradient-to-br from-primary to-primary/90 group-hover:from-primary/90 group-hover:to-primary relative">
               <ArrowRight className="absolute top-4 right-4 w-4 h-4 text-primary-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-heading font-bold text-primary-foreground">Currently Clocked In</CardTitle>
@@ -246,6 +259,7 @@ export default function Admin() {
           </div>
 
           <div 
+            id="quick-nav-reports"
             onClick={() => { setIsNavigating(true); navigate('/admin/reports'); }}
             className="cursor-pointer group active:scale-95"
             title="Click to view today's reports"
@@ -272,6 +286,7 @@ export default function Admin() {
           </div>
 
           <div 
+            id="quick-nav-amendments"
             onClick={() => { setIsNavigating(true); navigate('/admin/amendments'); }}
             className="cursor-pointer group active:scale-95"
             title="Click to review amendments"
@@ -376,7 +391,7 @@ export default function Admin() {
           </Card>
 
           {/* Recent Activity - Auto Clockouts */}
-          <div className="md:col-span-2">
+          <div id="recent-activity-card" className="md:col-span-2">
             <RecentActivityCard 
               maxItems={20}
               maxHeight="24rem"
@@ -389,6 +404,14 @@ export default function Admin() {
       <ChangePasswordDialog 
         open={showChangePassword} 
         onOpenChange={setShowChangePassword}
+      />
+
+      {/* Manager Tutorial */}
+      <ManagerTourGate
+        steps={dashboardSteps}
+        autoRun={true}
+        forceRun={showTutorial}
+        onTourEnd={() => setShowTutorial(false)}
       />
     </Layout>
   );

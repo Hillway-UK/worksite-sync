@@ -223,10 +223,10 @@ export default function AdminAmendments() {
           <p className="text-muted-foreground">Manage time amendments and expense types</p>
         </div>
 
-        <Tabs defaultValue="expenses" className="w-full">
+        <Tabs defaultValue="expenses" className="w-full" id="status-filter-tabs">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="expenses">Expense Types</TabsTrigger>
-            <TabsTrigger value="amendments">Time Amendments</TabsTrigger>
+            <TabsTrigger id="amendments-tab" value="amendments">Time Amendments</TabsTrigger>
           </TabsList>
           
           <TabsContent value="expenses" className="space-y-6">
@@ -294,18 +294,18 @@ export default function AdminAmendments() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {amendment.status === 'pending' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="hover:bg-secondary/80"
-                            onClick={() => setSelectedAmendment(amendment)}
-                          >
-                            Review
-                          </Button>
-                        )}
-                      </TableCell>
+                       <TableCell>
+                         {amendment.status === 'pending' && (
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             className="hover:bg-secondary/80"
+                             onClick={() => setSelectedAmendment(amendment)}
+                           >
+                             Review
+                           </Button>
+                         )}
+                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -332,23 +332,23 @@ export default function AdminAmendments() {
                   value={managerNotes}
                   onChange={(e) => setManagerNotes(e.target.value)}
                 />
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => handleApproval(selectedAmendment.id, 'approved')}
-                    className="flex-1 hover:bg-primary/90"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve
-                  </Button>
-                  <Button
-                    onClick={() => handleApproval(selectedAmendment.id, 'rejected')}
-                    variant="destructive"
-                    className="flex-1 hover:bg-destructive/90"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject
-                  </Button>
-                </div>
+                 <div className="flex space-x-2">
+                   <Button
+                     onClick={() => handleApproval(selectedAmendment.id, 'approved')}
+                     className="btn-approve-amendment flex-1 hover:bg-primary/90"
+                   >
+                     <CheckCircle className="h-4 w-4 mr-2" />
+                     Approve
+                   </Button>
+                   <Button
+                     onClick={() => handleApproval(selectedAmendment.id, 'rejected')}
+                     variant="destructive"
+                     className="btn-reject-amendment flex-1 hover:bg-destructive/90"
+                   >
+                     <XCircle className="h-4 w-4 mr-2" />
+                     Reject
+                   </Button>
+                 </div>
               </div>
             </DialogContent>
           </Dialog>
