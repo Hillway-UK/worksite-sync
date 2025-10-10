@@ -146,3 +146,19 @@ export async function hasSeenAddWorkerTutorial(): Promise<boolean> {
 export async function markAddWorkerTutorialSeen(): Promise<void> {
   localStorage.setItem('tutorial-add-worker-seen', 'true');
 }
+
+/**
+ * Check if Add Job modal tutorial has been seen
+ * @returns true if tutorial has been completed
+ */
+export async function hasSeenAddJobTutorial(): Promise<boolean> {
+  const flag = localStorage.getItem('tutorial-add-job-seen');
+  return flag === 'true';
+}
+
+/**
+ * Mark Add Job modal tutorial as seen
+ */
+export async function markAddJobTutorialSeen(): Promise<void> {
+  localStorage.setItem('tutorial-add-job-seen', 'true');
+}

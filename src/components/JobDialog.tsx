@@ -13,6 +13,9 @@ import { Plus, Edit, MapPin } from 'lucide-react';
 import { LeafletMap } from './LeafletMap';
 import { validatePostcode, geocodePostcode, formatLegacyAddress, formatPostcode } from '@/lib/postcode-utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { ManagerTourGate } from './onboarding/ManagerTourGate';
+import { addJobSteps } from '@/config/onboarding';
+import { hasSeenAddJobTutorial, markAddJobTutorialSeen } from '@/lib/supabase/manager-tutorial';
 
 const jobSchema = z.object({
   code: z.string().min(1, 'Job code is required'),
@@ -63,6 +66,7 @@ export function JobDialog({ job, onSave, trigger, triggerClassName }: JobDialogP
     job ? [job.latitude, job.longitude] : undefined
   );
   const [radius, setRadius] = useState(job?.geofence_radius || 100);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const {
     register,
@@ -102,6 +106,24 @@ const { organizationId, user } = useAuth();
 
 // Watch postcode field
 const watchedPostcode = watch('postcode');
+
+// Check if tutorial should be shown when dialog opens (only for new jobs)
+useEffect(() => {
+  const checkTutorial = async () => {
+    if (open && !job) {
+      const hasSeenTutorial = await hasSeenAddJobTutorial();
+      if (!hasSeenTutorial) {
+        setTimeout(() => setShowTutorial(true), 500);
+      }
+    }
+  };
+  checkTutorial();
+}, [open, job]);
+
+const handleTutorialEnd = async () => {
+  setShowTutorial(false);
+  await markAddJobTutorialSeen();
+};
 
   const handleManualGeocode = async () => {
     if (!watchedPostcode || geocoding) return;
@@ -289,6 +311,7 @@ const watchedPostcode = watch('postcode');
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="job-details-section space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="code">Job Code</Label>
@@ -397,7 +420,9 @@ const watchedPostcode = watch('postcode');
               </p>
             </div>
           </div>
+          </div>
 
+          <div className="job-location-section space-y-4">
           <div>
             <Label className="flex items-center gap-2 mb-2">
               <MapPin className="h-4 w-4" />
@@ -413,7 +438,7 @@ const watchedPostcode = watch('postcode');
             />
           </div>
 
-          <div>
+          <div className="job-geofence-slider">
             <Label>Geofence Radius: {radius} meters</Label>
             <div className="mt-2">
               <Slider
@@ -430,6 +455,7 @@ const watchedPostcode = watch('postcode');
               <span>500m</span>
             </div>
           </div>
+          </div>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button
@@ -439,12 +465,20 @@ const watchedPostcode = watch('postcode');
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="job-submit-button">
               {loading ? 'Saving...' : (job ? 'Update' : 'Create')}
             </Button>
           </div>
         </form>
       </DialogContent>
+      
+      {/* Add Job Tutorial */}
+      <ManagerTourGate
+        steps={addJobSteps}
+        autoRun={false}
+        forceRun={showTutorial}
+        onTourEnd={handleTutorialEnd}
+      />
     </Dialog>
   );
 }
