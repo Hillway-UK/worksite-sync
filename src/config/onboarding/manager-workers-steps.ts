@@ -29,7 +29,7 @@ export const workersSteps: Step[] = [
   },
   {
     target: '.worker-status-badge',
-    content: '✅ Green badge means active, gray means inactive.',
+    content: '✅ Active workers can log in to the app. Inactive workers cannot.',
     placement: 'top',
   },
   {
