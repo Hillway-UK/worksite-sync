@@ -26,4 +26,9 @@ export const timeAmendmentsSteps: Step[] = [
     content: '❌ Reject the request if needed. Always add a reason so the worker understands why.',
     placement: 'left',
   },
+  {
+    target: '#nav-reports-button',
+    content: '📊 Next, click Reports to generate detailed time and expense reports for your team!',
+    placement: 'bottom',
+  },
 ];
