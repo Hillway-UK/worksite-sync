@@ -433,6 +433,8 @@ export default function AdminJobs() {
           forceRun={showJobsTour}
           onTourEnd={handleJobsTourEnd}
           onStepChange={handleJobsStepChange}
+          completionDescription="You now know how to manage jobs! If you want a refresher later, just click the 'Tutorial' button on this page."
+          exploreButtonText="Explore Jobs"
         />
       </Layout>
     );

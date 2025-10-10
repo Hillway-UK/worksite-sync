@@ -15,6 +15,9 @@ interface ManagerTourGateProps {
   forceRun?: boolean; // Manual replay
   onTourEnd?: () => void;
   onStepChange?: (stepIndex: number) => void; // Callback when step changes
+  completionTitle?: string;
+  completionDescription?: string;
+  exploreButtonText?: string;
 }
 
 export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
@@ -23,6 +26,9 @@ export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
   forceRun = false,
   onTourEnd,
   onStepChange,
+  completionTitle,
+  completionDescription,
+  exploreButtonText,
 }) => {
   const [runTour, setRunTour] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -88,6 +94,9 @@ export const ManagerTourGate: React.FC<ManagerTourGateProps> = ({
         open={showCompletionModal}
         onReplay={handleReplay}
         onClose={handleCloseModal}
+        title={completionTitle}
+        description={completionDescription}
+        exploreButtonText={exploreButtonText}
       />
     </>
   );

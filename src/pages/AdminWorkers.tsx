@@ -689,6 +689,8 @@ export default function AdminWorkers() {
           forceRun={showWorkersTour}
           onTourEnd={handleWorkersTourEnd}
           onStepChange={handleWorkersStepChange}
+          completionDescription="You now know how to manage workers! If you want a refresher later, just click the 'Tutorial' button on this page."
+          exploreButtonText="Explore Workers"
         />
       </div>
     </Layout>
