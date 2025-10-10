@@ -40,7 +40,6 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
       run={run}
       continuous
       showSkipButton
-      showProgress
       disableOverlayClose
       disableCloseOnEsc={false}
       scrollToFirstStep
@@ -84,9 +83,11 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         back: 'Back',
         close: 'Close',
         last: 'Finish',
-        next: 'Next',
+        next: 'Next Step',
         skip: 'Skip tour',
       }}
+      hideBackButton={false}
+      disableScrolling={false}
       callback={handleJoyrideCallback}
     />
   );
