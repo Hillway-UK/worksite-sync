@@ -41,7 +41,6 @@ export default function AdminJobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [workerCounts, setWorkerCounts] = useState<Record<string, number>>({});
   const [showJobsTour, setShowJobsTour] = useState(false);
 
   useEffect(() => {
@@ -106,24 +105,6 @@ export default function AdminJobs() {
       if (error) throw error;
       setJobs(data || []);
 
-      // Fetch worker counts for each job
-      const counts: Record<string, number> = {};
-      for (const job of data || []) {
-        try {
-          const { count, error: countError } = await supabase
-            .from('clock_entries')
-            .select('*', { count: 'exact', head: true })
-            .eq('job_id', job.id)
-            .is('clock_out', null);
-
-          if (!countError) {
-            counts[job.id] = count || 0;
-          }
-        } catch (error) {
-          console.error(`Error fetching worker count for job ${job.id}:`, error);
-        }
-      }
-      setWorkerCounts(counts);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast({
@@ -308,7 +289,6 @@ export default function AdminJobs() {
                       <TableHead>Name</TableHead>
                       <TableHead>Address</TableHead>
                       <TableHead>Geofence</TableHead>
-                      <TableHead>Workers On Site</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -320,7 +300,6 @@ export default function AdminJobs() {
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-8 rounded-full" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-2">
@@ -396,7 +375,7 @@ export default function AdminJobs() {
                 <TableBody>
                   {filteredJobs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12">
+                      <TableCell colSpan={6} className="text-center py-12">
                         {searchTerm ? (
                           <div>
                             <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -449,14 +428,6 @@ export default function AdminJobs() {
                             <MapPin className="h-3 w-3" />
                             {job.geofence_radius}m
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={workerCounts[job.id] > 0 ? "default" : "secondary"}
-                            className="workers-on-site-badge"
-                          >
-                            {workerCounts[job.id] || 0}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={job.is_active ? "default" : "secondary"}>
