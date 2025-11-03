@@ -10,16 +10,16 @@ import { format } from "date-fns";
 interface AutoClockoutActivity {
   id: string;
   worker_id: string;
+  worker_name: string;
+  worker_email: string;
+  job_name: string | null;
   shift_date: string;
   performed: boolean;
   reason: string;
   decided_at: string;
   notes: string | null;
-  worker_name: string;
-  worker_email: string;
   organization_id: string;
   clock_out_time: string | null;
-  job_name: string | null;
 }
 
 interface RecentActivityCardProps {
@@ -200,7 +200,7 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
         {activities.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No auto-clockout activities in the past 14 days.</p>
+            <p className="text-muted-foreground">No auto-clockout activities in the last 14 days.</p>
           </div>
         ) : (
           <ScrollArea style={{ maxHeight }} className="w-full">
