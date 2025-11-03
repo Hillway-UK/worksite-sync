@@ -394,7 +394,6 @@ export default function Admin() {
           {/* Recent Activity - Auto Clockouts */}
           <div id="recent-activity-card" className="md:col-span-2">
             <RecentActivityCard 
-              maxItems={20}
               maxHeight="24rem"
             />
           </div>
