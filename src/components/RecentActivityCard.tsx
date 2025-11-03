@@ -66,9 +66,9 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
     if (!orgId) return;
 
     try {
-      // Calculate date 7 days ago for rolling window
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // Calculate date 14 days ago for rolling window
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
       const { data, error } = await supabase
         .from("auto_clockout_audit")
@@ -86,7 +86,7 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
         )
         .eq("workers.organization_id", orgId)
         .eq("performed", true)
-        .gte("decided_at", sevenDaysAgo.toISOString())
+        .gte("decided_at", fourteenDaysAgo.toISOString())
         .order("decided_at", { ascending: false });
 
       if (error) throw error;
@@ -191,13 +191,13 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Activity (Last 7 Days)</CardTitle>
+        <CardTitle>Recent Activity (Last 14 Days)</CardTitle>
       </CardHeader>
       <CardContent>
         {activities.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No auto-clockout activities in the past 7 days.</p>
+            <p className="text-muted-foreground">No auto-clockout activities in the past 14 days.</p>
           </div>
         ) : (
           <ScrollArea style={{ maxHeight }} className="w-full">
