@@ -187,17 +187,7 @@ Deno.serve(async (req: Request) => {
 
     // 2. Delete worker-related data
     if (worker_ids.length > 0) {
-      // Time amendments (must delete before clock_entries due to FK constraint)
-      const { error: taErr } = await admin
-        .from("time_amendments")
-        .delete()
-        .in("worker_id", worker_ids);
-      if (taErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
-        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
-      }
-
-      // Fetch related clock entry IDs for these workers (needed to clean dependent additional_costs first)
+      // Fetch related clock entry IDs (needed for dependent table cleanup)
       const { data: ceRows, error: ceIdsErr } = await admin
         .from("clock_entries")
         .select("id")
@@ -209,7 +199,51 @@ Deno.serve(async (req: Request) => {
       const clock_entry_ids = (ceRows ?? []).map((r: { id: string }) => r.id);
       console.log(`[DELETE-ORGANIZATION] Found ${clock_entry_ids.length} clock entries`);
 
-      // Additional costs that reference clock entries (delete FIRST to satisfy FK additional_costs_clock_entry_id_fkey)
+      // Fetch time amendment IDs (needed for clock_entry_history cleanup)
+      const { data: amendRows, error: amendIdsErr } = await admin
+        .from("time_amendments")
+        .select("id")
+        .in("worker_id", worker_ids);
+      if (amendIdsErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to fetch amendment ids:", amendIdsErr);
+        return oops({ error: `Failed to fetch amendment ids: ${amendIdsErr.message}` });
+      }
+      const amendment_ids = (amendRows ?? []).map((r: { id: string }) => r.id);
+      console.log(`[DELETE-ORGANIZATION] Found ${amendment_ids.length} time amendments`);
+
+      // STEP 1: Delete clock_entry_history FIRST (deepest dependency - references both clock_entries AND time_amendments)
+      if (clock_entry_ids.length > 0 || amendment_ids.length > 0) {
+        const conditions = [];
+        if (clock_entry_ids.length > 0) {
+          conditions.push(`clock_entry_id.in.(${clock_entry_ids.join(",")})`);
+        }
+        if (amendment_ids.length > 0) {
+          conditions.push(`amendment_id.in.(${amendment_ids.join(",")})`);
+        }
+        
+        const { error: cehErr } = await admin
+          .from("clock_entry_history")
+          .delete()
+          .or(conditions.join(","));
+        if (cehErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete clock_entry_history:", cehErr);
+          return oops({ error: `Failed to delete clock entry history: ${cehErr.message}` });
+        }
+      }
+
+      // STEP 2: Delete geofence_events (references clock_entries and workers)
+      if (clock_entry_ids.length > 0) {
+        const { error: gfErr } = await admin
+          .from("geofence_events")
+          .delete()
+          .in("clock_entry_id", clock_entry_ids);
+        if (gfErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete geofence_events:", gfErr);
+          return oops({ error: `Failed to delete geofence events: ${gfErr.message}` });
+        }
+      }
+
+      // STEP 3: Delete additional_costs (references clock_entries and workers)
       if (clock_entry_ids.length > 0) {
         const { error: acByCeErr } = await admin
           .from("additional_costs")
@@ -231,7 +265,17 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete additional costs (by worker): ${acByWorkerErr.message}` });
       }
 
-      // Finally delete clock entries (now safe after purging dependent additional_costs)
+      // STEP 4: Delete time_amendments (now safe after clock_entry_history is gone)
+      const { error: taErr } = await admin
+        .from("time_amendments")
+        .delete()
+        .in("worker_id", worker_ids);
+      if (taErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
+        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
+      }
+
+      // STEP 5: Delete clock_entries (now safe after all dependencies are gone)
       const { error: ceErr } = await admin
         .from("clock_entries")
         .delete()
@@ -241,7 +285,7 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete clock entries: ${ceErr.message}` });
       }
 
-      // Notifications
+      // STEP 6: Delete worker-related notification and tracking data
       const { error: notifErr } = await admin
         .from("notifications")
         .delete()
@@ -251,7 +295,6 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notifications: ${notifErr.message}` });
       }
 
-      // Notification preferences
       const { error: npErr } = await admin
         .from("notification_preferences")
         .delete()
@@ -261,7 +304,6 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notification preferences: ${npErr.message}` });
       }
 
-      // Notification log
       const { error: nlErr } = await admin
         .from("notification_log")
         .delete()
@@ -271,7 +313,6 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notification log: ${nlErr.message}` });
       }
 
-      // Auto clockout counters
       const { error: accErr } = await admin
         .from("auto_clockout_counters")
         .delete()
@@ -281,7 +322,6 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete auto clockout counters: ${accErr.message}` });
       }
 
-      // Auto clockout audit
       const { error: acaErr } = await admin
         .from("auto_clockout_audit")
         .delete()
@@ -370,7 +410,17 @@ Deno.serve(async (req: Request) => {
       return oops({ error: `Failed to delete super admins: ${saErr.message}` });
     }
 
-    // 10. Finally, delete the organization
+    // 10. Delete subscription_audit_log for this org
+    const { error: salErr } = await admin
+      .from("subscription_audit_log")
+      .delete()
+      .eq("organization_id", organization_id);
+    if (salErr) {
+      console.error("[DELETE-ORGANIZATION] Failed to delete subscription_audit_log:", salErr);
+      return oops({ error: `Failed to delete subscription audit log: ${salErr.message}` });
+    }
+
+    // 11. Finally, delete the organization
     const { error: orgDelErr } = await admin
       .from("organizations")
       .delete()
