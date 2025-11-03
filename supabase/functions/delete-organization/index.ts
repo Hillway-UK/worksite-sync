@@ -348,8 +348,35 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[DELETE-ORGANIZATION] Found ${manager_count} managers`);
 
-    // 4. Delete expense types (created by managers)
+    // 4. Get expense type IDs and delete additional_costs referencing them
     if (manager_ids.length > 0) {
+      // First, get all expense_type IDs for this organization
+      const { data: expenseTypes, error: etFetchErr } = await admin
+        .from("expense_types")
+        .select("id")
+        .in("created_by", manager_ids);
+      
+      if (etFetchErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to fetch expense_types:", etFetchErr);
+        return oops({ error: `Failed to fetch expense types: ${etFetchErr.message}` });
+      }
+
+      const expense_type_ids = (expenseTypes ?? []).map((et: { id: string }) => et.id);
+      console.log(`[DELETE-ORGANIZATION] Found ${expense_type_ids.length} expense types`);
+
+      // Delete any additional_costs referencing these expense types
+      if (expense_type_ids.length > 0) {
+        const { error: acByExpenseErr } = await admin
+          .from("additional_costs")
+          .delete()
+          .in("expense_type_id", expense_type_ids);
+        if (acByExpenseErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by expense_type_id:", acByExpenseErr);
+          return oops({ error: `Failed to delete additional costs (by expense type): ${acByExpenseErr.message}` });
+        }
+      }
+
+      // Now safe to delete expense types
       const { error: etErr } = await admin
         .from("expense_types")
         .delete()
