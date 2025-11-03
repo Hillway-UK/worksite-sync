@@ -35,6 +35,7 @@ const reasonLabels: Record<string, string> = {
   ALREADY_CLOCKED_OUT: "system rule",
   UNKNOWN: "system rule",
   OK: "system rule",
+  SYSTEM_AUTO: "auto clocked out",
 };
 
 export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardProps) {
@@ -66,62 +67,53 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
     if (!orgId) return;
 
     try {
-      // Calculate date 14 days ago for rolling window
+      // Calculate 14 days ago
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-      const { data, error } = await supabase
-        .from("auto_clockout_audit")
-        .select(
-          `
+      // Fetch clock entries where source = 'system_auto' (auto-clocked out workers)
+      // and clock_out is within the last 14 days
+      const { data: clockEntries, error } = await supabase
+        .from("clock_entries")
+        .select(`
           id,
           worker_id,
-          shift_date,
-          performed,
-          reason,
-          decided_at,
+          clock_in,
+          clock_out,
+          job_id,
           notes,
-          workers!inner(name, email, organization_id)
-        `,
-        )
+          workers!inner(name, email, organization_id),
+          jobs(name)
+        `)
+        .eq("source", "system_auto")
         .eq("workers.organization_id", orgId)
-        .eq("performed", true)
-        .gte("decided_at", fourteenDaysAgo.toISOString())
-        .order("decided_at", { ascending: false });
+        .gte("clock_out", fourteenDaysAgo.toISOString())
+        .not("clock_out", "is", null)
+        .order("clock_out", { ascending: false });
 
       if (error) throw error;
 
-      // Fetch clock_out times and job names for each entry
-      const activitiesWithDetails = await Promise.all(
-        (data || []).map(async (activity: any) => {
-          // Get clock entry with job information
-          const { data: clockEntry } = await supabase
-            .from("clock_entries")
-            .select("clock_out, job_id, jobs(name)")
-            .eq("worker_id", activity.worker_id)
-            .gte("clock_in", `${activity.shift_date}T00:00:00`)
-            .lte("clock_in", `${activity.shift_date}T23:59:59`)
-            .eq("auto_clocked_out", true)
-            .order("clock_out", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      if (!clockEntries || clockEntries.length === 0) {
+        setActivities([]);
+        setLoading(false);
+        return;
+      }
 
-          return {
-            id: activity.id,
-            worker_id: activity.worker_id,
-            shift_date: activity.shift_date,
-            performed: activity.performed,
-            reason: activity.reason,
-            decided_at: activity.decided_at,
-            notes: activity.notes,
-            worker_name: activity.workers.name,
-            worker_email: activity.workers.email,
-            organization_id: activity.workers.organization_id,
-            clock_out_time: clockEntry?.clock_out || activity.decided_at,
-            job_name: clockEntry?.jobs?.name || null,
-          };
-        }),
-      );
+      // Map to activity format
+      const activitiesWithDetails = clockEntries.map((entry: any) => ({
+        id: entry.id,
+        worker_id: entry.worker_id,
+        worker_name: entry.workers.name,
+        worker_email: entry.workers.email,
+        job_name: entry.jobs?.name || null,
+        shift_date: entry.clock_in.split('T')[0],
+        performed: true,
+        reason: entry.notes || 'Auto clocked out',
+        decided_at: entry.clock_out,
+        notes: entry.notes,
+        organization_id: entry.workers.organization_id,
+        clock_out_time: entry.clock_out,
+      }));
 
       setActivities(activitiesWithDetails);
     } catch (error) {
@@ -136,15 +128,15 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
 
     fetchActivities();
 
-    // Setup realtime subscription
+    // Setup realtime subscription for clock_entries
     const channel = supabase
-      .channel("auto_clockout_changes")
+      .channel("clock_entries_changes")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "auto_clockout_audit",
+          table: "clock_entries",
         },
         () => {
           fetchActivities();
@@ -159,9 +151,9 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
 
   const formatDateTime = (timestamp: string): string => {
     try {
-      return format(new Date(timestamp), "EEE, dd MMM yyyy, h:mm a");
+      return format(new Date(timestamp), 'dd/MM/yyyy HH:mm');
     } catch {
-      return "N/A";
+      return 'Invalid date';
     }
   };
 
@@ -169,20 +161,31 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+          <CardTitle>Recent Activity (Last 14 Days)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex gap-3">
-                <Skeleton className="h-4 w-4 mt-1" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Worker Name</TableHead>
+                <TableHead>Worker Email</TableHead>
+                <TableHead>Jobsite</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Date & Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...Array(5)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     );
@@ -208,7 +211,7 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
                   <TableHead>Worker Email</TableHead>
                   <TableHead>Jobsite</TableHead>
                   <TableHead>Reason</TableHead>
-                  <TableHead>Date & Time</TableHead>
+                  <TableHead className="whitespace-nowrap">Date & Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -216,8 +219,8 @@ export function RecentActivityCard({ maxHeight = "24rem" }: RecentActivityCardPr
                   <TableRow key={activity.id}>
                     <TableCell className="font-medium">{activity.worker_name}</TableCell>
                     <TableCell>{activity.worker_email}</TableCell>
-                    <TableCell>{activity.job_name || "N/A"}</TableCell>
-                    <TableCell>{reasonLabels[activity.reason] || reasonLabels.UNKNOWN}</TableCell>
+                    <TableCell>{activity.job_name || 'N/A'}</TableCell>
+                    <TableCell>{activity.reason}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       {formatDateTime(activity.clock_out_time || activity.decided_at)}
                     </TableCell>
