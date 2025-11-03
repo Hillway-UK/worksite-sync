@@ -166,28 +166,103 @@ export default function AdminJobs() {
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+    if (!confirm('⚠️ Are you sure you want to delete this job?\n\nThis will also permanently delete:\n• All clock entries (time records)\n• All time amendments\n• All additional costs/expenses\n• All clock entry history\n\nThis action cannot be undone.')) {
       return;
     }
     
     try {
-      const { error } = await supabase
+      console.log('Starting job deletion cascade for job:', jobId);
+      
+      // Step 1: Get all clock entries for this job
+      const { data: clockEntries, error: fetchError } = await supabase
+        .from('clock_entries')
+        .select('id')
+        .eq('job_id', jobId);
+      
+      if (fetchError) {
+        console.error('Error fetching clock entries:', fetchError);
+        throw new Error('Failed to fetch clock entries');
+      }
+      
+      if (clockEntries && clockEntries.length > 0) {
+        const clockEntryIds = clockEntries.map(ce => ce.id);
+        console.log(`Found ${clockEntryIds.length} clock entries to cascade delete`);
+        
+        // Step 2: Delete time amendments
+        const { error: amendmentsError } = await supabase
+          .from('time_amendments')
+          .delete()
+          .in('clock_entry_id', clockEntryIds);
+        
+        if (amendmentsError) {
+          console.error('Error deleting time amendments:', amendmentsError);
+          throw new Error('Failed to delete time amendments');
+        }
+        console.log('✓ Time amendments deleted');
+        
+        // Step 3: Delete additional costs (expenses)
+        const { error: costsError } = await supabase
+          .from('additional_costs')
+          .delete()
+          .in('clock_entry_id', clockEntryIds);
+        
+        if (costsError) {
+          console.error('Error deleting additional costs:', costsError);
+          throw new Error('Failed to delete additional costs');
+        }
+        console.log('✓ Additional costs deleted');
+        
+        // Step 4: Delete clock entry history
+        const { error: historyError } = await supabase
+          .from('clock_entry_history')
+          .delete()
+          .in('clock_entry_id', clockEntryIds);
+        
+        if (historyError) {
+          console.error('Error deleting clock entry history:', historyError);
+          throw new Error('Failed to delete clock entry history');
+        }
+        console.log('✓ Clock entry history deleted');
+        
+        // Step 5: Delete all clock entries (this will cascade delete geofence_events via DB)
+        const { error: clockEntriesError } = await supabase
+          .from('clock_entries')
+          .delete()
+          .eq('job_id', jobId);
+        
+        if (clockEntriesError) {
+          console.error('Error deleting clock entries:', clockEntriesError);
+          throw new Error('Failed to delete clock entries');
+        }
+        console.log('✓ Clock entries deleted');
+      } else {
+        console.log('No clock entries found for this job');
+      }
+      
+      // Step 6: Finally, delete the job itself
+      const { error: jobError } = await supabase
         .from('jobs')
         .delete()
         .eq('id', jobId);
       
-      if (error) throw error;
+      if (jobError) {
+        console.error('Error deleting job:', jobError);
+        throw jobError;
+      }
+      
+      console.log('✓ Job deleted successfully');
       
       toast({
         title: "Success",
-        description: "Job deleted successfully",
+        description: "Job and all related data deleted successfully",
       });
+      
       fetchJobs(); // Refresh the list
     } catch (error: any) {
-      console.error('Error deleting job:', error);
+      console.error('Error during job deletion cascade:', error);
       toast({
         title: "Error",
-        description: "Failed to delete job",
+        description: error.message || "Failed to delete job. Please check the console for details.",
         variant: "destructive",
       });
     }
