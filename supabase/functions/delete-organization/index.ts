@@ -169,10 +169,10 @@ Deno.serve(async (req: Request) => {
 
     // --- Cascading deletes in correct order ---
 
-    // 1. Get all worker IDs in this organization
+    // 1. Get all worker IDs and emails in this organization
     const { data: workers, error: workersErr } = await admin
       .from("workers")
-      .select("id")
+      .select("id, email")
       .eq("organization_id", organization_id);
 
     if (workersErr) {
@@ -180,7 +180,8 @@ Deno.serve(async (req: Request) => {
       return oops({ error: "Failed to fetch workers" });
     }
 
-    const worker_ids = (workers ?? []).map((w) => w.id);
+    const worker_ids = (workers ?? []).map((w: { id: string }) => w.id);
+    const worker_emails = (workers ?? []).map((w: { email: string }) => w.email);
     const worker_count = worker_ids.length;
 
     console.log(`[DELETE-ORGANIZATION] Found ${worker_count} workers`);
@@ -332,10 +333,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 3. Get all manager IDs in this organization (for expense types)
+    // 3. Get all manager IDs and emails in this organization (for expense types)
     const { data: managers, error: managersErr } = await admin
       .from("managers")
-      .select("id")
+      .select("id, email")
       .eq("organization_id", organization_id);
 
     if (managersErr) {
@@ -343,7 +344,8 @@ Deno.serve(async (req: Request) => {
       return oops({ error: "Failed to fetch managers" });
     }
 
-    const manager_ids = (managers ?? []).map((m) => m.id);
+    const manager_ids = (managers ?? []).map((m: { id: string }) => m.id);
+    const manager_emails = (managers ?? []).map((m: { email: string }) => m.email);
     const manager_count = manager_ids.length;
 
     console.log(`[DELETE-ORGANIZATION] Found ${manager_count} managers`);
@@ -387,7 +389,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 5. Delete workers
+    // 5. Delete workers from workers table
     const { error: wErr } = await admin
       .from("workers")
       .delete()
@@ -395,6 +397,27 @@ Deno.serve(async (req: Request) => {
     if (wErr) {
       console.error("[DELETE-ORGANIZATION] Failed to delete workers:", wErr);
       return oops({ error: `Failed to delete workers: ${wErr.message}` });
+    }
+
+    // 5b. Delete workers from auth.users
+    if (worker_emails.length > 0) {
+      console.log(`[DELETE-ORGANIZATION] Deleting ${worker_emails.length} workers from auth`);
+      for (const email of worker_emails) {
+        try {
+          const { data: authUsers } = await admin.auth.admin.listUsers();
+          const authUser = authUsers.users.find(u => u.email === email);
+          if (authUser) {
+            const { error: authDelErr } = await admin.auth.admin.deleteUser(authUser.id);
+            if (authDelErr) {
+              console.error(`[DELETE-ORGANIZATION] Failed to delete auth user ${email}:`, authDelErr);
+            } else {
+              console.log(`[DELETE-ORGANIZATION] Deleted auth user: ${email}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[DELETE-ORGANIZATION] Error deleting auth user ${email}:`, err);
+        }
+      }
     }
 
     // 6. Delete jobs
@@ -407,7 +430,7 @@ Deno.serve(async (req: Request) => {
       return oops({ error: `Failed to delete jobs: ${jErr.message}` });
     }
 
-    // 7. Delete managers
+    // 7. Delete managers from managers table
     const { error: mErr } = await admin
       .from("managers")
       .delete()
@@ -415,6 +438,27 @@ Deno.serve(async (req: Request) => {
     if (mErr) {
       console.error("[DELETE-ORGANIZATION] Failed to delete managers:", mErr);
       return oops({ error: `Failed to delete managers: ${mErr.message}` });
+    }
+
+    // 7b. Delete managers from auth.users
+    if (manager_emails.length > 0) {
+      console.log(`[DELETE-ORGANIZATION] Deleting ${manager_emails.length} managers from auth`);
+      for (const email of manager_emails) {
+        try {
+          const { data: authUsers } = await admin.auth.admin.listUsers();
+          const authUser = authUsers.users.find(u => u.email === email);
+          if (authUser) {
+            const { error: authDelErr } = await admin.auth.admin.deleteUser(authUser.id);
+            if (authDelErr) {
+              console.error(`[DELETE-ORGANIZATION] Failed to delete auth user ${email}:`, authDelErr);
+            } else {
+              console.log(`[DELETE-ORGANIZATION] Deleted auth user: ${email}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[DELETE-ORGANIZATION] Error deleting auth user ${email}:`, err);
+        }
+      }
     }
 
     // 8. Delete subscription usage
