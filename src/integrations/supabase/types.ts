@@ -192,6 +192,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           auto_clocked_out: boolean | null
+          auto_clockout_type: string | null
           clock_in: string
           clock_in_lat: number | null
           clock_in_lng: number | null
@@ -201,11 +202,18 @@ export type Database = {
           clock_out_lng: number | null
           clock_out_photo: string | null
           created_at: string | null
+          geofence_exit_data: Json | null
           id: string
+          is_overtime: boolean | null
           job_id: string
           manual_entry: boolean | null
           needs_approval: boolean | null
           notes: string | null
+          ot_approved_at: string | null
+          ot_approved_by: string | null
+          ot_approved_reason: string | null
+          ot_requested_at: string | null
+          ot_status: string | null
           photo_required: boolean | null
           source: string | null
           total_hours: number | null
@@ -215,6 +223,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           auto_clocked_out?: boolean | null
+          auto_clockout_type?: string | null
           clock_in: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -224,11 +233,18 @@ export type Database = {
           clock_out_lng?: number | null
           clock_out_photo?: string | null
           created_at?: string | null
+          geofence_exit_data?: Json | null
           id?: string
+          is_overtime?: boolean | null
           job_id: string
           manual_entry?: boolean | null
           needs_approval?: boolean | null
           notes?: string | null
+          ot_approved_at?: string | null
+          ot_approved_by?: string | null
+          ot_approved_reason?: string | null
+          ot_requested_at?: string | null
+          ot_status?: string | null
           photo_required?: boolean | null
           source?: string | null
           total_hours?: number | null
@@ -238,6 +254,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           auto_clocked_out?: boolean | null
+          auto_clockout_type?: string | null
           clock_in?: string
           clock_in_lat?: number | null
           clock_in_lng?: number | null
@@ -247,11 +264,18 @@ export type Database = {
           clock_out_lng?: number | null
           clock_out_photo?: string | null
           created_at?: string | null
+          geofence_exit_data?: Json | null
           id?: string
+          is_overtime?: boolean | null
           job_id?: string
           manual_entry?: boolean | null
           needs_approval?: boolean | null
           notes?: string | null
+          ot_approved_at?: string | null
+          ot_approved_by?: string | null
+          ot_approved_reason?: string | null
+          ot_requested_at?: string | null
+          ot_status?: string | null
           photo_required?: boolean | null
           source?: string | null
           total_hours?: number | null
@@ -270,6 +294,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_entries_ot_approved_by_fkey"
+            columns: ["ot_approved_by"]
+            isOneToOne: false
+            referencedRelation: "managers"
             referencedColumns: ["id"]
           },
           {
@@ -427,6 +458,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      geofence_events: {
+        Row: {
+          accuracy: number
+          clock_entry_id: string
+          created_at: string | null
+          distance_from_center: number
+          event_type: string
+          id: string
+          job_radius: number
+          latitude: number
+          longitude: number
+          metadata: Json | null
+          safe_out_threshold: number
+          shift_date: string
+          timestamp: string
+          worker_id: string
+        }
+        Insert: {
+          accuracy: number
+          clock_entry_id: string
+          created_at?: string | null
+          distance_from_center: number
+          event_type: string
+          id?: string
+          job_radius: number
+          latitude: number
+          longitude: number
+          metadata?: Json | null
+          safe_out_threshold: number
+          shift_date: string
+          timestamp: string
+          worker_id: string
+        }
+        Update: {
+          accuracy?: number
+          clock_entry_id?: string
+          created_at?: string | null
+          distance_from_center?: number
+          event_type?: string
+          id?: string
+          job_radius?: number
+          latitude?: number
+          longitude?: number
+          metadata?: Json | null
+          safe_out_threshold?: number
+          shift_date?: string
+          timestamp?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geofence_events_clock_entry_id_fkey"
+            columns: ["clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "geofence_events_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       jobs: {
         Row: {
@@ -1005,6 +1102,7 @@ export type Database = {
           organization_id: string
           phone: string | null
           photo_url: string | null
+          pwa_install_info_dismissed: boolean | null
           shift_days: number[] | null
           shift_end: string | null
           shift_start: string | null
@@ -1026,6 +1124,7 @@ export type Database = {
           organization_id: string
           phone?: string | null
           photo_url?: string | null
+          pwa_install_info_dismissed?: boolean | null
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
@@ -1047,6 +1146,7 @@ export type Database = {
           organization_id?: string
           phone?: string | null
           photo_url?: string | null
+          pwa_install_info_dismissed?: boolean | null
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
@@ -1074,10 +1174,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      auto_clock_out_after_12_hours: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      auto_clock_out_after_12_hours: { Args: never; Returns: undefined }
       can_manage_organization: {
         Args: { target_org_id: string }
         Returns: boolean
@@ -1096,14 +1193,8 @@ export type Database = {
           planned_workers: number
         }[]
       }
-      check_is_manager: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
-      ensure_usage_row: {
-        Args: { p_org: string }
-        Returns: undefined
-      }
+      check_is_manager: { Args: { user_email: string }; Returns: boolean }
+      ensure_usage_row: { Args: { p_org: string }; Returns: undefined }
       get_active_subscription_usage: {
         Args: { p_org_id: string }
         Returns: {
@@ -1123,9 +1214,15 @@ export type Database = {
           superseded_by: string | null
           total_cost: number | null
         }
+        SetofOptions: {
+          from: "*"
+          to: "subscription_usage"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_clocked_in_workers: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           clock_in: string
           job_name: string
@@ -1134,15 +1231,31 @@ export type Database = {
         }[]
       }
       get_current_user_permissions: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           is_manager: boolean
           is_super_admin: boolean
           organization_id: string
         }[]
       }
+      get_overtime_requests: {
+        Args: never
+        Returns: {
+          clock_in: string
+          clock_out: string
+          hours: number
+          id: string
+          job_name: string
+          ot_approved_by: string
+          ot_approved_reason: string
+          ot_requested_at: string
+          ot_status: string
+          worker_id: string
+          worker_name: string
+        }[]
+      }
       get_recent_activity: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           clock_in: string
           clock_out: string
@@ -1163,10 +1276,7 @@ export type Database = {
           workers_available: number
         }[]
       }
-      get_total_hours_today: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      get_total_hours_today: { Args: never; Returns: number }
       get_user_organization_id: {
         Args: { user_email: string }
         Returns: string
@@ -1182,20 +1292,11 @@ export type Database = {
         Args: { week_start: string; worker_uuid: string }
         Returns: number
       }
-      is_manager: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
-      is_super_admin: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
-      is_super_admin_of_org: {
-        Args: { org_id: string }
-        Returns: boolean
-      }
+      is_manager: { Args: { user_email: string }; Returns: boolean }
+      is_super_admin: { Args: { user_email: string }; Returns: boolean }
+      is_super_admin_of_org: { Args: { org_id: string }; Returns: boolean }
       reconcile_subscription_usage: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           new_managers: number
           new_workers: number
@@ -1222,16 +1323,13 @@ export type Database = {
         Args: { check_org_id: string }
         Returns: boolean
       }
-      user_is_worker: {
-        Args: { check_worker_id: string }
-        Returns: boolean
-      }
+      user_is_worker: { Args: { check_worker_id: string }; Returns: boolean }
       user_is_worker_in_org: {
         Args: { check_org_id: string }
         Returns: boolean
       }
       validate_subscription_counts: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           expected_managers: number
           expected_workers: number

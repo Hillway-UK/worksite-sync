@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import { RecentActivityCard } from '@/components/RecentActivityCard';
+import { OvertimeRequestsCard } from '@/components/OvertimeRequestsCard';
 import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
 import { dashboardSteps } from '@/config/onboarding';
 import { setAutoContinueWorkersPage } from '@/lib/supabase/manager-tutorial';
@@ -390,6 +391,9 @@ export default function Admin() {
               )}
             </CardContent>
           </Card>
+
+          {/* Overtime Requests */}
+          <OvertimeRequestsCard />
 
           {/* Recent Activity - Auto Clockouts */}
           <div id="recent-activity-card" className="md:col-span-2">
