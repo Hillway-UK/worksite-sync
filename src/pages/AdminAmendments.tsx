@@ -47,6 +47,18 @@ export default function AdminAmendments() {
   const [activeTab, setActiveTab] = useState('expenses');
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
+  // Calculate hours between two timestamps
+  const calculateRequestedHours = (clockIn?: string, clockOut?: string): string => {
+    if (!clockIn || !clockOut) return 'N/A';
+    
+    const start = new Date(clockIn);
+    const end = new Date(clockOut);
+    const diffMs = end.getTime() - start.getTime();
+    const hours = diffMs / (1000 * 60 * 60);
+    
+    return hours.toFixed(2);
+  };
+
   useEffect(() => {
     fetchAmendments();
   }, []);
@@ -315,6 +327,7 @@ export default function AdminAmendments() {
                   <TableRow>
                     <TableHead>Worker</TableHead>
                     <TableHead>Requested</TableHead>
+                    <TableHead>Hours Requested</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -338,6 +351,11 @@ export default function AdminAmendments() {
                           {amendment.requested_clock_out && (
                             <div>Out: {formatUKTime(amendment.requested_clock_out)}</div>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-sm">
+                          {calculateRequestedHours(amendment.requested_clock_in, amendment.requested_clock_out)} hours
                         </div>
                       </TableCell>
                       <TableCell className="max-w-xs">
