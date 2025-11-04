@@ -203,7 +203,7 @@ export default function AdminReports() {
         // Only include completed entries (non-null clock_out) for weekly summary
         const { data: clockEntries, error: clockError } = await supabase
           .from("clock_entries")
-          .select("job_id, total_hours, clock_in, clock_out, jobs:jobs(id, name, address)")
+          .select("job_id, total_hours, clock_in, clock_out, is_overtime, ot_status, jobs:jobs(id, name, address)")
           .eq("worker_id", worker.id)
           .gte("clock_in", format(weekStart, "yyyy-MM-dd"))
           .lt("clock_in", format(addDays(weekStart, 7), "yyyy-MM-dd"))
@@ -213,8 +213,13 @@ export default function AdminReports() {
           console.error("Error fetching clock entries for worker", worker.name, ":", clockError);
         }
 
+        // Filter out unapproved overtime
+        const filteredClockEntries = clockEntries?.filter(entry => 
+          !entry.is_overtime || entry.ot_status === 'approved'
+        ) || [];
+
         // Skip workers who have no completed clock entries during the selected week
-        if (!clockEntries || clockEntries.length === 0) {
+        if (filteredClockEntries.length === 0) {
           continue;
         }
 
@@ -225,7 +230,7 @@ export default function AdminReports() {
         let totalHours = 0;
         const jobsMap = new Map();
 
-        clockEntries?.forEach((entry: any) => {
+        filteredClockEntries?.forEach((entry: any) => {
           // Calculate hours for this entry
           const hours =
             entry.total_hours != null
@@ -313,10 +318,15 @@ export default function AdminReports() {
 
       if (error) throw error;
 
+      // Filter out unapproved overtime
+      const filteredEntries = (entries || []).filter(entry => 
+        !entry.is_overtime || entry.ot_status === 'approved'
+      );
+
       const detailedEntries: DetailedEntry[] = [];
       const workerPhotos: Record<string, string> = {};
 
-      for (const entry of entries || []) {
+      for (const entry of filteredEntries) {
         // Get profile photo if not already fetched
         if (!workerPhotos[entry.worker_id]) {
           const { data: photoData } = await supabase

@@ -47,10 +47,10 @@ export function OvertimeDecisionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!entry || !reason.trim()) {
+    if (!entry) {
       toast({
         title: 'Error',
-        description: 'Please provide a reason for your decision.',
+        description: 'Invalid overtime entry.',
         variant: 'destructive',
       });
       return;
@@ -77,7 +77,7 @@ export function OvertimeDecisionModal({
         .update({
           ot_status: decision === 'approve' ? 'approved' : 'rejected',
           ot_approved_by: managerData.id,
-          ot_approved_reason: reason,
+          ot_approved_reason: reason || null,
           ot_approved_at: new Date().toISOString(),
         })
         .eq('id', entry.id);
@@ -86,8 +86,8 @@ export function OvertimeDecisionModal({
 
       // Send notification to worker
       const notificationBody = decision === 'approve'
-        ? `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} (${entry.hours?.toFixed(1) || '0'} hrs) has been approved.`
-        : `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} was rejected. Reason: ${reason}`;
+        ? `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} (${entry.hours?.toFixed(1) || '0'} hrs) has been approved.${reason ? ` Note: ${reason}` : ''}`
+        : `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} was rejected.${reason ? ` Reason: ${reason}` : ''}`;
 
       const { error: notificationError } = await supabase
         .from('notifications')
@@ -145,11 +145,11 @@ export function OvertimeDecisionModal({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="reason">
-              Reason <span className="text-destructive">*</span>
+              Notes (Optional)
             </Label>
             <Textarea
               id="reason"
-              placeholder={`Enter reason for ${decision === 'approve' ? 'approval' : 'rejection'}...`}
+              placeholder={`Add optional notes for ${decision === 'approve' ? 'approval' : 'rejection'}...`}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
@@ -171,7 +171,7 @@ export function OvertimeDecisionModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !reason.trim()}
+            disabled={isSubmitting}
             variant={decision === 'approve' ? 'default' : 'destructive'}
           >
             {isSubmitting ? 'Processing...' : decision === 'approve' ? 'Approve' : 'Reject'}
