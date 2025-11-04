@@ -22,8 +22,8 @@ interface OvertimeRequest {
   worker_name: string;
   job_name: string;
   clock_in: string;
-  clock_out: string;
-  hours: number;
+  clock_out: string | null;
+  hours: number | null;
   ot_status: string;
   ot_requested_at: string;
   ot_approved_by: string | null;
@@ -152,11 +152,21 @@ export function OvertimeRequestsCard() {
                       <TableCell>{entry.job_name}</TableCell>
                       <TableCell>{format(new Date(entry.clock_in), 'MMM dd, yyyy')}</TableCell>
                       <TableCell>{format(new Date(entry.clock_in), 'HH:mm')}</TableCell>
-                      <TableCell>{format(new Date(entry.clock_out), 'HH:mm')}</TableCell>
-                      <TableCell>{entry.hours.toFixed(1)}</TableCell>
+                      <TableCell>
+                        {entry.clock_out 
+                          ? format(new Date(entry.clock_out), 'HH:mm')
+                          : <span className="text-muted-foreground">-</span>
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {entry.hours !== null 
+                          ? `${entry.hours.toFixed(1)} hrs`
+                          : <span className="text-muted-foreground">-</span>
+                        }
+                      </TableCell>
                       <TableCell>{getStatusBadge(entry.ot_status)}</TableCell>
                       <TableCell>
-                        {entry.ot_status === 'pending' && (
+                        {entry.ot_status === 'pending' && entry.clock_out !== null && entry.hours !== null && (
                           <div className="flex gap-2">
                             <Button
                               size="sm"
@@ -172,6 +182,9 @@ export function OvertimeRequestsCard() {
                               Reject
                             </Button>
                           </div>
+                        )}
+                        {entry.ot_status === 'pending' && (entry.clock_out === null || entry.hours === null) && (
+                          <span className="text-sm text-muted-foreground italic">In Progress</span>
                         )}
                       </TableCell>
                     </TableRow>

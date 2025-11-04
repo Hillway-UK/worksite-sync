@@ -20,8 +20,8 @@ interface OvertimeRequest {
   worker_name: string;
   job_name: string;
   clock_in: string;
-  clock_out: string;
-  hours: number;
+  clock_out: string | null;
+  hours: number | null;
   ot_status: string;
   ot_requested_at: string;
   ot_approved_by: string | null;
@@ -86,7 +86,7 @@ export function OvertimeDecisionModal({
 
       // Send notification to worker
       const notificationBody = decision === 'approve'
-        ? `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} (${entry.hours} hrs) has been approved.`
+        ? `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} (${entry.hours?.toFixed(1) || '0'} hrs) has been approved.`
         : `Your overtime request for ${format(new Date(entry.clock_in), 'MMM dd, yyyy')} was rejected. Reason: ${reason}`;
 
       const { error: notificationError } = await supabase
@@ -135,7 +135,7 @@ export function OvertimeDecisionModal({
                   <p><strong>Worker:</strong> {entry.worker_name}</p>
                   <p><strong>Job:</strong> {entry.job_name}</p>
                   <p><strong>Date:</strong> {format(new Date(entry.clock_in), 'MMM dd, yyyy')}</p>
-                  <p><strong>Hours:</strong> {entry.hours} hrs</p>
+                  <p><strong>Hours:</strong> {entry.hours !== null ? `${entry.hours.toFixed(1)} hrs` : 'In Progress'}</p>
                 </div>
               </>
             )}
