@@ -27,7 +27,7 @@ interface WeeklyData {
   worker_email: string;
   total_hours: number;
   hourly_rate: number;
-  jobs: { job_id: string; job_name: string; job_address: string; hours: number }[];
+  jobs: { job_id: string; job_name: string; job_address: string; work_date: string; hours: number }[];
   additional_costs: number;
   total_amount: number;
   profile_photo?: string;
@@ -241,15 +241,22 @@ export default function AdminReports() {
 
           totalHours += hours;
 
-          // Aggregate job data using joined job information
+          // Aggregate job data using joined job information, grouped by date
           if (entry.job_id && entry.jobs) {
-            if (jobsMap.has(entry.job_id)) {
-              jobsMap.get(entry.job_id).hours += hours;
+            // Extract date from clock_in timestamp
+            const workDate = format(new Date(entry.clock_in), 'yyyy-MM-dd');
+            
+            // Create composite key: job_id + date
+            const mapKey = `${entry.job_id}_${workDate}`;
+            
+            if (jobsMap.has(mapKey)) {
+              jobsMap.get(mapKey).hours += hours;
             } else {
-              jobsMap.set(entry.job_id, {
+              jobsMap.set(mapKey, {
                 job_id: entry.job_id,
                 job_name: entry.jobs.name || "Unknown Job",
                 job_address: entry.jobs.address || "",
+                work_date: workDate,
                 hours,
               });
             }
@@ -258,7 +265,10 @@ export default function AdminReports() {
 
         console.log(`Aggregated jobs for ${worker.name}:`, Array.from(jobsMap.values()));
 
-        const jobs = Array.from(jobsMap.values());
+        // Sort jobs by date chronologically
+        const jobs = Array.from(jobsMap.values()).sort((a, b) => 
+          new Date(a.work_date).getTime() - new Date(b.work_date).getTime()
+        );
 
         // Get additional costs
         const { data: costs } = await supabase
@@ -777,6 +787,9 @@ export default function AdminReports() {
     const csvHeaders = [
       "ContactName",
       "EmailAddress",
+      "Date",
+      "SiteName",
+      "SiteAddress",
       "InvoiceNumber",
       "InvoiceDate",
       "DueDate",
@@ -789,38 +802,37 @@ export default function AdminReports() {
       "TrackingOption1",
     ];
 
-    const csvRows = weeklyData
-      .filter((worker) => worker.total_hours > 0) // Only include workers with hours
-      .map((worker, index) => {
-        // TrackingOption1: Collect ALL job names where worker had clock entries (comma-separated)
-        // If worker has job entries (even with 0 hours due to incomplete clock-out), include those job names
-        // If no job entries exist, default to "General Work"
-        let trackingOption1 = "General Work";
+    // Escape quotes in CSV fields
+    const escapeCSV = (field: string) => field.replace(/"/g, '""');
 
+    // Create one row per job per day for each worker
+    const csvRows: string[][] = [];
+    
+    weeklyData
+      .filter((worker) => worker.total_hours > 0)
+      .forEach((worker) => {
         if (worker.jobs && worker.jobs.length > 0) {
-          const jobNames = worker.jobs.map((job) => job.job_name).filter(Boolean);
-          if (jobNames.length > 0) {
-            trackingOption1 = jobNames.join(", ");
-          }
+          worker.jobs.forEach((job) => {
+            const row = [
+              escapeCSV(worker.worker_name),
+              escapeCSV(worker.worker_email || ""),
+              format(new Date(job.work_date), 'EEE dd/MM/yyyy'), // e.g., "Mon 04/11/2024"
+              escapeCSV(job.job_name),
+              escapeCSV(job.job_address),
+              `WE-${format(weekEnd, "yyyyMMdd")}-${worker.worker_id.slice(-4)}`,
+              invoiceDate,
+              dueDate,
+              escapeCSV(`${job.job_name} - ${format(new Date(job.work_date), 'EEE dd/MM/yyyy')}`),
+              job.hours.toFixed(2),
+              worker.hourly_rate.toFixed(2),
+              "200",
+              "No VAT",
+              "Job",
+              escapeCSV(job.job_name),
+            ];
+            csvRows.push(row);
+          });
         }
-
-        // Escape quotes in CSV fields
-        const escapeCSV = (field: string) => field.replace(/"/g, '""');
-
-        return [
-          escapeCSV(worker.worker_name),
-          escapeCSV(worker.worker_email || ""), // Use real worker email
-          `WE-${format(weekEnd, "yyyyMMdd")}-${worker.worker_id.slice(-4)}`,
-          invoiceDate,
-          dueDate,
-          escapeCSV(`Construction work - Week ending ${format(weekEnd, "dd/MM/yyyy")}`),
-          worker.total_hours.toFixed(2),
-          worker.hourly_rate.toFixed(2),
-          "200",
-          "No VAT",
-          "Job",
-          escapeCSV(trackingOption1),
-        ];
       });
 
     const csvContent = [csvHeaders, ...csvRows].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n");
