@@ -1,45 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { AutoTimeLogo } from '@/components/AutoTimeLogo';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { AutoTimeLogo } from "@/components/AutoTimeLogo";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const { signIn, user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/';
+  const from = location.state?.from?.pathname || "/";
 
   useEffect(() => {
     if (!loading && user && userRole) {
-      if (userRole === 'super_admin') {
-        navigate('/super-admin', { replace: true });
-      } else if (userRole === 'manager') {
-        navigate('/admin', { replace: true });
-      } else if (userRole === 'worker') {
-        navigate('/dashboard', { replace: true });
+      if (userRole === "super_admin") {
+        navigate("/super-admin", { replace: true });
+      } else if (userRole === "manager") {
+        navigate("/admin", { replace: true });
+      } else if (userRole === "worker") {
+        navigate("/dashboard", { replace: true });
       }
     }
   }, [user, userRole, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
-    
+
     const { error } = await signIn(email, password);
-    
+
     if (error) {
       setError(error);
       setIsLoading(false);
@@ -72,9 +72,6 @@ export default function Login() {
           <CardTitle className="text-2xl text-center font-heading font-extrabold text-foreground">
             Manager Portal
           </CardTitle>
-          <CardDescription className="text-center text-muted-foreground font-body text-sm">
-            Workforce Management System
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -84,7 +81,7 @@ export default function Login() {
                 <span>{error}</span>
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -118,11 +115,14 @@ export default function Login() {
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-heading font-semibold py-3 transition-all duration-200 transform hover:scale-[1.02] min-h-[44px]"
               disabled={isLoading}
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
 
             <div className="text-center">
-              <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Forgot your password?
               </Link>
             </div>

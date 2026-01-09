@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +22,7 @@ interface ExpenseType {
   amount: number;
   description?: string;
   is_active: boolean;
+  calculation_type?: 'flat_rate' | 'hourly_multiplied';
   created_at: string;
 }
 
@@ -40,7 +42,8 @@ const expenseTypeSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   amount: z.number().positive('Amount must be positive').multipleOf(0.01, 'Amount must have at most 2 decimal places'),
   description: z.string().max(200, 'Description must be 200 characters or less').optional(),
-  is_active: z.boolean()
+  is_active: z.boolean(),
+  calculation_type: z.enum(['flat_rate', 'hourly_multiplied']).default('flat_rate')
 });
 
 type ExpenseTypeForm = z.infer<typeof expenseTypeSchema>;
@@ -53,7 +56,8 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
     name: '',
     amount: 0,
     description: '',
-    is_active: true
+    is_active: true,
+    calculation_type: 'flat_rate'
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ExpenseTypeForm, string>>>({});
 
@@ -81,21 +85,24 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
         name: presetData.name,
         amount: presetData.amount,
         description: presetData.description || '',
-        is_active: true
+        is_active: true,
+        calculation_type: 'flat_rate'
       });
     } else if (expenseType) {
       setFormData({
         name: expenseType.name,
         amount: expenseType.amount,
         description: expenseType.description || '',
-        is_active: expenseType.is_active
+        is_active: expenseType.is_active,
+        calculation_type: expenseType.calculation_type || 'flat_rate'
       });
     } else {
       setFormData({
         name: '',
         amount: 0,
         description: '',
-        is_active: true
+        is_active: true,
+        calculation_type: 'flat_rate'
       });
     }
     setErrors({});
@@ -141,6 +148,7 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
           amount: data.amount,
           description: data.description || null,
           is_active: data.is_active,
+          calculation_type: data.calculation_type,
           created_by: currentManager.id
         });
 
@@ -186,7 +194,8 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
           name: data.name,
           amount: data.amount,
           description: data.description || null,
-          is_active: data.is_active
+          is_active: data.is_active,
+          calculation_type: data.calculation_type
         })
         .eq('id', expenseType.id);
 
@@ -329,6 +338,28 @@ export function ExpenseTypeDialog({ open, onOpenChange, expenseType, onSuccess, 
             {errors.amount && (
               <p className="text-sm text-destructive">{errors.amount}</p>
             )}
+          </div>
+
+          <div className="space-y-3" id="calculation-type">
+            <Label>Calculation Method *</Label>
+            <RadioGroup 
+              value={formData.calculation_type} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, calculation_type: value as 'flat_rate' | 'hourly_multiplied' }))}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="flat_rate" id="flat_rate" />
+                <Label htmlFor="flat_rate" className="font-normal cursor-pointer">Flat Rate</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="hourly_multiplied" id="hourly_multiplied" />
+                <Label htmlFor="hourly_multiplied" className="font-normal cursor-pointer">Multiplied by Total Hours</Label>
+              </div>
+            </RadioGroup>
+            <p className="text-xs text-muted-foreground">
+              {formData.calculation_type === 'flat_rate' 
+                ? 'The set amount will be added directly to the worker\'s earnings.' 
+                : 'The amount will be multiplied by the worker\'s total hours worked.'}
+            </p>
           </div>
 
           <div className="space-y-2">

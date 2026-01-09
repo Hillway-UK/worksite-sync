@@ -169,10 +169,10 @@ Deno.serve(async (req: Request) => {
 
     // --- Cascading deletes in correct order ---
 
-    // 1. Get all worker IDs and emails in this organization
+    // 1. Get all worker IDs in this organization
     const { data: workers, error: workersErr } = await admin
       .from("workers")
-      .select("id, email")
+      .select("id")
       .eq("organization_id", organization_id);
 
     if (workersErr) {
@@ -180,15 +180,14 @@ Deno.serve(async (req: Request) => {
       return oops({ error: "Failed to fetch workers" });
     }
 
-    const worker_ids = (workers ?? []).map((w: { id: string }) => w.id);
-    const worker_emails = (workers ?? []).map((w: { email: string }) => w.email);
+    const worker_ids = (workers ?? []).map((w) => w.id);
     const worker_count = worker_ids.length;
 
     console.log(`[DELETE-ORGANIZATION] Found ${worker_count} workers`);
 
     // 2. Delete worker-related data
     if (worker_ids.length > 0) {
-      // Fetch related clock entry IDs (needed for dependent table cleanup)
+      // 1) Fetch clock entry IDs for dependent deletions
       const { data: ceRows, error: ceIdsErr } = await admin
         .from("clock_entries")
         .select("id")
@@ -200,7 +199,19 @@ Deno.serve(async (req: Request) => {
       const clock_entry_ids = (ceRows ?? []).map((r: { id: string }) => r.id);
       console.log(`[DELETE-ORGANIZATION] Found ${clock_entry_ids.length} clock entries`);
 
-      // Fetch time amendment IDs (needed for clock_entry_history cleanup)
+      // Proactively delete all clock_entry_history tied to these clock entries (handles DBs without CASCADE)
+      if (clock_entry_ids.length > 0) {
+        const { error: cehByCeErr } = await admin
+          .from("clock_entry_history")
+          .delete()
+          .in("clock_entry_id", clock_entry_ids);
+        if (cehByCeErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete clock_entry_history by clock_entry_id:", cehByCeErr);
+          return oops({ error: `Failed to delete clock entry history by clock entry: ${cehByCeErr.message}` });
+        }
+      }
+
+      // Also delete clock_entry_history linked to amendments for these workers (prevents FK errors)
       const { data: amendRows, error: amendIdsErr } = await admin
         .from("time_amendments")
         .select("id")
@@ -210,73 +221,31 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to fetch amendment ids: ${amendIdsErr.message}` });
       }
       const amendment_ids = (amendRows ?? []).map((r: { id: string }) => r.id);
-      console.log(`[DELETE-ORGANIZATION] Found ${amendment_ids.length} time amendments`);
-
-      // STEP 1: Delete clock_entry_history FIRST (deepest dependency - references both clock_entries AND time_amendments)
-      if (clock_entry_ids.length > 0 || amendment_ids.length > 0) {
-        const conditions = [];
-        if (clock_entry_ids.length > 0) {
-          conditions.push(`clock_entry_id.in.(${clock_entry_ids.join(",")})`);
-        }
-        if (amendment_ids.length > 0) {
-          conditions.push(`amendment_id.in.(${amendment_ids.join(",")})`);
-        }
-        
+      console.log(`[DELETE-ORGANIZATION] Found ${amendment_ids.length} amendments`);
+      if (amendment_ids.length > 0) {
         const { error: cehErr } = await admin
           .from("clock_entry_history")
           .delete()
-          .or(conditions.join(","));
+          .in("amendment_id", amendment_ids);
         if (cehErr) {
-          console.error("[DELETE-ORGANIZATION] Failed to delete clock_entry_history:", cehErr);
+          console.error("[DELETE-ORGANIZATION] Failed to delete clock_entry_history by amendment_id:", cehErr);
           return oops({ error: `Failed to delete clock entry history: ${cehErr.message}` });
         }
       }
 
-      // STEP 2: Delete geofence_events (references clock_entries and workers)
+      // 2) Delete additional_costs referencing clock entries (if any)
       if (clock_entry_ids.length > 0) {
-        const { error: gfErr } = await admin
-          .from("geofence_events")
-          .delete()
-          .in("clock_entry_id", clock_entry_ids);
-        if (gfErr) {
-          console.error("[DELETE-ORGANIZATION] Failed to delete geofence_events:", gfErr);
-          return oops({ error: `Failed to delete geofence events: ${gfErr.message}` });
-        }
-      }
-
-      // STEP 3: Delete additional_costs (references clock_entries and workers)
-      if (clock_entry_ids.length > 0) {
-        const { error: acByCeErr } = await admin
+        const { error: acErr } = await admin
           .from("additional_costs")
           .delete()
           .in("clock_entry_id", clock_entry_ids);
-        if (acByCeErr) {
-          console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by clock_entry_id:", acByCeErr);
-          return oops({ error: `Failed to delete additional costs (by clock entry): ${acByCeErr.message}` });
+        if (acErr) {
+          console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by clock_entry_id:", acErr);
+          return oops({ error: `Failed to delete additional costs: ${acErr.message}` });
         }
       }
 
-      // Additional costs by worker (catch costs not linked to a clock entry)
-      const { error: acByWorkerErr } = await admin
-        .from("additional_costs")
-        .delete()
-        .in("worker_id", worker_ids);
-      if (acByWorkerErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by worker_id:", acByWorkerErr);
-        return oops({ error: `Failed to delete additional costs (by worker): ${acByWorkerErr.message}` });
-      }
-
-      // STEP 4: Delete time_amendments (now safe after clock_entry_history is gone)
-      const { error: taErr } = await admin
-        .from("time_amendments")
-        .delete()
-        .in("worker_id", worker_ids);
-      if (taErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
-        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
-      }
-
-      // STEP 5: Delete clock_entries (now safe after all dependencies are gone)
+      // 3) Delete clock entries (cascades will remove related history and possibly amendments)
       const { error: ceErr } = await admin
         .from("clock_entries")
         .delete()
@@ -286,7 +255,17 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete clock entries: ${ceErr.message}` });
       }
 
-      // STEP 6: Delete worker-related notification and tracking data
+      // 4) Cleanup: delete any remaining time amendments for these workers (if not cascaded)
+      const { error: taErr } = await admin
+        .from("time_amendments")
+        .delete()
+        .in("worker_id", worker_ids);
+      if (taErr) {
+        console.error("[DELETE-ORGANIZATION] Failed to delete time_amendments:", taErr);
+        return oops({ error: `Failed to delete time amendments: ${taErr.message}` });
+      }
+
+      // 5) Notifications
       const { error: notifErr } = await admin
         .from("notifications")
         .delete()
@@ -296,6 +275,7 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notifications: ${notifErr.message}` });
       }
 
+      // 6) Notification preferences
       const { error: npErr } = await admin
         .from("notification_preferences")
         .delete()
@@ -305,6 +285,7 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notification preferences: ${npErr.message}` });
       }
 
+      // 7) Notification log
       const { error: nlErr } = await admin
         .from("notification_log")
         .delete()
@@ -314,6 +295,7 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete notification log: ${nlErr.message}` });
       }
 
+      // 8) Auto clockout counters
       const { error: accErr } = await admin
         .from("auto_clockout_counters")
         .delete()
@@ -323,6 +305,7 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete auto clockout counters: ${accErr.message}` });
       }
 
+      // 9) Auto clockout audit
       const { error: acaErr } = await admin
         .from("auto_clockout_audit")
         .delete()
@@ -332,11 +315,10 @@ Deno.serve(async (req: Request) => {
         return oops({ error: `Failed to delete auto clockout audit: ${acaErr.message}` });
       }
     }
-
-    // 3. Get all manager IDs and emails in this organization (for expense types)
+    // 3. Get all manager IDs in this organization (for expense types)
     const { data: managers, error: managersErr } = await admin
       .from("managers")
-      .select("id, email")
+      .select("id")
       .eq("organization_id", organization_id);
 
     if (managersErr) {
@@ -344,41 +326,13 @@ Deno.serve(async (req: Request) => {
       return oops({ error: "Failed to fetch managers" });
     }
 
-    const manager_ids = (managers ?? []).map((m: { id: string }) => m.id);
-    const manager_emails = (managers ?? []).map((m: { email: string }) => m.email);
+    const manager_ids = (managers ?? []).map((m) => m.id);
     const manager_count = manager_ids.length;
 
     console.log(`[DELETE-ORGANIZATION] Found ${manager_count} managers`);
 
-    // 4. Get expense type IDs and delete additional_costs referencing them
+    // 4. Delete expense types (created by managers)
     if (manager_ids.length > 0) {
-      // First, get all expense_type IDs for this organization
-      const { data: expenseTypes, error: etFetchErr } = await admin
-        .from("expense_types")
-        .select("id")
-        .in("created_by", manager_ids);
-      
-      if (etFetchErr) {
-        console.error("[DELETE-ORGANIZATION] Failed to fetch expense_types:", etFetchErr);
-        return oops({ error: `Failed to fetch expense types: ${etFetchErr.message}` });
-      }
-
-      const expense_type_ids = (expenseTypes ?? []).map((et: { id: string }) => et.id);
-      console.log(`[DELETE-ORGANIZATION] Found ${expense_type_ids.length} expense types`);
-
-      // Delete any additional_costs referencing these expense types
-      if (expense_type_ids.length > 0) {
-        const { error: acByExpenseErr } = await admin
-          .from("additional_costs")
-          .delete()
-          .in("expense_type_id", expense_type_ids);
-        if (acByExpenseErr) {
-          console.error("[DELETE-ORGANIZATION] Failed to delete additional_costs by expense_type_id:", acByExpenseErr);
-          return oops({ error: `Failed to delete additional costs (by expense type): ${acByExpenseErr.message}` });
-        }
-      }
-
-      // Now safe to delete expense types
       const { error: etErr } = await admin
         .from("expense_types")
         .delete()
@@ -389,7 +343,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 5. Delete workers from workers table
+    // 5. Delete workers
     const { error: wErr } = await admin
       .from("workers")
       .delete()
@@ -397,27 +351,6 @@ Deno.serve(async (req: Request) => {
     if (wErr) {
       console.error("[DELETE-ORGANIZATION] Failed to delete workers:", wErr);
       return oops({ error: `Failed to delete workers: ${wErr.message}` });
-    }
-
-    // 5b. Delete workers from auth.users
-    if (worker_emails.length > 0) {
-      console.log(`[DELETE-ORGANIZATION] Deleting ${worker_emails.length} workers from auth`);
-      for (const email of worker_emails) {
-        try {
-          const { data: authUsers } = await admin.auth.admin.listUsers();
-          const authUser = authUsers.users.find(u => u.email === email);
-          if (authUser) {
-            const { error: authDelErr } = await admin.auth.admin.deleteUser(authUser.id);
-            if (authDelErr) {
-              console.error(`[DELETE-ORGANIZATION] Failed to delete auth user ${email}:`, authDelErr);
-            } else {
-              console.log(`[DELETE-ORGANIZATION] Deleted auth user: ${email}`);
-            }
-          }
-        } catch (err) {
-          console.error(`[DELETE-ORGANIZATION] Error deleting auth user ${email}:`, err);
-        }
-      }
     }
 
     // 6. Delete jobs
@@ -430,7 +363,7 @@ Deno.serve(async (req: Request) => {
       return oops({ error: `Failed to delete jobs: ${jErr.message}` });
     }
 
-    // 7. Delete managers from managers table
+    // 7. Delete managers
     const { error: mErr } = await admin
       .from("managers")
       .delete()
@@ -438,27 +371,6 @@ Deno.serve(async (req: Request) => {
     if (mErr) {
       console.error("[DELETE-ORGANIZATION] Failed to delete managers:", mErr);
       return oops({ error: `Failed to delete managers: ${mErr.message}` });
-    }
-
-    // 7b. Delete managers from auth.users
-    if (manager_emails.length > 0) {
-      console.log(`[DELETE-ORGANIZATION] Deleting ${manager_emails.length} managers from auth`);
-      for (const email of manager_emails) {
-        try {
-          const { data: authUsers } = await admin.auth.admin.listUsers();
-          const authUser = authUsers.users.find(u => u.email === email);
-          if (authUser) {
-            const { error: authDelErr } = await admin.auth.admin.deleteUser(authUser.id);
-            if (authDelErr) {
-              console.error(`[DELETE-ORGANIZATION] Failed to delete auth user ${email}:`, authDelErr);
-            } else {
-              console.log(`[DELETE-ORGANIZATION] Deleted auth user: ${email}`);
-            }
-          }
-        } catch (err) {
-          console.error(`[DELETE-ORGANIZATION] Error deleting auth user ${email}:`, err);
-        }
-      }
     }
 
     // 8. Delete subscription usage
@@ -481,17 +393,7 @@ Deno.serve(async (req: Request) => {
       return oops({ error: `Failed to delete super admins: ${saErr.message}` });
     }
 
-    // 10. Delete subscription_audit_log for this org
-    const { error: salErr } = await admin
-      .from("subscription_audit_log")
-      .delete()
-      .eq("organization_id", organization_id);
-    if (salErr) {
-      console.error("[DELETE-ORGANIZATION] Failed to delete subscription_audit_log:", salErr);
-      return oops({ error: `Failed to delete subscription audit log: ${salErr.message}` });
-    }
-
-    // 11. Finally, delete the organization
+    // 10. Finally, delete the organization
     const { error: orgDelErr } = await admin
       .from("organizations")
       .delete()

@@ -27,6 +27,7 @@ import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
 import AdminAmendments from "./pages/AdminAmendments";
 import AdminProfile from "./pages/AdminProfile";
+import Resources from "./pages/Resources";
 
 import OrganizationDashboard from "./pages/OrganizationDashboard";
 import OrganizationSettings from "./pages/OrganizationSettings";
@@ -46,10 +47,10 @@ const App = () => (
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/demo-request" element={<DemoRequest />} />
             <Route path="/admin-portal" element={<Index />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
             
             {/* Super Admin Routes */}
@@ -176,6 +177,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireRole="manager">
                   <AdminProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/resources" 
+              element={
+                <ProtectedRoute requireRole="manager">
+                  <Resources />
                 </ProtectedRoute>
               } 
             />

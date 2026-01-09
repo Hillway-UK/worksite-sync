@@ -38,7 +38,7 @@ interface Worker {
   profile_photo?: string;
 }
 
-const WorkerCapacityBadge = () => {
+const WorkerCapacityBadge = ({ activeCount }: { activeCount: number }) => {
   const { data: capacity, isLoading } = useQuery({
     queryKey: ['worker-capacity'],
     queryFn: async () => {
@@ -63,10 +63,9 @@ const WorkerCapacityBadge = () => {
 
   if (isLoading || !capacity) return null;
 
-  const current = capacity.current_worker_count;
   const planned = capacity.planned_workers;
-  const isFull = planned !== 999999 && current >= planned;
-  const isNearLimit = planned !== 999999 && current >= planned * 0.8;
+  const isFull = planned !== 999999 && activeCount >= planned;
+  const isNearLimit = planned !== 999999 && activeCount >= planned * 0.8;
 
   return (
     <Badge 
@@ -75,7 +74,7 @@ const WorkerCapacityBadge = () => {
     >
       {isFull && <AlertTriangle className="h-3 w-3 mr-1" />}
       {!isFull && !isNearLimit && <CheckCircle2 className="h-3 w-3 mr-1" />}
-      {current}/{planned === 999999 ? '∞' : planned}
+      {activeCount}/{planned === 999999 ? '∞' : planned}
       {isFull && " (Full)"}
       {isNearLimit && !isFull && " (Near Limit)"}
     </Badge>
@@ -446,7 +445,7 @@ export default function AdminWorkers() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
               <CardTitle>Workers ({workers.length})</CardTitle>
-              <WorkerCapacityBadge />
+              <WorkerCapacityBadge activeCount={workers.filter(w => w.is_active).length} />
             </div>
             <div className="flex gap-4">
               <div className="relative">
@@ -471,7 +470,6 @@ export default function AdminWorkers() {
               <Button 
                 id="btn-add-worker"
                 onClick={() => handleAddWorker()}
-                className="bg-black hover:bg-gray-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Worker

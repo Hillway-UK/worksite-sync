@@ -19,13 +19,12 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, CheckCircle, Copy } from "lucide-react";
-import { generateSecurePassword } from "@/lib/validation";
-import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
-import { addWorkerSteps } from '@/config/onboarding';
-import { hasSeenAddWorkerTutorial, markAddWorkerTutorialSeen } from '@/lib/supabase/manager-tutorial';
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { addWorkerSteps } from "@/config/onboarding";
+import { hasSeenAddWorkerTutorial, markAddWorkerTutorialSeen } from "@/lib/supabase/manager-tutorial";
 
 // Enhanced validation schema with better security
-const workerSchema = z.object({
+const baseWorkerSchema = z.object({
   name: z
     .string()
     .trim()
@@ -52,7 +51,28 @@ const workerSchema = z.object({
   shift_days: z.array(z.number()).optional(),
 });
 
-type WorkerFormData = z.infer<typeof workerSchema>;
+// Schema for new workers with password fields
+const newWorkerSchema = baseWorkerSchema.extend({
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(50, "Password must be less than 50 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+// Use base schema for editing, new schema for creating
+const workerSchema = baseWorkerSchema;
+
+type WorkerFormData = z.infer<typeof baseWorkerSchema> & {
+  password?: string;
+  confirmPassword?: string;
+};
 
 interface Worker {
   id: string;
@@ -110,14 +130,14 @@ export function WorkerDialog({
   const copyCredentialsToClipboard = async () => {
     if (!workerCredentials) return;
 
-    const credentialText = `Welcome to AutoTime
+    const credentialText = `Welcome to TimeTrack
 
 Name: ${workerCredentials.name}
 Email: ${workerCredentials.email}
-Temporary Password: ${workerCredentials.password}
+Password: ${workerCredentials.password}
 App URL: "https://autotimeworkers.hillwayco.uk/login"
 
-Please change your password on first login for security.`;
+Please change your password after first login for security.`;
 
     try {
       await navigator.clipboard.writeText(credentialText);
@@ -142,7 +162,7 @@ Please change your password on first login for security.`;
     watch,
     setValue,
   } = useForm<WorkerFormData>({
-    resolver: zodResolver(workerSchema),
+    resolver: zodResolver(worker ? workerSchema : newWorkerSchema),
     defaultValues: worker
       ? {
           name: worker.name,
@@ -167,7 +187,9 @@ Please change your password on first login for security.`;
           shift_start: "07:00",
           shift_end: "15:00",
           shift_days: [1, 2, 3, 4, 5],
-        },
+          password: "",
+          confirmPassword: "",
+        } as any,
   });
 
   const selectedShiftDays = watch("shift_days") || [];
@@ -200,7 +222,9 @@ Please change your password on first login for security.`;
         shift_start: "07:00",
         shift_end: "15:00",
         shift_days: [1, 2, 3, 4, 5],
-      });
+        password: "",
+        confirmPassword: "",
+      } as any);
     }
   }, [open, worker, reset]);
 
@@ -336,13 +360,13 @@ Please change your password on first login for security.`;
         onSave();
       } else {
         // Create new worker - including auth user creation
-        // Generate secure temporary password with better entropy
-        const tempPassword = generateSecurePassword(12);
+        // Use manager-provided password
+        const workerPassword = (data as any).password;
 
         // Create auth user for worker
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: data.email,
-          password: tempPassword,
+          password: workerPassword,
           options: {
             emailRedirectTo: "https://autotimeworkers.hillwayco.uk/login",
             data: {
@@ -363,9 +387,10 @@ Please change your password on first login for security.`;
         }
 
         // Pre-insert capacity check
-        const { data: preCheck } = await supabase
-          .rpc('check_capacity_with_plan', { org_id: workerData.organization_id });
-        
+        const { data: preCheck } = await supabase.rpc("check_capacity_with_plan", {
+          org_id: workerData.organization_id,
+        });
+
         const preInsertCount = preCheck?.[0]?.current_worker_count || 0;
 
         // Create worker database record
@@ -373,24 +398,25 @@ Please change your password on first login for security.`;
 
         if (!workerError) {
           // Post-insert verification
-          const { data: postCheck } = await supabase
-            .rpc('check_capacity_with_plan', { org_id: workerData.organization_id });
-          
+          const { data: postCheck } = await supabase.rpc("check_capacity_with_plan", {
+            org_id: workerData.organization_id,
+          });
+
           const postInsertCount = postCheck?.[0]?.current_worker_count || 0;
           const expectedCount = preInsertCount + 1;
-          
+
           // Verify counter was incremented correctly
           if (postInsertCount !== expectedCount) {
-            console.error('Worker count mismatch detected after insert', {
+            console.error("Worker count mismatch detected after insert", {
               expected: expectedCount,
               actual: postInsertCount,
               preCount: preInsertCount,
-              workerEmail: workerData.email
+              workerEmail: workerData.email,
             });
-            
+
             // Trigger reconciliation
-            await supabase.functions.invoke('reconcile-subscription', {
-              body: { organization_id: workerData.organization_id, reason: 'post_insert_mismatch' }
+            await supabase.functions.invoke("reconcile-subscription", {
+              body: { organization_id: workerData.organization_id, reason: "post_insert_mismatch" },
             });
           }
         }
@@ -405,7 +431,7 @@ Please change your password on first login for security.`;
               const plannedCount = parseInt(match[2]);
 
               // Use capacity limit from error message
-              const planName = 'Current Plan';
+              const planName = "Current Plan";
               const maxAllowed = plannedCount; // Use plannedCount as the limit
 
               // Use callback if provided, otherwise show toast
@@ -436,11 +462,45 @@ Please change your password on first login for security.`;
           return;
         }
 
+        // Fetch organization name for email
+        let organizationName = "Your Organization";
+        try {
+          const { data: orgData } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", managerData.organization_id)
+            .maybeSingle();
+          if (orgData?.name) {
+            organizationName = orgData.name;
+          }
+        } catch (orgErr) {
+          console.error("Failed to fetch organization name:", orgErr);
+        }
+
+        // Send invitation email via MailChannels
+        try {
+          const { error: emailError } = await supabase.functions.invoke("send-invitation-email", {
+            body: {
+              type: "worker",
+              recipientEmail: data.email,
+              recipientName: data.name,
+              password: workerPassword,
+              organizationName: organizationName,
+              loginUrl: "https://autotimeworkers.hillwayco.uk/login",
+            },
+          });
+          if (emailError) {
+            console.error("Failed to send invitation email:", emailError);
+          }
+        } catch (emailErr) {
+          console.error("Email sending error:", emailErr);
+        }
+
         // Store credentials for display
         setWorkerCredentials({
           name: data.name,
           email: data.email,
-          password: tempPassword,
+          password: workerPassword,
         });
         setShowSuccessModal(true);
 
@@ -462,11 +522,7 @@ Please change your password on first login for security.`;
   };
 
   const defaultTrigger = (
-    <Button 
-      variant={worker ? "outline" : "default"} 
-      size={worker ? "sm" : "default"}
-      className={triggerClassName}
-    >
+    <Button variant={worker ? "outline" : "default"} size={worker ? "sm" : "default"} className={triggerClassName}>
       {worker ? <Edit className="h-4 w-4" /> : <Plus className="h-4 w-4 mr-2" />}
       {worker ? "" : "Add New Worker"}
     </Button>
@@ -492,7 +548,10 @@ Please change your password on first login for security.`;
     <>
       <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto pr-12 pl-12" style={{ zIndex: showAddWorkerTour ? 9990 : undefined }}>
+        <DialogContent
+          className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto pr-12 pl-12"
+          style={{ zIndex: showAddWorkerTour ? 9990 : undefined }}
+        >
           <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
             <DialogTitle>{worker ? "Edit Worker" : "Add New Worker"}</DialogTitle>
           </DialogHeader>
@@ -500,79 +559,119 @@ Please change your password on first login for security.`;
             <div className="worker-details-section space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
-              <Input id="name" {...register("name")} placeholder="Enter worker's full name" maxLength={100} />
-              {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-            </div>
+                <Input id="name" {...register("name")} placeholder="Enter worker's full name" maxLength={100} />
+                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="font-body font-semibold text-[#111111]">
-                Email Address *
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                {...register("email")}
-                placeholder="worker@example.com"
-                className="font-body border-[#939393] focus:border-[#702D30] focus:ring-[#702D30]"
-                maxLength={255}
-                required
-              />
-              {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-              {worker && (
-                <p className="text-xs text-[#939393] font-body">
-                  Changing email will require the worker to login with the new email address
-                </p>
-              )}
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="font-body font-semibold text-[#111111]">
+                  Email Address *
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  {...register("email")}
+                  placeholder="worker@example.com"
+                  className="font-body"
+                  maxLength={255}
+                  required
+                />
+                {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                {worker && (
+                  <p className="text-xs text-[#939393] font-body">
+                    Changing email will require the worker to login with the new email address
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <Label htmlFor="phone">Phone (Optional)</Label>
-              <Input id="phone" {...register("phone")} placeholder="Enter phone number" maxLength={20} />
-              {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
-            </div>
+              <div>
+                <Label htmlFor="phone">Phone (Optional)</Label>
+                <Input id="phone" {...register("phone")} placeholder="Enter phone number" maxLength={20} />
+                {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+              </div>
 
-            <div>
-              <Label htmlFor="hourly_rate">Hourly Rate (£)</Label>
-              <Input
-                id="hourly_rate"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1000"
-                {...register("hourly_rate", { valueAsNumber: true })}
-                placeholder="25.00"
-              />
-              {errors.hourly_rate && <p className="text-sm text-destructive mt-1">{errors.hourly_rate.message}</p>}
-            </div>
+              <div>
+                <Label htmlFor="hourly_rate">Hourly Rate (£)</Label>
+                <Input
+                  id="hourly_rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1000"
+                  {...register("hourly_rate", { valueAsNumber: true })}
+                  placeholder="25.00"
+                />
+                {errors.hourly_rate && <p className="text-sm text-destructive mt-1">{errors.hourly_rate.message}</p>}
+              </div>
 
-            <div>
-              <Label htmlFor="address">Address (Optional)</Label>
-              <Input id="address" {...register("address")} placeholder="Home address" maxLength={500} />
-              {errors.address && <p className="text-sm text-destructive mt-1">{errors.address.message}</p>}
-            </div>
+              <div>
+                <Label htmlFor="address">Address (Optional)</Label>
+                <Input id="address" {...register("address")} placeholder="Home address" maxLength={500} />
+                {errors.address && <p className="text-sm text-destructive mt-1">{errors.address.message}</p>}
+              </div>
 
-            <div>
-              <Label htmlFor="emergency_contact">Emergency Contact (Optional)</Label>
-              <Input
-                id="emergency_contact"
-                {...register("emergency_contact")}
-                placeholder="Name and phone number"
-                maxLength={200}
-              />
-              {errors.emergency_contact && (
-                <p className="text-sm text-destructive mt-1">{errors.emergency_contact.message}</p>
-              )}
-            </div>
+              <div>
+                <Label htmlFor="emergency_contact">Emergency Contact (Optional)</Label>
+                <Input
+                  id="emergency_contact"
+                  {...register("emergency_contact")}
+                  placeholder="Name and phone number"
+                  maxLength={200}
+                />
+                {errors.emergency_contact && (
+                  <p className="text-sm text-destructive mt-1">{errors.emergency_contact.message}</p>
+                )}
+              </div>
 
               <div>
                 <Label htmlFor="date_started">Start Date</Label>
                 <Input id="date_started" type="date" {...register("date_started")} />
               </div>
+
+              {!worker && (
+                <>
+                  <div className="border-t pt-4">
+                    <h3 className="text-sm font-semibold mb-3">Set Worker Password</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="password">Password *</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          {...register("password")}
+                          placeholder="Create a password"
+                          maxLength={50}
+                          required
+                        />
+                        {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Must be at least 8 characters with uppercase, lowercase, and number
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          {...register("confirmPassword")}
+                          placeholder="Re-enter password"
+                          maxLength={50}
+                          required
+                        />
+                        {errors.confirmPassword && (
+                          <p className="text-sm text-destructive mt-1">{errors.confirmPassword.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="border-t pt-4 space-y-4 worker-schedule-section">
               <h3 className="text-sm font-semibold">Worker Schedule</h3>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="shift_start">Shift Start Time</Label>
@@ -608,7 +707,10 @@ Please change your password on first login for security.`;
                           if (checked) {
                             setValue("shift_days", [...currentDays, day.value].sort());
                           } else {
-                            setValue("shift_days", currentDays.filter((d) => d !== day.value));
+                            setValue(
+                              "shift_days",
+                              currentDays.filter((d) => d !== day.value),
+                            );
                           }
                         }}
                       />
@@ -657,7 +759,7 @@ Please change your password on first login for security.`;
                   <p className="text-green-700 font-mono">{workerCredentials?.email}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-green-800">Temporary Password:</span>
+                  <span className="font-medium text-green-800">Password:</span>
                   <p className="text-green-700 font-mono text-lg bg-green-100 p-2 rounded border">
                     {workerCredentials?.password}
                   </p>
@@ -665,8 +767,8 @@ Please change your password on first login for security.`;
               </div>
               <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm">
-                  <strong>Important:</strong> Please share these credentials securely with the worker. They must change
-                  their password on first login.
+                  <strong>Important:</strong> Please share these credentials securely with the worker. Recommend they change
+                  their password after first login for security.
                 </p>
               </div>
             </AlertDialogDescription>
@@ -698,3 +800,4 @@ Please change your password on first login for security.`;
     </>
   );
 }
+

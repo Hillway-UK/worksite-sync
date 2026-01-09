@@ -14,8 +14,26 @@ export const addJobSteps: Step[] = [
     disableBeacon: true,
   },
   {
+    target: '#enable-geofencing-toggle',
+    content: '🔒 Enable Geofencing: Toggle this ON to require workers to be at the job site to clock in. Turn it OFF to allow workers to clock in from anywhere within the UK.',
+    placement: 'bottom',
+    disableBeacon: true,
+  },
+  {
+    target: '#terms-upload',
+    content: '📄 RAMS Upload: Upload Risk Assessments and Method Statements that workers need to review before starting work.',
+    placement: 'bottom',
+    disableBeacon: true,
+  },
+  {
+    target: '#waiver-upload',
+    content: '📋 Site Instructions Upload: Upload site-specific instructions and safety information for workers.',
+    placement: 'bottom',
+    disableBeacon: true,
+  },
+  {
     target: '.job-location-section',
-    content: '📍 Location & Geofence: Set the exact location on the map and define the geofence radius.',
+    content: '📍 Location & Geofence: When geofencing is enabled, set the exact location on the map and define the geofence radius. This appears only when geofencing is ON.',
     placement: 'top',
     disableBeacon: true,
   },

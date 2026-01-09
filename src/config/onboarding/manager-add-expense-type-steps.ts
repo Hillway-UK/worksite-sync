@@ -17,6 +17,11 @@ export const addExpenseTypeSteps: Step[] = [
     placement: 'bottom',
   },
   {
+    target: '#calculation-type',
+    content: '🧮 Choose how the expense is calculated: "Flat Rate" adds the set amount directly, or "Multiplied by Total Hours" multiplies the amount by total hours worked.',
+    placement: 'bottom',
+  },
+  {
     target: '#description',
     content: '📄 Add an optional description to help workers understand when to use this expense type.',
     placement: 'bottom',

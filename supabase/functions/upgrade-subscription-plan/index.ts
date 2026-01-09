@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in upgrade-subscription-plan function:', error);
     return new Response(
       JSON.stringify({

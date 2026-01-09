@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock, HelpCircle } from 'lucide-react';
 import moment from 'moment';
 import { ExpenseTypesManager } from '@/components/ExpenseTypesManager';
+import { OvertimeRequests } from '@/components/OvertimeRequests';
 import { formatUKTime } from '@/lib/timezone-utils';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { expenseTypesSteps, timeAmendmentsSteps } from '@/config/onboarding';
@@ -33,6 +34,7 @@ interface Amendment {
   manager_notes?: string;
   approved_by?: string;
   approved_at?: string;
+  source?: 'time_amendments' | 'amendment_requests';
 }
 
 export default function AdminAmendments() {
@@ -44,20 +46,9 @@ export default function AdminAmendments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showExpenseTour, setShowExpenseTour] = useState(false);
   const [showAmendmentsTour, setShowAmendmentsTour] = useState(false);
+  const [showOvertimeTour, setShowOvertimeTour] = useState(false);
   const [activeTab, setActiveTab] = useState('expenses');
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
-
-  // Calculate hours between two timestamps
-  const calculateRequestedHours = (clockIn?: string, clockOut?: string): string => {
-    if (!clockIn || !clockOut) return 'N/A';
-    
-    const start = new Date(clockIn);
-    const end = new Date(clockOut);
-    const diffMs = end.getTime() - start.getTime();
-    const hours = diffMs / (1000 * 60 * 60);
-    
-    return hours.toFixed(2);
-  };
 
   useEffect(() => {
     fetchAmendments();
@@ -83,6 +74,13 @@ export default function AdminAmendments() {
 
   const handleAmendmentsTourEnd = async () => {
     setShowAmendmentsTour(false);
+    // Auto-switch to overtime tab after amendments tour
+    setActiveTab('overtime');
+    setTimeout(() => setShowOvertimeTour(true), 500);
+  };
+
+  const handleOvertimeTourEnd = async () => {
+    setShowOvertimeTour(false);
     await markPageTutorialComplete('amendments');
     // Show completion dialog
     setShowCompletionDialog(true);
@@ -99,19 +97,54 @@ export default function AdminAmendments() {
 
   const fetchAmendments = async () => {
     try {
-      const { data } = await supabase
-        .from('time_amendments')
-        .select(`
-          *,
-          workers:worker_id(name, email)
-        `)
-        .order('created_at', { ascending: false });
+      // Fetch from both time_amendments and amendment_requests tables
+      const [legacyResponse, newResponse] = await Promise.all([
+        supabase
+          .from('time_amendments')
+          .select(`
+            *,
+            workers:worker_id(name, email)
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('amendment_requests')
+          .select(`
+            *,
+            workers:worker_id(name, email)
+          `)
+          .eq('type', 'time_amendment')
+          .order('created_at', { ascending: false })
+      ]);
 
-      const transformedData = (data || []).map(item => ({
+      // Transform legacy time_amendments data
+      const legacyAmendments: Amendment[] = (legacyResponse.data || []).map(item => ({
         ...item,
-        worker: item.workers
+        worker: item.workers,
+        source: 'time_amendments' as const
       }));
-      setAmendments(transformedData);
+
+      // Transform new amendment_requests data
+      const newAmendments: Amendment[] = (newResponse.data || []).map(item => {
+        const payload = item.payload as { clock_in?: string; clock_out?: string } | null;
+        return {
+          id: item.id,
+          clock_entry_id: item.clock_entry_id,
+          worker: item.workers,
+          requested_clock_in: payload?.clock_in,
+          requested_clock_out: payload?.clock_out,
+          reason: item.reason || '',
+          status: item.status,
+          created_at: item.created_at,
+          manager_notes: item.manager_notes,
+          source: 'amendment_requests' as const
+        };
+      });
+
+      // Merge and sort by created_at (newest first)
+      const allAmendments = [...legacyAmendments, ...newAmendments]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setAmendments(allAmendments);
     } catch (error) {
       console.error('Error fetching amendments:', error);
     } finally {
@@ -119,7 +152,7 @@ export default function AdminAmendments() {
     }
   };
 
-  const handleApproval = async (amendmentId: string, status: 'approved' | 'rejected') => {
+  const handleApproval = async (amendmentId: string, status: 'approved' | 'rejected', source: 'time_amendments' | 'amendment_requests' = 'time_amendments') => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast({
@@ -142,24 +175,42 @@ export default function AdminAmendments() {
         throw new Error('Manager not found');
       }
 
-      // Step 2: Get full amendment details including clock entry info
-      const { data: amendment, error: amendmentFetchError } = await supabase
-        .from('time_amendments')
-        .select(`
-          *,
-          clock_entries:clock_entry_id(
-            id,
-            clock_in,
-            clock_out,
-            total_hours,
-            worker_id
-          )
-        `)
-        .eq('id', amendmentId)
-        .single();
+      // Step 2: Get full amendment details based on source table
+      let amendment: any;
+      
+      if (source === 'amendment_requests') {
+        const { data, error } = await supabase
+          .from('amendment_requests')
+          .select('*')
+          .eq('id', amendmentId)
+          .single();
+        
+        if (error || !data) throw new Error('Amendment not found');
+        
+        const payload = data.payload as { clock_in?: string; clock_out?: string } | null;
+        amendment = {
+          ...data,
+          requested_clock_in: payload?.clock_in,
+          requested_clock_out: payload?.clock_out
+        };
+      } else {
+        const { data, error } = await supabase
+          .from('time_amendments')
+          .select(`
+            *,
+            clock_entries:clock_entry_id(
+              id,
+              clock_in,
+              clock_out,
+              total_hours,
+              worker_id
+            )
+          `)
+          .eq('id', amendmentId)
+          .single();
 
-      if (amendmentFetchError || !amendment) {
-        throw new Error('Amendment not found');
+        if (error || !data) throw new Error('Amendment not found');
+        amendment = data;
       }
 
       console.log('[AMENDMENT-APPROVAL] Processing amendment:', {
@@ -172,29 +223,47 @@ export default function AdminAmendments() {
         requestedClockOut: amendment.requested_clock_out
       });
 
-      // Step 3: Update amendment status
-      // The database trigger will automatically update clock_entries if status='approved'
-      const { error: updateError } = await supabase
-        .from('time_amendments')
-        .update({
-          status,
-          manager_notes: managerNotes,
-          processed_at: new Date().toISOString(),
-          approved_by: manager.name,
-          approved_at: status === 'approved' ? new Date().toISOString() : null,
-          manager_id: manager.id
-        })
-        .eq('id', amendmentId);
+      // Step 3: Update amendment status based on source table
+      if (source === 'amendment_requests') {
+        const { error: updateError } = await supabase
+          .from('amendment_requests')
+          .update({
+            status,
+            manager_notes: managerNotes,
+            processed_at: new Date().toISOString(),
+            manager_id: manager.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', amendmentId);
 
-      if (updateError) {
-        console.error('[AMENDMENT-APPROVAL] Failed to update amendment:', updateError);
-        throw new Error(`Failed to ${status} amendment: ${updateError.message}`);
+        if (updateError) {
+          console.error('[AMENDMENT-APPROVAL] Failed to update amendment_requests:', updateError);
+          throw new Error(`Failed to ${status} amendment: ${updateError.message}`);
+        }
+      } else {
+        // The database trigger will automatically update clock_entries if status='approved'
+        const { error: updateError } = await supabase
+          .from('time_amendments')
+          .update({
+            status,
+            manager_notes: managerNotes,
+            processed_at: new Date().toISOString(),
+            approved_by: manager.name,
+            approved_at: status === 'approved' ? new Date().toISOString() : null,
+            manager_id: manager.id
+          })
+          .eq('id', amendmentId);
+
+        if (updateError) {
+          console.error('[AMENDMENT-APPROVAL] Failed to update time_amendments:', updateError);
+          throw new Error(`Failed to ${status} amendment: ${updateError.message}`);
+        }
       }
 
       console.log('[AMENDMENT-APPROVAL] Amendment updated successfully');
 
-      // Step 4: Verify clock entry was updated (for approved amendments)
-      if (status === 'approved') {
+      // Step 4: Verify clock entry was updated (for approved amendments from time_amendments table)
+      if (status === 'approved' && source === 'time_amendments') {
         const { data: updatedClockEntry, error: verifyError } = await supabase
           .from('clock_entries')
           .select('clock_in, clock_out, total_hours')
@@ -262,6 +331,16 @@ export default function AdminAmendments() {
     }
   };
 
+  const calculateRequestedHours = (clockIn?: string, clockOut?: string): string => {
+    if (!clockIn || !clockOut) return '-';
+    
+    const start = moment(clockIn);
+    const end = moment(clockOut);
+    const hours = end.diff(start, 'hours', true);
+    
+    return `${hours.toFixed(2)} hrs`;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -279,7 +358,7 @@ export default function AdminAmendments() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Management</h1>
-            <p className="text-muted-foreground">Manage time amendments and expense types</p>
+            <p className="text-muted-foreground">Manage time additions and expense types</p>
           </div>
           <Button
             variant="outline"
@@ -292,9 +371,10 @@ export default function AdminAmendments() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" id="status-filter-tabs">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="expenses">Expense Types</TabsTrigger>
-            <TabsTrigger id="amendments-tab" value="amendments">Time Amendments</TabsTrigger>
+            <TabsTrigger id="amendments-tab" value="amendments">Time Additions</TabsTrigger>
+            <TabsTrigger id="overtime-tab" value="overtime">Overtime Requests</TabsTrigger>
           </TabsList>
           
           <TabsContent value="expenses" className="space-y-6">
@@ -307,7 +387,7 @@ export default function AdminAmendments() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="h-5 w-5" />
-              <span>Amendment Requests</span>
+              <span>Addition Requests</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -315,7 +395,7 @@ export default function AdminAmendments() {
               <div className="text-center py-12">
                 <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground text-lg font-medium mb-2">
-                  No amendment requests at this time
+                  No addition requests at this time
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Worker time change requests will appear here
@@ -354,8 +434,8 @@ export default function AdminAmendments() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-semibold text-sm">
-                          {calculateRequestedHours(amendment.requested_clock_in, amendment.requested_clock_out)} hours
+                        <div className="font-medium">
+                          {calculateRequestedHours(amendment.requested_clock_in, amendment.requested_clock_out)}
                         </div>
                       </TableCell>
                       <TableCell className="max-w-xs">
@@ -390,13 +470,19 @@ export default function AdminAmendments() {
            </Card>
            </div>
            </TabsContent>
+
+           <TabsContent value="overtime" className="space-y-6">
+             <div className="overtime-requests-section">
+               <OvertimeRequests />
+             </div>
+           </TabsContent>
         </Tabs>
 
         {selectedAmendment && (
           <Dialog open={true} onOpenChange={() => setSelectedAmendment(null)}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Review Amendment Request</DialogTitle>
+                <DialogTitle>Review Addition Request</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -410,14 +496,14 @@ export default function AdminAmendments() {
                 />
                  <div className="flex space-x-2">
                    <Button
-                     onClick={() => handleApproval(selectedAmendment.id, 'approved')}
+                     onClick={() => handleApproval(selectedAmendment.id, 'approved', selectedAmendment.source || 'time_amendments')}
                      className="btn-approve-amendment flex-1 hover:bg-primary/90"
                    >
                      <CheckCircle className="h-4 w-4 mr-2" />
                      Approve
                    </Button>
                    <Button
-                     onClick={() => handleApproval(selectedAmendment.id, 'rejected')}
+                     onClick={() => handleApproval(selectedAmendment.id, 'rejected', selectedAmendment.source || 'time_amendments')}
                      variant="destructive"
                      className="btn-reject-amendment flex-1 hover:bg-destructive/90"
                    >
@@ -439,7 +525,7 @@ export default function AdminAmendments() {
           </DialogHeader>
           <div className="py-6">
             <p className="text-center text-muted-foreground">
-              You now know how to manage expense types and time amendments! If you want a refresher later, just click the "Tutorial" button on this page.
+              You now know how to manage expense types and time additions! If you want a refresher later, just click the "Tutorial" button on this page.
             </p>
           </div>
           <div className="flex justify-center gap-2">
@@ -450,7 +536,7 @@ export default function AdminAmendments() {
               Replay Tutorial
             </Button>
             <Button onClick={() => setShowCompletionDialog(false)}>
-              Explore Amendments
+              Explore Additions
             </Button>
           </div>
         </DialogContent>
@@ -464,12 +550,41 @@ export default function AdminAmendments() {
         onSkip={handleExpenseTourEnd}
       />
 
-      {/* Time Amendments Tutorial */}
+      {/* Time Additions Tutorial */}
       <OnboardingTour
         steps={timeAmendmentsSteps}
         run={showAmendmentsTour}
         onComplete={handleAmendmentsTourEnd}
         onSkip={handleAmendmentsTourEnd}
+      />
+
+      {/* Overtime Requests Tutorial */}
+      <OnboardingTour
+        steps={[
+          {
+            target: '#overtime-tab',
+            content: '⏰ This is the Overtime Requests tab where you manage worker overtime submissions.',
+            placement: 'bottom',
+          },
+          {
+            target: '.overtime-requests-section',
+            content: '📋 This table displays all overtime requests from the last 14 days with their details.',
+            placement: 'top',
+          },
+          {
+            target: 'body',
+            content: '✅❌ Approve or Reject overtime requests. Only approved overtime will appear in your reports!',
+            placement: 'center',
+          },
+          {
+            target: '#nav-reports-button',
+            content: '📊 Next, visit Reports to generate detailed time and expense reports for your team!',
+            placement: 'bottom',
+          },
+        ]}
+        run={showOvertimeTour}
+        onComplete={handleOvertimeTourEnd}
+        onSkip={handleOvertimeTourEnd}
       />
     </Layout>
   );

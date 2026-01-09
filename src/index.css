@@ -8,7 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* AutoTime Color Palette - Black/White/Grey */
+    /* TimeTrack Color Palette - Black/White/Grey */
     --autotime-black: 0 0% 0%;           /* #000000 */
     --autotime-dark-grey: 0 0% 22%;      /* #374151 */
     --autotime-mid-grey: 0 0% 42%;       /* #6B7280 */
@@ -18,7 +18,7 @@ All colors MUST be HSL.
     --autotime-danger: 0 71% 67%;        /* #F56565 */
     --autotime-warning: 26 77% 58%;      /* #ED8936 */
 
-    /* Main Design System Colors mapped to AutoTime palette */
+    /* Main Design System Colors mapped to TimeTrack palette */
     --background: var(--autotime-white);
     --foreground: var(--autotime-black);
 
@@ -67,7 +67,7 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark mode using AutoTime colors */
+    /* Dark mode using TimeTrack colors */
     --background: var(--autotime-black);
     --foreground: var(--autotime-white);
 

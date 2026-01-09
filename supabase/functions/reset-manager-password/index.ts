@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,14 +40,17 @@ serve(async (req) => {
 
     // Verify the user is authenticated
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
       console.error("Authentication failed:", authError);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify the user is a superadmin
@@ -59,10 +62,10 @@ serve(async (req) => {
 
     if (superAdminError || !superAdmin) {
       console.error("Superadmin verification failed:", superAdminError);
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Superadmin access required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden: Superadmin access required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { managerId, password, requirePasswordChange, sendEmail }: ResetPasswordRequest = await req.json();
@@ -76,10 +79,10 @@ serve(async (req) => {
 
     if (managerError || !manager) {
       console.error("Manager not found:", managerError);
-      return new Response(
-        JSON.stringify({ error: "Manager not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Manager not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Prevent targeting superadmin accounts
@@ -90,10 +93,10 @@ serve(async (req) => {
       .single();
 
     if (targetIsSuperAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Cannot reset password for superadmin accounts" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Cannot reset password for superadmin accounts" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Generate or use provided password
@@ -101,26 +104,23 @@ serve(async (req) => {
 
     // Get the user's auth ID
     const { data: authUsers, error: authUsersError } = await supabase.auth.admin.listUsers();
-    
+
     if (authUsersError) {
       console.error("Failed to list users:", authUsersError);
       throw authUsersError;
     }
 
-    const authUser = authUsers.users.find(u => u.email === manager.email);
-    
+    const authUser = authUsers.users.find((u) => u.email === manager.email);
+
     if (!authUser) {
-      return new Response(
-        JSON.stringify({ error: "Manager auth account not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Manager auth account not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update the password
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
-      authUser.id,
-      { password: tempPassword }
-    );
+    const { error: updateError } = await supabase.auth.admin.updateUserById(authUser.id, { password: tempPassword });
 
     if (updateError) {
       console.error("Failed to update password:", updateError);
@@ -161,11 +161,11 @@ serve(async (req) => {
       const resendApiKey = Deno.env.get("RESEND_API_KEY");
       if (resendApiKey) {
         const resend = new Resend(resendApiKey);
-        const siteUrl = Deno.env.get('SITE_URL') || 'https://kejblmetyrsehzvrxgmt.lovable.app';
+        const siteUrl = Deno.env.get("SITE_URL") || "https://autotime.hillwayco.uk";
         const loginUrl = `${siteUrl}/login`;
-        
+
         await resend.emails.send({
-          from: "AutoTime <no-reply@hillwayco.uk>",
+          from: "TimeTrack <no-reply@hillwayco.uk>",
           to: [manager.email],
           subject: "Your Manager Account Password Was Reset",
           html: `
@@ -175,10 +175,10 @@ serve(async (req) => {
             <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
             <p><strong>Temporary Password:</strong> ${tempPassword}</p>
             <p>⚠️ Please do not share this temporary password with anyone for your account security.</p>
-            <p>You can log in here: <a href="https://autotime.hillwayco.uk/login">Login</a></p>
-            ${requirePasswordChange ? '<p><strong>Action Required:</strong> You will be required to change your password when you log in.</p>' : ''}
+            <p>You can log in here: <a href="${loginUrl}">Login</a></p>
+            ${requirePasswordChange ? "<p><strong>Action Required:</strong> You will be required to change your password when you log in.</p>" : ""}
             <p>If you did not request this change, please contact your system administrator immediately.</p>
-            <p>Best regards,<br>AutoTime Team</p>
+            <p>Best regards,<br>TimeTrack Team</p>
           `,
         });
       }
@@ -195,16 +195,13 @@ serve(async (req) => {
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error: any) {
     console.error("Error in reset-manager-password function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

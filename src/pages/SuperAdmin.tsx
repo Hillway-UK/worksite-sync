@@ -1,26 +1,35 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key, Pencil } from 'lucide-react';
-import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
-import { TempPasswordModal } from '@/components/TempPasswordModal';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { generateSecurePassword } from '@/lib/validation';
-import { useCapacityCheck } from '@/hooks/useCapacityCheck';
-import { CapacityLimitDialog } from '@/components/CapacityLimitDialog';
-import { OrganizationLogoUpload, OrganizationLogoUploadRef } from '@/components/OrganizationLogoUpload';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Building, Users, Trash, AlertCircle, LogOut, Key, Pencil } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { TempPasswordModal } from "@/components/TempPasswordModal";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { generateSecurePassword } from "@/lib/validation";
+import { useCapacityCheck } from "@/hooks/useCapacityCheck";
+import { CapacityLimitDialog } from "@/components/CapacityLimitDialog";
+import { OrganizationLogoUpload, OrganizationLogoUploadRef } from "@/components/OrganizationLogoUpload";
 
 const SUBSCRIPTION_PLANS = {
   trial: {
-    label: 'Trial',
+    label: "Trial",
     maxManagers: 1,
     maxWorkers: 3,
     plannedManagers: 1,
@@ -28,48 +37,48 @@ const SUBSCRIPTION_PLANS = {
     durationMonths: 1,
     costPerManager: 0,
     costPerWorker: 0,
-    isCustomizable: false
+    isCustomizable: false,
   },
   starter: {
-    label: 'Starter',
+    label: "Starter",
     maxManagers: 2,
     maxWorkers: 10,
     plannedManagers: 2,
     plannedWorkers: 10,
     durationMonths: 1,
     costPerManager: 25,
-    costPerWorker: 1.50,
-    isCustomizable: false
+    costPerWorker: 1.5,
+    isCustomizable: false,
   },
   pro: {
-    label: 'Pro',
+    label: "Pro",
     maxManagers: 5,
     maxWorkers: 100,
     plannedManagers: 5,
     plannedWorkers: 100,
     durationMonths: 1,
     costPerManager: 25,
-    costPerWorker: 1.50,
-    isCustomizable: false
+    costPerWorker: 1.5,
+    isCustomizable: false,
   },
   enterprise: {
-    label: 'Enterprise',
+    label: "Enterprise",
     maxManagers: null,
     maxWorkers: null,
     plannedManagers: 1,
     plannedWorkers: 0,
     durationMonths: 1,
     costPerManager: 25,
-    costPerWorker: 1.50,
-    isCustomizable: true
-  }
+    costPerWorker: 1.5,
+    isCustomizable: true,
+  },
 } as const;
 
 const PLAN_DISPLAY_NAMES: Record<SubscriptionPlan, string> = {
-  trial: 'Trial (1 Manager, 3 Workers - Free)',
-  starter: 'Starter (2 Managers, 10 Workers)',
-  pro: 'Pro (5 Managers, 100 Workers)',
-  enterprise: 'Enterprise (Custom capacity)'
+  trial: "Trial (1 Manager, 3 Workers - Free)",
+  starter: "Starter (2 Managers, 10 Workers)",
+  pro: "Pro (5 Managers, 100 Workers)",
+  enterprise: "Enterprise (Custom capacity)",
 } as const;
 
 type SubscriptionPlan = keyof typeof SUBSCRIPTION_PLANS;
@@ -88,58 +97,62 @@ export default function SuperAdmin() {
   const [selectedManager, setSelectedManager] = useState<{ id: string; name: string; email: string } | null>(null);
   const [tempPasswordModalOpen, setTempPasswordModalOpen] = useState(false);
   const [showManagerSuccessModal, setShowManagerSuccessModal] = useState(false);
-  const [managerCredentials, setManagerCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [managerCredentials, setManagerCredentials] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
   const [capacityLimitDialog, setCapacityLimitDialog] = useState({
     open: false,
-    type: 'manager' as 'manager' | 'worker',
-    planName: '',
+    type: "manager" as "manager" | "worker",
+    planName: "",
     currentCount: 0,
     maxAllowed: null as number | null,
-    plannedCount: 0
+    plannedCount: 0,
   });
-  
+
   const { checkCapacity } = useCapacityCheck();
-  
+
   const [orgForm, setOrgForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    company_number: '',
-    vat_number: '',
-    subscriptionPlan: 'starter' as SubscriptionPlan,
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    company_number: "",
+    vat_number: "",
+    subscriptionPlan: "starter" as SubscriptionPlan,
     plannedManagers: 2,
-    plannedWorkers: 10
+    plannedWorkers: 10,
   });
 
   const [stagedLogoFile, setStagedLogoFile] = useState<File | null>(null);
   const logoUploadRef = useRef<OrganizationLogoUploadRef>(null);
 
   const [updateOrgForm, setUpdateOrgForm] = useState({
-    organizationId: '',
-    organizationName: '',
-    email: '',
-    phone: '',
-    address: '',
-    company_number: '',
-    vat_number: '',
+    organizationId: "",
+    organizationName: "",
+    email: "",
+    phone: "",
+    address: "",
+    company_number: "",
+    vat_number: "",
     logo_url: null as string | null,
-    subscriptionPlan: 'starter' as SubscriptionPlan,
+    subscriptionPlan: "starter" as SubscriptionPlan,
     plannedManagers: 1,
     plannedWorkers: 0,
-    currentActive: { managers: 0, workers: 0 }
+    currentActive: { managers: 0, workers: 0 },
   });
 
   const [originalSubscription, setOriginalSubscription] = useState({
-    plan: 'starter' as SubscriptionPlan,
+    plan: "starter" as SubscriptionPlan,
     plannedManagers: 1,
-    plannedWorkers: 0
+    plannedWorkers: 0,
   });
-  
+
   const [managerForm, setManagerForm] = useState({
-    email: '',
-    name: '',
-    organization_id: ''
+    email: "",
+    name: "",
+    organization_id: "",
   });
 
   useEffect(() => {
@@ -148,7 +161,7 @@ export default function SuperAdmin() {
 
   const verifyAuthentication = async () => {
     if (!user) {
-      toast.error('Please log in to access this page');
+      toast.error("Please log in to access this page");
       setLoading(false);
       return;
     }
@@ -156,19 +169,19 @@ export default function SuperAdmin() {
     // Check if user is in super_admins table
     try {
       const { data: superAdmin, error } = await supabase
-        .from('super_admins')
-        .select('*')
-        .eq('email', user.email)
+        .from("super_admins")
+        .select("*")
+        .eq("email", user.email)
         .maybeSingle();
 
       if (error) {
-        toast.error('Failed to verify admin status');
+        toast.error("Failed to verify admin status");
         setLoading(false);
         return;
       }
 
       if (!superAdmin) {
-        toast.error('Access denied: Super admin privileges required');
+        toast.error("Access denied: Super admin privileges required");
         setLoading(false);
         return;
       }
@@ -176,7 +189,7 @@ export default function SuperAdmin() {
       setAuthVerified(true);
       await initializeData();
     } catch (err: any) {
-      toast.error('Authentication verification failed');
+      toast.error("Authentication verification failed");
       setLoading(false);
     }
   };
@@ -196,17 +209,17 @@ export default function SuperAdmin() {
     const planConfig = SUBSCRIPTION_PLANS[plan];
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + planConfig.durationMonths);
-    
+
     return {
-      subscription_start_date: startDate.toISOString().split('T')[0],
-      subscription_end_date: endDate.toISOString().split('T')[0],
-      trial_ends_at: plan === 'trial' ? endDate.toISOString().split('T')[0] : null
+      subscription_start_date: startDate.toISOString().split("T")[0],
+      subscription_end_date: endDate.toISOString().split("T")[0],
+      trial_ends_at: plan === "trial" ? endDate.toISOString().split("T")[0] : null,
     };
   };
 
   const calculateTotalCost = (plan: SubscriptionPlan, managers: number, workers: number) => {
     const planConfig = SUBSCRIPTION_PLANS[plan];
-    return (managers * planConfig.costPerManager) + (workers * planConfig.costPerWorker);
+    return managers * planConfig.costPerManager + workers * planConfig.costPerWorker;
   };
 
   const handlePlanChange = (plan: SubscriptionPlan) => {
@@ -215,20 +228,20 @@ export default function SuperAdmin() {
       ...orgForm,
       subscriptionPlan: plan,
       plannedManagers: planConfig.plannedManagers,
-      plannedWorkers: planConfig.plannedWorkers
+      plannedWorkers: planConfig.plannedWorkers,
     });
   };
 
   const handleUpdatePlanChange = (plan: SubscriptionPlan) => {
     const planConfig = SUBSCRIPTION_PLANS[plan];
-    
+
     // If switching TO a non-customizable plan, use its defaults
     if (!planConfig.isCustomizable) {
       setUpdateOrgForm({
         ...updateOrgForm,
         subscriptionPlan: plan,
         plannedManagers: Math.max(planConfig.plannedManagers, updateOrgForm.currentActive.managers),
-        plannedWorkers: Math.max(planConfig.plannedWorkers, updateOrgForm.currentActive.workers)
+        plannedWorkers: Math.max(planConfig.plannedWorkers, updateOrgForm.currentActive.workers),
       });
     } else {
       // For Enterprise (customizable), preserve current values unless they're below active counts
@@ -236,7 +249,7 @@ export default function SuperAdmin() {
         ...updateOrgForm,
         subscriptionPlan: plan,
         plannedManagers: Math.max(updateOrgForm.plannedManagers, updateOrgForm.currentActive.managers),
-        plannedWorkers: Math.max(updateOrgForm.plannedWorkers, updateOrgForm.currentActive.workers)
+        plannedWorkers: Math.max(updateOrgForm.plannedWorkers, updateOrgForm.currentActive.workers),
       });
     }
   };
@@ -244,119 +257,115 @@ export default function SuperAdmin() {
   const fetchOrganizations = async () => {
     try {
       // First try simple query without joins
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('name');
-      
+      const { data, error } = await supabase.from("organizations").select("*").order("name");
+
       if (error) {
         toast.error(`Failed to load organizations: ${error.message}`);
         return;
       }
-      
+
       // Get manager count separately for each organization
       const orgsWithManagerCount = await Promise.all(
         (data || []).map(async (org) => {
           try {
             const { count, error: countError } = await supabase
-              .from('managers')
-              .select('*', { count: 'exact', head: true })
-              .eq('organization_id', org.id);
-            
+              .from("managers")
+              .select("*", { count: "exact", head: true })
+              .eq("organization_id", org.id);
+
             return {
               ...org,
-              managers: { count: count || 0 }
+              managers: { count: count || 0 },
             };
           } catch (err) {
             return {
               ...org,
-              managers: { count: 0 }
+              managers: { count: 0 },
             };
           }
-        })
+        }),
       );
-      
+
       setOrganizations(orgsWithManagerCount);
-      
     } catch (err: any) {
-      toast.error('Failed to load organizations');
+      toast.error("Failed to load organizations");
     }
   };
 
   const fetchManagers = async () => {
     try {
       // First get managers
-      const { data: managersData, error } = await supabase
-        .from('managers')
-        .select('*')
-        .order('name');
-      
+      const { data: managersData, error } = await supabase.from("managers").select("*").order("name");
+
       if (error) {
         toast.error(`Failed to load managers: ${error.message}`);
         return;
       }
-      
+
       // Get organization names separately
       const managersWithOrgs = await Promise.all(
         (managersData || []).map(async (manager) => {
           if (!manager.organization_id) {
             return {
               ...manager,
-              organizations: null
+              organizations: null,
             };
           }
-          
+
           try {
             const { data: orgData, error: orgError } = await supabase
-              .from('organizations')
-              .select('name')
-              .eq('id', manager.organization_id)
+              .from("organizations")
+              .select("name")
+              .eq("id", manager.organization_id)
               .maybeSingle();
-            
+
             return {
               ...manager,
-              organizations: orgData
+              organizations: orgData,
             };
           } catch (err) {
             return {
               ...manager,
-              organizations: null
+              organizations: null,
             };
           }
-        })
+        }),
       );
-      
+
       setManagers(managersWithOrgs);
-      
     } catch (err: any) {
-      toast.error('Failed to load managers');
+      toast.error("Failed to load managers");
     }
   };
 
   const createOrganization = async () => {
     try {
       if (!orgForm.name || !orgForm.email) {
-        toast.error('Organization name and email are required');
+        toast.error("Organization name and email are required");
         return;
       }
 
       const planConfig = SUBSCRIPTION_PLANS[orgForm.subscriptionPlan];
-      
+
       // Validation for non-enterprise plans
       if (!planConfig.isCustomizable) {
-        if (orgForm.plannedManagers !== planConfig.plannedManagers || 
-            orgForm.plannedWorkers !== planConfig.plannedWorkers) {
-          toast.error(`${planConfig.label} plan requires exactly ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`);
+        if (
+          orgForm.plannedManagers !== planConfig.plannedManagers ||
+          orgForm.plannedWorkers !== planConfig.plannedWorkers
+        ) {
+          toast.error(
+            `${planConfig.label} plan requires exactly ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`,
+          );
           return;
         }
       } else {
         // Enterprise validation
         if (orgForm.plannedManagers < 1) {
-          toast.error('Planned managers must be at least 1');
+          toast.error("Planned managers must be at least 1");
           return;
         }
         if (orgForm.plannedWorkers < 0) {
-          toast.error('Planned workers cannot be negative');
+          toast.error("Planned workers cannot be negative");
           return;
         }
       }
@@ -367,7 +376,7 @@ export default function SuperAdmin() {
 
       // Insert into organizations table (without max_managers/max_workers)
       const { data, error } = await supabase
-        .from('organizations')
+        .from("organizations")
         .insert({
           name: orgForm.name,
           email: orgForm.email,
@@ -375,14 +384,14 @@ export default function SuperAdmin() {
           address: orgForm.address || null,
           company_number: orgForm.company_number || null,
           vat_number: orgForm.vat_number || null,
-          subscription_status: orgForm.subscriptionPlan === 'trial' ? 'trial' : 'active',
+          subscription_status: orgForm.subscriptionPlan === "trial" ? "trial" : "active",
           subscription_start_date: dates.subscription_start_date,
           subscription_end_date: dates.subscription_end_date,
-          trial_ends_at: dates.trial_ends_at
+          trial_ends_at: dates.trial_ends_at,
         })
         .select()
         .single();
-      
+
       if (error) {
         toast.error(`Failed to create organization: ${error.message}`);
         return;
@@ -392,84 +401,84 @@ export default function SuperAdmin() {
       let logoUrl: string | null = null;
       if (stagedLogoFile && logoUploadRef.current) {
         logoUrl = await logoUploadRef.current.uploadStagedFile(data.id);
-        
+
         if (logoUrl) {
-          await supabase
-            .from('organizations')
-            .update({ logo_url: logoUrl })
-            .eq('id', data.id);
+          await supabase.from("organizations").update({ logo_url: logoUrl }).eq("id", data.id);
         }
       }
 
       // Create subscription_usage record with new schema
-      const { error: usageError } = await supabase
-        .from('subscription_usage')
-        .insert({
-          organization_id: data.id,
-          month: dates.subscription_start_date,
-          planned_number_of_managers: orgForm.plannedManagers,
-          planned_number_of_workers: orgForm.plannedWorkers,
-          total_cost: totalCost,
-          active_managers: 0,
-          active_workers: 0,
-          billed: false,
-          status: 'active',
-          effective_start_date: dates.subscription_start_date,
-          plan_type: orgForm.subscriptionPlan === 'trial' ? 'trial' : 
-                     orgForm.plannedManagers === 2 && orgForm.plannedWorkers === 10 ? 'starter' :
-                     orgForm.plannedManagers === 5 && orgForm.plannedWorkers === 100 ? 'pro' : 'custom'
-        });
+      const { error: usageError } = await supabase.from("subscription_usage").insert({
+        organization_id: data.id,
+        month: dates.subscription_start_date,
+        planned_number_of_managers: orgForm.plannedManagers,
+        planned_number_of_workers: orgForm.plannedWorkers,
+        total_cost: totalCost,
+        active_managers: 0,
+        active_workers: 0,
+        billed: false,
+        status: "active",
+        effective_start_date: dates.subscription_start_date,
+        plan_type:
+          orgForm.subscriptionPlan === "trial"
+            ? "trial"
+            : orgForm.plannedManagers === 2 && orgForm.plannedWorkers === 10
+              ? "starter"
+              : orgForm.plannedManagers === 5 && orgForm.plannedWorkers === 100
+                ? "pro"
+                : "custom",
+      });
 
       if (usageError) {
-        console.error('Failed to create subscription usage:', usageError);
-        toast.error('Organization created but subscription tracking failed');
+        console.error("Failed to create subscription usage:", usageError);
+        toast.error("Organization created but subscription tracking failed");
       } else {
-        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free Trial';
-        const logoMessage = logoUrl ? ' with logo' : '';
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : "Free Trial";
+        const logoMessage = logoUrl ? " with logo" : "";
         toast.success(`Organization created${logoMessage} with ${planConfig.label} plan (${costDisplay})`);
       }
-      
+
       setShowOrgDialog(false);
-      setOrgForm({ 
-        name: '', 
-        email: '', 
-        phone: '', 
-        address: '', 
-        company_number: '', 
-        vat_number: '', 
-        subscriptionPlan: 'starter',
-        plannedManagers: 2, 
-        plannedWorkers: 10 
+      setOrgForm({
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        company_number: "",
+        vat_number: "",
+        subscriptionPlan: "starter",
+        plannedManagers: 2,
+        plannedWorkers: 10,
       });
       setStagedLogoFile(null);
       await fetchOrganizations();
     } catch (err: any) {
-      toast.error('An unexpected error occurred');
+      toast.error("An unexpected error occurred");
     }
   };
 
   const createManager = async () => {
     try {
       if (!managerForm.email || !managerForm.name || !managerForm.organization_id) {
-        toast.error('Please fill in all fields');
+        toast.error("Please fill in all fields");
         return;
       }
 
       // Check capacity BEFORE creating manager
-      const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
-      
+      const capacityCheck = await checkCapacity(managerForm.organization_id, "manager");
+
       if (!capacityCheck.allowed) {
         if (capacityCheck.capacity) {
           setCapacityLimitDialog({
             open: true,
-            type: 'manager',
+            type: "manager",
             planName: capacityCheck.capacity.planName,
             currentCount: capacityCheck.capacity.currentManagerCount,
             maxAllowed: capacityCheck.capacity.maxManagers,
-            plannedCount: capacityCheck.capacity.plannedManagers
+            plannedCount: capacityCheck.capacity.plannedManagers,
           });
         } else {
-          toast.error(capacityCheck.error || 'Cannot add manager at this time');
+          toast.error(capacityCheck.error || "Cannot add manager at this time");
         }
         return;
       }
@@ -487,43 +496,44 @@ export default function SuperAdmin() {
           emailRedirectTo: "https://autotime.hillwayco.uk/login",
           data: {
             name: managerForm.name,
-            role: 'manager',
-            organization_id: managerForm.organization_id
-          }
-        }
+            role: "manager",
+            organization_id: managerForm.organization_id,
+          },
+        },
       });
-      
+
       if (authError) {
         // Check if user already exists
-        if (authError.message.includes('already registered')) {
+        if (authError.message.includes("already registered")) {
           // User exists, use upsert to handle potential duplicates gracefully
-          const { error: managerError } = await supabase
-            .from('managers')
-            .upsert({
+          const { error: managerError } = await supabase.from("managers").upsert(
+            {
               email: managerForm.email,
               name: managerForm.name,
-              organization_id: managerForm.organization_id
-            }, {
-              onConflict: 'email'
-            });
-          
+              organization_id: managerForm.organization_id,
+            },
+            {
+              onConflict: "email",
+            },
+          );
+
           if (managerError) {
             // Check if this is a capacity limit error from the database trigger
-            if (managerError.message.includes('Manager limit reached')) {
+            if (managerError.message.includes("Manager limit reached")) {
               const match = managerError.message.match(/active (\d+) \/ planned (\d+)/);
               if (match) {
                 const currentCount = parseInt(match[1]);
                 const plannedCount = parseInt(match[2]);
-                
-                const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
-                
+
+                const capacityCheck = await checkCapacity(managerForm.organization_id, "manager");
+
                 setCapacityLimitDialog({
                   open: true,
-                  type: 'manager',
-                  planName: capacityCheck.capacity?.planName || 'Current Plan',
+                  type: "manager",
+                  planName: capacityCheck.capacity?.planName || "Current Plan",
                   currentCount: currentCount,
                   maxAllowed: capacityCheck.capacity?.maxManagers || plannedCount,
-                  plannedCount: plannedCount
+                  plannedCount: plannedCount,
                 });
                 setCreatingManager(false);
                 return;
@@ -531,75 +541,109 @@ export default function SuperAdmin() {
             }
             toast.error(`Manager record error: ${managerError.message}`);
           } else {
-            toast.success('Manager linked to existing user successfully!');
+            toast.success("Manager linked to existing user successfully!");
             setShowManagerDialog(false);
-            setManagerForm({ email: '', name: '', organization_id: '' });
+            setManagerForm({ email: "", name: "", organization_id: "" });
             await Promise.all([fetchManagers(), fetchOrganizations()]);
           }
           setCreatingManager(false);
           return;
         }
-        
+
         toast.error(`Auth error: ${authError.message}`);
         setCreatingManager(false);
         return;
       }
-      
+
       // Create manager record for new user - use upsert to handle edge cases
-      const { error: managerError } = await supabase
-        .from('managers')
-        .upsert({
+      const { error: managerError } = await supabase.from("managers").upsert(
+        {
           email: managerForm.email,
           name: managerForm.name,
-          organization_id: managerForm.organization_id
-        }, {
-          onConflict: 'email'
-        });
-      
+          organization_id: managerForm.organization_id,
+        },
+        {
+          onConflict: "email",
+        },
+      );
+
       if (managerError) {
         // Check if this is a capacity limit error from the database trigger
-        if (managerError.message.includes('Manager limit reached')) {
+        if (managerError.message.includes("Manager limit reached")) {
           // Parse the error message: "Manager limit reached for organization X (active Y / planned Z)"
           const match = managerError.message.match(/active (\d+) \/ planned (\d+)/);
           if (match) {
             const currentCount = parseInt(match[1]);
             const plannedCount = parseInt(match[2]);
-            
+
             // Get plan info for display
-            const capacityCheck = await checkCapacity(managerForm.organization_id, 'manager');
-            
+            const capacityCheck = await checkCapacity(managerForm.organization_id, "manager");
+
             setCapacityLimitDialog({
               open: true,
-              type: 'manager',
-              planName: capacityCheck.capacity?.planName || 'Current Plan',
+              type: "manager",
+              planName: capacityCheck.capacity?.planName || "Current Plan",
               currentCount: currentCount,
               maxAllowed: capacityCheck.capacity?.maxManagers || plannedCount,
-              plannedCount: plannedCount
+              plannedCount: plannedCount,
             });
             setCreatingManager(false);
             return;
           }
         }
-        
+
         toast.error(`Failed to create manager record: ${managerError.message}`);
         setCreatingManager(false);
         return;
       }
-      
+
+      // Fetch organization name for email
+      let organizationName = "Your Organization";
+      try {
+        const { data: orgData } = await supabase
+          .from("organizations")
+          .select("name")
+          .eq("id", managerForm.organization_id)
+          .maybeSingle();
+        if (orgData?.name) {
+          organizationName = orgData.name;
+        }
+      } catch (orgErr) {
+        console.error("Failed to fetch organization name:", orgErr);
+      }
+
+      // Send invitation email via MailChannels
+      try {
+        const { error: emailError } = await supabase.functions.invoke("send-invitation-email", {
+          body: {
+            type: "manager",
+            recipientEmail: managerForm.email,
+            recipientName: managerForm.name,
+            password: autoPassword,
+            organizationName: organizationName,
+            loginUrl: "https://autotime.hillwayco.uk/login",
+          },
+        });
+        if (emailError) {
+          console.error("Failed to send invitation email:", emailError);
+        }
+      } catch (emailErr) {
+        console.error("Email sending error:", emailErr);
+      }
+
       // Store credentials and show success modal
       setManagerCredentials({
         name: managerForm.name,
         email: managerForm.email,
-        password: autoPassword
+        password: autoPassword,
       });
-      
+
       setShowManagerDialog(false);
-      setManagerForm({ email: '', name: '', organization_id: '' });
+      setManagerForm({ email: "", name: "", organization_id: "" });
       setShowManagerSuccessModal(true);
       await Promise.all([fetchManagers(), fetchOrganizations()]);
-      
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create manager');
+      toast.error(error.message || "Failed to create manager");
     } finally {
       setCreatingManager(false);
     }
@@ -607,8 +651,8 @@ export default function SuperAdmin() {
 
   const copyManagerCredentialsToClipboard = () => {
     if (!managerCredentials) return;
-    
-    const text = `Welcome to AutoTime Manager Portal
+
+    const text = `Welcome to TimeTrack Manager Portal
 
 Name: ${managerCredentials.name}
 Email: ${managerCredentials.email}
@@ -617,9 +661,9 @@ Temporary Password: ${managerCredentials.password}
 Manager Portal URL: https://autotime.hillwayco.uk/login
 
 Please change your password on first login for security.`;
-    
+
     navigator.clipboard.writeText(text);
-    toast.success('Login details copied to clipboard!');
+    toast.success("Login details copied to clipboard!");
   };
 
   const handleManagerSuccessModalClose = () => {
@@ -631,32 +675,30 @@ Please change your password on first login for security.`;
     try {
       // Fetch current subscription usage
       const { data: usageData, error: usageError } = await supabase
-        .from('subscription_usage')
-        .select('*')
-        .eq('organization_id', org.id)
-        .eq('status', 'active')
-        .order('effective_start_date', { ascending: false })
+        .from("subscription_usage")
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("status", "active")
+        .order("effective_start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (usageError && usageError.code !== 'PGRST116') {
-        toast.error('Failed to fetch subscription data');
+      if (usageError && usageError.code !== "PGRST116") {
+        toast.error("Failed to fetch subscription data");
         return;
       }
 
       // Determine current plan from subscription_usage data
-      let currentPlan: SubscriptionPlan = 'starter'; // default fallback
+      let currentPlan: SubscriptionPlan = "starter"; // default fallback
 
       if (usageData?.plan_type) {
         // Use the actual plan_type from subscription_usage
         // Map 'custom' to 'enterprise' for the dropdown
         const planType = usageData.plan_type.toLowerCase().trim();
-        currentPlan = (planType === 'custom') 
-          ? 'enterprise' 
-          : planType as SubscriptionPlan;
-      } else if (org.subscription_status === 'trial') {
+        currentPlan = planType === "custom" ? "enterprise" : (planType as SubscriptionPlan);
+      } else if (org.subscription_status === "trial") {
         // Fallback: if no usage data but status is trial
-        currentPlan = 'trial';
+        currentPlan = "trial";
       }
 
       const plannedManagers = usageData?.planned_number_of_managers || 1;
@@ -665,38 +707,38 @@ Please change your password on first login for security.`;
       setUpdateOrgForm({
         organizationId: org.id,
         organizationName: org.name,
-        email: org.email || '',
-        phone: org.phone || '',
-        address: org.address || '',
-        company_number: org.company_number || '',
-        vat_number: org.vat_number || '',
+        email: org.email || "",
+        phone: org.phone || "",
+        address: org.address || "",
+        company_number: org.company_number || "",
+        vat_number: org.vat_number || "",
         logo_url: org.logo_url || null,
         subscriptionPlan: currentPlan,
         plannedManagers: plannedManagers,
         plannedWorkers: plannedWorkers,
         currentActive: {
           managers: usageData?.active_managers || 0,
-          workers: usageData?.active_workers || 0
-        }
+          workers: usageData?.active_workers || 0,
+        },
       });
 
       // Store original subscription for change detection
       setOriginalSubscription({
         plan: currentPlan,
         plannedManagers: plannedManagers,
-        plannedWorkers: plannedWorkers
+        plannedWorkers: plannedWorkers,
       });
 
       setShowUpdateOrgDialog(true);
     } catch (err: any) {
-      toast.error('Failed to load organization data');
+      toast.error("Failed to load organization data");
     }
   };
 
   const updateOrganization = async () => {
     try {
       if (!updateOrgForm.organizationName) {
-        toast.error('Organization name is required');
+        toast.error("Organization name is required");
         return;
       }
 
@@ -704,9 +746,13 @@ Please change your password on first login for security.`;
 
       // Validation
       if (!planConfig.isCustomizable) {
-        if (updateOrgForm.plannedManagers < planConfig.plannedManagers || 
-            updateOrgForm.plannedWorkers < planConfig.plannedWorkers) {
-          toast.error(`${planConfig.label} plan requires at least ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`);
+        if (
+          updateOrgForm.plannedManagers < planConfig.plannedManagers ||
+          updateOrgForm.plannedWorkers < planConfig.plannedWorkers
+        ) {
+          toast.error(
+            `${planConfig.label} plan requires at least ${planConfig.plannedManagers} managers and ${planConfig.plannedWorkers} workers`,
+          );
           return;
         }
       }
@@ -722,18 +768,18 @@ Please change your password on first login for security.`;
       }
 
       // Find the organization in the current list
-      const currentOrg = organizations.find(o => o.id === updateOrgForm.organizationId);
+      const currentOrg = organizations.find((o) => o.id === updateOrgForm.organizationId);
 
       // Detect what changed
-      const companyDetailsChanged = 
+      const companyDetailsChanged =
         updateOrgForm.organizationName !== currentOrg?.name ||
-        updateOrgForm.email !== (currentOrg?.email || '') ||
-        updateOrgForm.phone !== (currentOrg?.phone || '') ||
-        updateOrgForm.address !== (currentOrg?.address || '') ||
-        updateOrgForm.company_number !== (currentOrg?.company_number || '') ||
-        updateOrgForm.vat_number !== (currentOrg?.vat_number || '');
+        updateOrgForm.email !== (currentOrg?.email || "") ||
+        updateOrgForm.phone !== (currentOrg?.phone || "") ||
+        updateOrgForm.address !== (currentOrg?.address || "") ||
+        updateOrgForm.company_number !== (currentOrg?.company_number || "") ||
+        updateOrgForm.vat_number !== (currentOrg?.vat_number || "");
 
-      const subscriptionChanged = 
+      const subscriptionChanged =
         updateOrgForm.subscriptionPlan !== originalSubscription.plan ||
         updateOrgForm.plannedManagers !== originalSubscription.plannedManagers ||
         updateOrgForm.plannedWorkers !== originalSubscription.plannedWorkers;
@@ -741,16 +787,16 @@ Please change your password on first login for security.`;
       // Update company details if changed
       if (companyDetailsChanged) {
         const { error: orgError } = await supabase
-          .from('organizations')
+          .from("organizations")
           .update({
             name: updateOrgForm.organizationName,
             email: updateOrgForm.email,
             phone: updateOrgForm.phone,
             address: updateOrgForm.address,
             company_number: updateOrgForm.company_number,
-            vat_number: updateOrgForm.vat_number
+            vat_number: updateOrgForm.vat_number,
           })
-          .eq('id', updateOrgForm.organizationId);
+          .eq("id", updateOrgForm.organizationId);
 
         if (orgError) {
           toast.error(`Failed to update organization: ${orgError.message}`);
@@ -760,14 +806,17 @@ Please change your password on first login for security.`;
 
       // Only update subscription if it actually changed
       if (subscriptionChanged) {
-        const { data: upgradeData, error: upgradeError } = await supabase.functions.invoke('upgrade-subscription-plan', {
-          body: {
-            organizationId: updateOrgForm.organizationId,
-            newMaxManagers: updateOrgForm.plannedManagers,
-            newMaxWorkers: updateOrgForm.plannedWorkers,
-            planType: updateOrgForm.subscriptionPlan
-          }
-        });
+        const { data: upgradeData, error: upgradeError } = await supabase.functions.invoke(
+          "upgrade-subscription-plan",
+          {
+            body: {
+              organizationId: updateOrgForm.organizationId,
+              newMaxManagers: updateOrgForm.plannedManagers,
+              newMaxWorkers: updateOrgForm.plannedWorkers,
+              planType: updateOrgForm.subscriptionPlan,
+            },
+          },
+        );
 
         if (upgradeError) {
           toast.error(`Failed to update subscription: ${upgradeError.message}`);
@@ -776,125 +825,129 @@ Please change your password on first login for security.`;
       }
 
       // Success message based on what was updated
-      const totalCost = calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers);
+      const totalCost = calculateTotalCost(
+        updateOrgForm.subscriptionPlan,
+        updateOrgForm.plannedManagers,
+        updateOrgForm.plannedWorkers,
+      );
       if (companyDetailsChanged && subscriptionChanged) {
-        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : "Free";
         toast.success(`Organization and subscription updated successfully (${costDisplay})`);
       } else if (companyDetailsChanged) {
-        toast.success('Organization details updated successfully');
+        toast.success("Organization details updated successfully");
       } else if (subscriptionChanged) {
-        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : 'Free';
+        const costDisplay = totalCost > 0 ? `£${totalCost.toFixed(2)}/month` : "Free";
         toast.success(`Subscription updated successfully (${costDisplay})`);
       } else {
-        toast.info('No changes detected');
+        toast.info("No changes detected");
       }
 
       setShowUpdateOrgDialog(false);
       setUpdateOrgForm({
-        organizationId: '',
-        organizationName: '',
-        email: '',
-        phone: '',
-        address: '',
-        company_number: '',
-        vat_number: '',
+        organizationId: "",
+        organizationName: "",
+        email: "",
+        phone: "",
+        address: "",
+        company_number: "",
+        vat_number: "",
         logo_url: null,
-        subscriptionPlan: 'starter',
+        subscriptionPlan: "starter",
         plannedManagers: 1,
         plannedWorkers: 0,
-        currentActive: { managers: 0, workers: 0 }
+        currentActive: { managers: 0, workers: 0 },
       });
       await fetchOrganizations();
     } catch (err: any) {
-      toast.error('Failed to update organization');
+      toast.error("Failed to update organization");
     }
   };
 
   const deleteOrganization = async (id: string) => {
     // Guard + validation
-    if (id == null || id === '') {
-      console.error('deleteOrganization(): missing id', id);
-      toast.error('Missing organization id');
+    if (id == null || id === "") {
+      console.error("deleteOrganization(): missing id", id);
+      toast.error("Missing organization id");
       return;
     }
 
-    if (!confirm('Delete this organization and all its data? This action cannot be undone.')) {
+    if (!confirm("Delete this organization and all its data? This action cannot be undone.")) {
       return;
     }
 
     // Optimistic UI: snapshot current state for rollback
     const prevOrganizations = organizations;
-    setOrganizations(prev => prev.filter(o => o.id !== id));
+    setOrganizations((prev) => prev.filter((o) => o.id !== id));
 
     // Debug log
-    console.debug('deleteOrganization(): sending body', { organization_id: String(id) });
+    console.debug("deleteOrganization(): sending body", { organization_id: String(id) });
 
     try {
       // ✅ Explicit method + proper body
-      const { data, error } = await supabase.functions.invoke('delete-organization', {
-        method: 'POST',
+      const { data, error } = await supabase.functions.invoke("delete-organization", {
+        method: "POST",
         body: { organization_id: String(id) },
       });
 
       if (error) {
         // Extract server body if present
         const resp = (error as any)?.context?.response;
-        let msg = error.message || 'Edge Function returned an error';
-        
-        if (resp && typeof resp.text === 'function') {
+        let msg = error.message || "Edge Function returned an error";
+
+        if (resp && typeof resp.text === "function") {
           const text = await resp.text();
-          try { 
-            msg = JSON.parse(text).error || text; 
-          } catch { 
-            msg = text || msg; 
+          try {
+            msg = JSON.parse(text).error || text;
+          } catch {
+            msg = text || msg;
           }
         }
-        
+
         // Rollback optimistic change
         setOrganizations(prevOrganizations);
-        console.error('Edge function error:', msg);
+        console.error("Edge function error:", msg);
         toast.error(msg);
         return;
       }
 
       if (!data?.success) {
         setOrganizations(prevOrganizations);
-        toast.error(data?.error || 'Failed to delete organization');
+        toast.error(data?.error || "Failed to delete organization");
         return;
       }
 
       toast.success(
-        `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`
+        `Organization deleted successfully. Removed ${data.details?.worker_count ?? 0} workers and ${data.details?.manager_count ?? 0} managers.`,
       );
       // Refresh both organizations and managers tables
       await fetchOrganizations();
       await fetchManagers();
     } catch (e: any) {
       setOrganizations(prevOrganizations); // rollback
-      console.error('Delete org unexpected error:', e);
-      toast.error(e?.message || 'Unexpected error while deleting organization');
+      console.error("Delete org unexpected error:", e);
+      toast.error(e?.message || "Unexpected error while deleting organization");
     }
   };
 
   const deleteManager = async (email: string) => {
-    if (!confirm('Remove this manager? This action cannot be undone.')) return;
-    
+    if (!confirm("Remove this manager? This action cannot be undone.")) return;
+
     try {
       // Call edge function to delete both database record and auth user
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { email, table: 'managers' }
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { email, table: "managers" },
       });
 
       if (error) {
-        toast.error('Failed to delete manager');
+        toast.error("Failed to delete manager");
         return;
       }
-      
-      toast.success('Manager removed');
+
+      toast.success("Manager removed");
       fetchManagers();
     } catch (error) {
-      console.error('Error deleting manager:', error);
-      toast.error('Failed to delete manager');
+      console.error("Error deleting manager:", error);
+      toast.error("Failed to delete manager");
     }
   };
 
@@ -927,24 +980,24 @@ Please change your password on first login for security.`;
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
         <div className="flex gap-2">
-          <Button 
+          <Button
             onClick={async () => {
               try {
-                const { data, error } = await supabase.functions.invoke('reconcile-subscription', {
-                  body: { reason: 'manual_admin_trigger' }
+                const { data, error } = await supabase.functions.invoke("reconcile-subscription", {
+                  body: { reason: "manual_admin_trigger" },
                 });
-                
+
                 if (error) throw error;
-                
+
                 if (data.reconciled?.length > 0) {
                   toast.success(`Reconciled ${data.reconciled.length} organization(s)`);
                 } else {
-                  toast.success('No discrepancies found');
+                  toast.success("No discrepancies found");
                 }
-                
+
                 await fetchOrganizations();
               } catch (error: any) {
-                toast.error('Reconciliation failed: ' + error.message);
+                toast.error("Reconciliation failed: " + error.message);
               }
             }}
             variant="outline"
@@ -953,10 +1006,10 @@ Please change your password on first login for security.`;
             <AlertCircle className="mr-2 h-4 w-4" />
             Reconcile Subscriptions
           </Button>
-          <Button 
+          <Button
             onClick={async () => {
               await supabase.auth.signOut();
-              navigate('/login');
+              navigate("/login");
             }}
             variant="outline"
             className="border-black hover:bg-gray-100"
@@ -968,12 +1021,11 @@ Please change your password on first login for security.`;
       </div>
       <div className="mb-4 p-3 bg-muted rounded-lg">
         <p className="text-sm text-muted-foreground">
-          Logged in as: <span className="font-medium">{user?.email}</span> | 
-          Organizations: {organizations.length} | 
+          Logged in as: <span className="font-medium">{user?.email}</span> | Organizations: {organizations.length} |
           Managers: {managers.length}
         </p>
       </div>
-      
+
       {/* Organizations Section */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -998,17 +1050,15 @@ Please change your password on first login for security.`;
               </TableRow>
             </TableHeader>
             <TableBody>
-              {organizations.map(org => (
-                <TableRow 
+              {organizations.map((org) => (
+                <TableRow
                   key={org.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => navigate(`/organization/${org.id}`)}
                 >
-                  <TableCell className="font-medium text-primary hover:underline">
-                    {org.name}
-                  </TableCell>
-                  <TableCell>{org.email || 'Not set'}</TableCell>
-                  <TableCell>{org.phone || 'Not set'}</TableCell>
+                  <TableCell className="font-medium text-primary hover:underline">{org.name}</TableCell>
+                  <TableCell>{org.email || "Not set"}</TableCell>
+                  <TableCell>{org.phone || "Not set"}</TableCell>
                   <TableCell>{org.managers?.count || 0}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
@@ -1060,11 +1110,11 @@ Please change your password on first login for security.`;
               </TableRow>
             </TableHeader>
             <TableBody>
-              {managers.map(manager => (
+              {managers.map((manager) => (
                 <TableRow key={manager.email}>
                   <TableCell className="font-medium">{manager.name}</TableCell>
                   <TableCell>{manager.email}</TableCell>
-                  <TableCell>{manager.organizations?.name || 'Unassigned'}</TableCell>
+                  <TableCell>{manager.organizations?.name || "Unassigned"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <TooltipProvider>
@@ -1108,12 +1158,15 @@ Please change your password on first login for security.`;
       </Card>
 
       {/* Organization Dialog */}
-        <Dialog open={showOrgDialog} onOpenChange={(open) => {
+      <Dialog
+        open={showOrgDialog}
+        onOpenChange={(open) => {
           if (!open) {
             setStagedLogoFile(null);
           }
           setShowOrgDialog(open);
-        }}>
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Organization</DialogTitle>
@@ -1124,7 +1177,7 @@ Please change your password on first login for security.`;
               <Input
                 id="org-name"
                 value={orgForm.name}
-                onChange={(e) => setOrgForm({...orgForm, name: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
                 placeholder="Enter organization name"
               />
             </div>
@@ -1134,7 +1187,7 @@ Please change your password on first login for security.`;
                 id="org-email"
                 type="email"
                 value={orgForm.email}
-                onChange={(e) => setOrgForm({...orgForm, email: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, email: e.target.value })}
                 placeholder="Enter email address"
               />
             </div>
@@ -1143,7 +1196,7 @@ Please change your password on first login for security.`;
               <Input
                 id="org-phone"
                 value={orgForm.phone}
-                onChange={(e) => setOrgForm({...orgForm, phone: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, phone: e.target.value })}
                 placeholder="Enter phone number"
               />
             </div>
@@ -1152,7 +1205,7 @@ Please change your password on first login for security.`;
               <Input
                 id="org-address"
                 value={orgForm.address}
-                onChange={(e) => setOrgForm({...orgForm, address: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, address: e.target.value })}
                 placeholder="Enter address"
               />
             </div>
@@ -1161,7 +1214,7 @@ Please change your password on first login for security.`;
               <Input
                 id="org-company-number"
                 value={orgForm.company_number}
-                onChange={(e) => setOrgForm({...orgForm, company_number: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, company_number: e.target.value })}
                 placeholder="Enter company number"
               />
             </div>
@@ -1170,7 +1223,7 @@ Please change your password on first login for security.`;
               <Input
                 id="org-vat-number"
                 value={orgForm.vat_number}
-                onChange={(e) => setOrgForm({...orgForm, vat_number: e.target.value})}
+                onChange={(e) => setOrgForm({ ...orgForm, vat_number: e.target.value })}
                 placeholder="Enter VAT number"
               />
             </div>
@@ -1184,7 +1237,7 @@ Please change your password on first login for security.`;
                 onUploadComplete={() => {}}
               />
             </div>
-            
+
             <div>
               <Label htmlFor="org-subscription-plan">Subscription Plan *</Label>
               <select
@@ -1209,8 +1262,14 @@ Please change your password on first login for security.`;
                   <div>✓ Customizable capacity for managers and workers</div>
                 ) : (
                   <>
-                    <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers} Manager{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers > 1 ? 's' : ''}</div>
-                    <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers} Worker{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers > 1 ? 's' : ''}</div>
+                    <div>
+                      ✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers} Manager
+                      {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxManagers > 1 ? "s" : ""}
+                    </div>
+                    <div>
+                      ✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers} Worker
+                      {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].maxWorkers > 1 ? "s" : ""}
+                    </div>
                   </>
                 )}
                 <div>✓ {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].durationMonths} month subscription</div>
@@ -1224,7 +1283,7 @@ Please change your password on first login for security.`;
                 type="number"
                 min="1"
                 value={orgForm.plannedManagers}
-                onChange={(e) => setOrgForm({...orgForm, plannedManagers: parseInt(e.target.value) || 1})}
+                onChange={(e) => setOrgForm({ ...orgForm, plannedManagers: parseInt(e.target.value) || 1 })}
                 placeholder="1"
                 disabled={!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable}
               />
@@ -1234,7 +1293,7 @@ Please change your password on first login for security.`;
                 </div>
               )}
             </div>
-            
+
             <div>
               <Label htmlFor="org-planned-workers">Planned Number of Workers *</Label>
               <Input
@@ -1242,7 +1301,7 @@ Please change your password on first login for security.`;
                 type="number"
                 min="0"
                 value={orgForm.plannedWorkers}
-                onChange={(e) => setOrgForm({...orgForm, plannedWorkers: parseInt(e.target.value) || 0})}
+                onChange={(e) => setOrgForm({ ...orgForm, plannedWorkers: parseInt(e.target.value) || 0 })}
                 placeholder="0"
                 disabled={!SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].isCustomizable}
               />
@@ -1252,17 +1311,21 @@ Please change your password on first login for security.`;
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 bg-muted rounded-lg">
               <div className="text-sm font-medium mb-2">
-                {orgForm.subscriptionPlan === 'trial' ? 'Trial Period Cost' : 'Estimated Monthly Cost'}
+                {orgForm.subscriptionPlan === "trial" ? "Trial Period Cost" : "Estimated Monthly Cost"}
               </div>
               <div className="text-2xl font-bold text-primary">
-                {orgForm.subscriptionPlan === 'trial' ? 'FREE' : `£${calculateTotalCost(orgForm.subscriptionPlan, orgForm.plannedManagers, orgForm.plannedWorkers).toFixed(2)}`}
+                {orgForm.subscriptionPlan === "trial"
+                  ? "FREE"
+                  : `£${calculateTotalCost(orgForm.subscriptionPlan, orgForm.plannedManagers, orgForm.plannedWorkers).toFixed(2)}`}
               </div>
-              {orgForm.subscriptionPlan !== 'trial' && (
+              {orgForm.subscriptionPlan !== "trial" && (
                 <div className="text-xs text-muted-foreground mt-2">
-                  ({orgForm.plannedManagers} × £{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerManager.toFixed(2)}) + ({orgForm.plannedWorkers} × £{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerWorker.toFixed(2)})
+                  ({orgForm.plannedManagers} × £{SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerManager.toFixed(2)}
+                  ) + ({orgForm.plannedWorkers} × £
+                  {SUBSCRIPTION_PLANS[orgForm.subscriptionPlan].costPerWorker.toFixed(2)})
                 </div>
               )}
             </div>
@@ -1288,7 +1351,7 @@ Please change your password on first login for security.`;
                 <Input
                   id="update-org-name"
                   value={updateOrgForm.organizationName}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, organizationName: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, organizationName: e.target.value })}
                   placeholder="Enter organization name"
                 />
               </div>
@@ -1298,7 +1361,7 @@ Please change your password on first login for security.`;
                   id="update-org-email"
                   type="email"
                   value={updateOrgForm.email}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, email: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, email: e.target.value })}
                   placeholder="Enter email address"
                 />
               </div>
@@ -1307,7 +1370,7 @@ Please change your password on first login for security.`;
                 <Input
                   id="update-org-phone"
                   value={updateOrgForm.phone}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, phone: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, phone: e.target.value })}
                   placeholder="Enter phone number"
                 />
               </div>
@@ -1316,7 +1379,7 @@ Please change your password on first login for security.`;
                 <Input
                   id="update-org-address"
                   value={updateOrgForm.address}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, address: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, address: e.target.value })}
                   placeholder="Enter address"
                 />
               </div>
@@ -1330,7 +1393,7 @@ Please change your password on first login for security.`;
                 <Input
                   id="update-org-company-number"
                   value={updateOrgForm.company_number}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, company_number: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, company_number: e.target.value })}
                   placeholder="Enter company number"
                 />
               </div>
@@ -1339,7 +1402,7 @@ Please change your password on first login for security.`;
                 <Input
                   id="update-org-vat-number"
                   value={updateOrgForm.vat_number}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, vat_number: e.target.value})}
+                  onChange={(e) => setUpdateOrgForm({ ...updateOrgForm, vat_number: e.target.value })}
                   placeholder="Enter VAT number"
                 />
               </div>
@@ -1351,15 +1414,15 @@ Please change your password on first login for security.`;
               <OrganizationLogoUpload
                 organizationId={updateOrgForm.organizationId}
                 currentLogoUrl={updateOrgForm.logo_url}
-                onUploadComplete={(logoUrl) => setUpdateOrgForm({...updateOrgForm, logo_url: logoUrl})}
-                onDeleteComplete={() => setUpdateOrgForm({...updateOrgForm, logo_url: null})}
+                onUploadComplete={(logoUrl) => setUpdateOrgForm({ ...updateOrgForm, logo_url: logoUrl })}
+                onDeleteComplete={() => setUpdateOrgForm({ ...updateOrgForm, logo_url: null })}
               />
             </div>
 
             {/* Subscription Capacity Section */}
             <div className="space-y-3 pt-3 border-t">
               <div className="text-sm font-semibold text-foreground">Subscription Capacity</div>
-              
+
               <div>
                 <Label htmlFor="update-subscription-plan">Subscription Plan *</Label>
                 <select
@@ -1404,16 +1467,18 @@ Please change your password on first login for security.`;
                   type="number"
                   min={updateOrgForm.currentActive.managers}
                   value={updateOrgForm.plannedManagers}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1})}
+                  onChange={(e) =>
+                    setUpdateOrgForm({ ...updateOrgForm, plannedManagers: parseInt(e.target.value) || 1 })
+                  }
                   placeholder="1"
                   disabled={!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable}
                 />
                 <div className="text-xs text-muted-foreground mt-1">
                   Minimum: {updateOrgForm.currentActive.managers} (current active)
-                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && ' • Fixed for this plan'}
+                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && " • Fixed for this plan"}
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="update-planned-workers">Planned Number of Workers *</Label>
                 <Input
@@ -1421,32 +1486,40 @@ Please change your password on first login for security.`;
                   type="number"
                   min={updateOrgForm.currentActive.workers}
                   value={updateOrgForm.plannedWorkers}
-                  onChange={(e) => setUpdateOrgForm({...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0})}
+                  onChange={(e) =>
+                    setUpdateOrgForm({ ...updateOrgForm, plannedWorkers: parseInt(e.target.value) || 0 })
+                  }
                   placeholder="0"
                   disabled={!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable}
                 />
                 <div className="text-xs text-muted-foreground mt-1">
                   Minimum: {updateOrgForm.currentActive.workers} (current active)
-                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && ' • Fixed for this plan'}
+                  {!SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].isCustomizable && " • Fixed for this plan"}
                 </div>
               </div>
-              
+
               <div className="p-4 bg-muted rounded-lg">
                 <div className="text-sm font-medium mb-2">
-                  {updateOrgForm.subscriptionPlan === 'trial' ? 'Trial Period Cost' : 'Updated Monthly Cost'}
+                  {updateOrgForm.subscriptionPlan === "trial" ? "Trial Period Cost" : "Updated Monthly Cost"}
                 </div>
                 <div className="text-2xl font-bold text-primary">
-                  {updateOrgForm.subscriptionPlan === 'trial' ? 'FREE' : `£${calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers).toFixed(2)}`}
+                  {updateOrgForm.subscriptionPlan === "trial"
+                    ? "FREE"
+                    : `£${calculateTotalCost(updateOrgForm.subscriptionPlan, updateOrgForm.plannedManagers, updateOrgForm.plannedWorkers).toFixed(2)}`}
                 </div>
-                {updateOrgForm.subscriptionPlan !== 'trial' && (
+                {updateOrgForm.subscriptionPlan !== "trial" && (
                   <div className="text-xs text-muted-foreground mt-2">
-                    ({updateOrgForm.plannedManagers} × £{SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerManager.toFixed(2)}) + ({updateOrgForm.plannedWorkers} × £{SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerWorker.toFixed(2)})
+                    ({updateOrgForm.plannedManagers} × £
+                    {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerManager.toFixed(2)}) + (
+                    {updateOrgForm.plannedWorkers} × £
+                    {SUBSCRIPTION_PLANS[updateOrgForm.subscriptionPlan].costPerWorker.toFixed(2)})
                   </div>
                 )}
               </div>
-              
+
               <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-100">
-                Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers, {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
+                Available capacity: {updateOrgForm.plannedManagers - updateOrgForm.currentActive.managers} managers,{" "}
+                {updateOrgForm.plannedWorkers - updateOrgForm.currentActive.workers} workers
               </div>
             </div>
 
@@ -1470,11 +1543,13 @@ Please change your password on first login for security.`;
                 id="manager-org"
                 className="w-full p-2 border border-border rounded-md bg-background"
                 value={managerForm.organization_id}
-                onChange={(e) => setManagerForm({...managerForm, organization_id: e.target.value})}
+                onChange={(e) => setManagerForm({ ...managerForm, organization_id: e.target.value })}
               >
                 <option value="">Select Organization</option>
-                {organizations.map(org => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1483,7 +1558,7 @@ Please change your password on first login for security.`;
               <Input
                 id="manager-name"
                 value={managerForm.name}
-                onChange={(e) => setManagerForm({...managerForm, name: e.target.value})}
+                onChange={(e) => setManagerForm({ ...managerForm, name: e.target.value })}
                 placeholder="Enter full name"
               />
             </div>
@@ -1493,19 +1568,15 @@ Please change your password on first login for security.`;
                 id="manager-email"
                 type="email"
                 value={managerForm.email}
-                onChange={(e) => setManagerForm({...managerForm, email: e.target.value})}
+                onChange={(e) => setManagerForm({ ...managerForm, email: e.target.value })}
                 placeholder="Enter email address"
               />
             </div>
             <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
               A secure password will be automatically generated for the manager.
             </div>
-            <Button
-              onClick={createManager} 
-              className="w-full"
-              disabled={creatingManager}
-            >
-              {creatingManager ? 'Creating Manager...' : 'Create Manager'}
+            <Button onClick={createManager} className="w-full" disabled={creatingManager}>
+              {creatingManager ? "Creating Manager..." : "Create Manager"}
             </Button>
           </div>
         </DialogContent>
@@ -1543,10 +1614,7 @@ Please change your password on first login for security.`;
             </div>
           )}
           <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={copyManagerCredentialsToClipboard}
-              className="mr-2"
-            >
+            <AlertDialogAction onClick={copyManagerCredentialsToClipboard} className="mr-2">
               Copy Login Details
             </AlertDialogAction>
             <AlertDialogCancel onClick={handleManagerSuccessModalClose}>Done</AlertDialogCancel>
@@ -1567,3 +1635,4 @@ Please change your password on first login for security.`;
     </div>
   );
 }
+

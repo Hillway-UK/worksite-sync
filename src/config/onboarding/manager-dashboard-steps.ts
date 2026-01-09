@@ -38,6 +38,11 @@ export const dashboardSteps: Step[] = [
     placement: 'top',
   },
   {
+    target: '#pending-overtime-card',
+    content: '⏰ View pending overtime requests that need your approval. Click to review them!',
+    placement: 'bottom',
+  },
+  {
     target: '#nav-workers-button',
     content: '👷 Ready to manage your team? Click here to see the Workers page and continue the tour!',
     placement: 'bottom',

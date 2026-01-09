@@ -4,30 +4,31 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PhotoModal } from "@/components/PhotoModal";
 import { XeroSettingsModal } from "@/components/XeroSettingsModal";
+import { CSVPreviewModal } from "@/components/reports/CSVPreviewModal";
 import { toast } from "@/hooks/use-toast";
-import { FileText, Download, ChevronDown, Camera, HelpCircle } from "lucide-react";
+import { FileText, Download, Camera, HelpCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, startOfWeek, endOfWeek, addDays, getWeek, getYear } from "date-fns";
-import moment from "moment";
+import { format, startOfWeek, addDays, getWeek, getYear } from "date-fns";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { CompletionModal } from "@/components/onboarding/CompletionModal";
 import { reportsSteps } from "@/config/onboarding";
 import { getPageTutorialStatus, markPageTutorialComplete } from "@/lib/supabase/manager-tutorial";
-
+import { useReportLineItems } from "@/hooks/useReportLineItems";
+import { EditableLineItemsTable } from "@/components/reports/EditableLineItemsTable";
+import { parseAddress, escapeCSV, groupItemsByWorker, ReportLineItem } from "@/lib/report-utils";
 interface WeeklyData {
   worker_id: string;
   worker_name: string;
   worker_email: string;
   total_hours: number;
   hourly_rate: number;
-  jobs: { job_id: string; job_name: string; job_address: string; work_date: string; hours: number }[];
+  jobs: { job_id: string; job_name: string; job_address: string; hours: number }[];
   additional_costs: number;
   total_amount: number;
   profile_photo?: string;
@@ -54,26 +55,11 @@ interface JobSiteData {
   }>;
 }
 
-interface DetailedEntry {
-  id: string;
-  worker_id: string;
-  worker_name: string;
-  date: string;
-  job_name: string;
-  clock_in: string;
-  clock_out: string;
-  clock_in_photo?: string;
-  clock_out_photo?: string;
-  hours: number;
-  profile_photo?: string;
-}
-
 export default function AdminReports() {
   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
-  const [detailedData, setDetailedData] = useState<DetailedEntry[]>([]);
   const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [loading, setLoading] = useState(false);
-  const [expandedWorkers, setExpandedWorkers] = useState<Set<string>>(new Set());
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [xeroSettings, setXeroSettings] = useState<XeroSettings>({
@@ -97,10 +83,32 @@ export default function AdminReports() {
     jobName: "",
   });
 
+  // CSV Preview Modal state
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [xeroModalOpen, setXeroModalOpen] = useState(false);
+
+  // Editable line items hook
+  const {
+    lineItems,
+    loading: lineItemsLoading,
+    saving,
+    fetchOrGenerateLineItems,
+    updateLineItem,
+    deleteLineItem,
+    regenerateFromSource,
+    getTotals,
+  } = useReportLineItems({ organizationId, weekStart: selectedWeek });
+
   useEffect(() => {
     generateReport();
-    generateDetailedReport();
   }, [selectedWeek]);
+
+  // Fetch line items when organization is loaded and week changes
+  useEffect(() => {
+    if (organizationId) {
+      fetchOrGenerateLineItems();
+    }
+  }, [organizationId, selectedWeek, fetchOrGenerateLineItems]);
 
   // Check if tutorial should run
   useEffect(() => {
@@ -159,6 +167,8 @@ export default function AdminReports() {
           throw new Error("No organization found for user");
         }
         
+        setOrganizationId(superAdmin.organization_id);
+        
         // Use super admin's organization
         const { data: workers, error: workersError } = await supabase
           .from("workers")
@@ -171,6 +181,8 @@ export default function AdminReports() {
         await processWorkersData(workers || [], weekStart, weekEnd);
         return;
       }
+
+      setOrganizationId(manager.organization_id);
 
       // Fetch workers from manager's organization only
       const { data: workers, error: workersError } = await supabase
@@ -203,7 +215,7 @@ export default function AdminReports() {
         // Only include completed entries (non-null clock_out) for weekly summary
         const { data: clockEntries, error: clockError } = await supabase
           .from("clock_entries")
-          .select("job_id, total_hours, clock_in, clock_out, is_overtime, ot_status, jobs:jobs(id, name, address)")
+          .select("job_id, total_hours, clock_in, clock_out, jobs:jobs(id, name, address)")
           .eq("worker_id", worker.id)
           .gte("clock_in", format(weekStart, "yyyy-MM-dd"))
           .lt("clock_in", format(addDays(weekStart, 7), "yyyy-MM-dd"))
@@ -213,13 +225,8 @@ export default function AdminReports() {
           console.error("Error fetching clock entries for worker", worker.name, ":", clockError);
         }
 
-        // Filter out unapproved overtime
-        const filteredClockEntries = clockEntries?.filter(entry => 
-          !entry.is_overtime || entry.ot_status === 'approved'
-        ) || [];
-
         // Skip workers who have no completed clock entries during the selected week
-        if (filteredClockEntries.length === 0) {
+        if (!clockEntries || clockEntries.length === 0) {
           continue;
         }
 
@@ -230,7 +237,7 @@ export default function AdminReports() {
         let totalHours = 0;
         const jobsMap = new Map();
 
-        filteredClockEntries?.forEach((entry: any) => {
+        clockEntries?.forEach((entry: any) => {
           // Calculate hours for this entry
           const hours =
             entry.total_hours != null
@@ -241,22 +248,15 @@ export default function AdminReports() {
 
           totalHours += hours;
 
-          // Aggregate job data using joined job information, grouped by date
+          // Aggregate job data using joined job information
           if (entry.job_id && entry.jobs) {
-            // Extract date from clock_in timestamp
-            const workDate = format(new Date(entry.clock_in), 'yyyy-MM-dd');
-            
-            // Create composite key: job_id + date
-            const mapKey = `${entry.job_id}_${workDate}`;
-            
-            if (jobsMap.has(mapKey)) {
-              jobsMap.get(mapKey).hours += hours;
+            if (jobsMap.has(entry.job_id)) {
+              jobsMap.get(entry.job_id).hours += hours;
             } else {
-              jobsMap.set(mapKey, {
+              jobsMap.set(entry.job_id, {
                 job_id: entry.job_id,
                 job_name: entry.jobs.name || "Unknown Job",
                 job_address: entry.jobs.address || "",
-                work_date: workDate,
                 hours,
               });
             }
@@ -265,20 +265,23 @@ export default function AdminReports() {
 
         console.log(`Aggregated jobs for ${worker.name}:`, Array.from(jobsMap.values()));
 
-        // Sort jobs by date chronologically
-        const jobs = Array.from(jobsMap.values()).sort((a, b) => 
-          new Date(a.work_date).getTime() - new Date(b.work_date).getTime()
-        );
+        const jobs = Array.from(jobsMap.values());
 
-        // Get additional costs
+        // Get additional costs with expense type calculation method
         const { data: costs } = await supabase
           .from("additional_costs")
-          .select("amount")
+          .select("amount, expense_types(calculation_type)")
           .eq("worker_id", worker.id)
           .gte("date", format(weekStart, "yyyy-MM-dd"))
           .lte("date", format(weekEnd, "yyyy-MM-dd"));
 
-        const additionalCosts = costs?.reduce((sum, cost) => sum + Number(cost.amount), 0) || 0;
+        const additionalCosts = costs?.reduce((sum, cost) => {
+          const calcType = (cost.expense_types as any)?.calculation_type || 'flat_rate';
+          if (calcType === 'hourly_multiplied') {
+            return sum + (Number(cost.amount) * totalHours);
+          }
+          return sum + Number(cost.amount);
+        }, 0) || 0;
 
         // Get profile photo
         const { data: photoData } = await supabase
@@ -303,101 +306,6 @@ export default function AdminReports() {
     }
 
     setWeeklyData(reportData);
-  };
-
-  const generateDetailedReport = async () => {
-    setLoading(true);
-    try {
-      const weekStart = new Date(selectedWeek);
-
-      // Unified date filtering: weekStart (inclusive) to weekStart + 7 days (exclusive)
-      const { data: entries, error } = await supabase
-        .from("clock_entries")
-        .select(
-          `
-          *,
-          workers(name),
-          jobs(name)
-        `,
-        )
-        .gte("clock_in", format(weekStart, "yyyy-MM-dd"))
-        .lt("clock_in", format(addDays(weekStart, 7), "yyyy-MM-dd"))
-        .not("clock_out", "is", null)
-        .order("worker_id")
-        .order("clock_in");
-
-      if (error) throw error;
-
-      // Filter out unapproved overtime
-      const filteredEntries = (entries || []).filter(entry => 
-        !entry.is_overtime || entry.ot_status === 'approved'
-      );
-
-      const detailedEntries: DetailedEntry[] = [];
-      const workerPhotos: Record<string, string> = {};
-
-      for (const entry of filteredEntries) {
-        // Get profile photo if not already fetched
-        if (!workerPhotos[entry.worker_id]) {
-          const { data: photoData } = await supabase
-            .from("clock_entries")
-            .select("clock_in_photo")
-            .eq("worker_id", entry.worker_id)
-            .not("clock_in_photo", "is", null)
-            .order("clock_in", { ascending: true })
-            .limit(1);
-
-          workerPhotos[entry.worker_id] = photoData?.[0]?.clock_in_photo || "";
-        }
-
-        detailedEntries.push({
-          id: entry.id,
-          worker_id: entry.worker_id,
-          worker_name: entry.workers?.name || "Unknown",
-          date: format(new Date(entry.clock_in), "yyyy-MM-dd"),
-          job_name: entry.jobs?.name || "Unknown Job",
-          clock_in: entry.clock_in,
-          clock_out: entry.clock_out,
-          clock_in_photo: entry.clock_in_photo,
-          clock_out_photo: entry.clock_out_photo,
-          hours: entry.total_hours || 0,
-          profile_photo: workerPhotos[entry.worker_id],
-        });
-      }
-
-      setDetailedData(detailedEntries);
-    } catch (error) {
-      console.error("Error generating detailed report:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleWorkerExpansion = (workerId: string) => {
-    setExpandedWorkers((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(workerId)) {
-        newSet.delete(workerId);
-      } else {
-        newSet.add(workerId);
-      }
-      return newSet;
-    });
-  };
-
-  const getWorkerDetailedEntries = (workerId: string) => {
-    return detailedData.filter((entry) => entry.worker_id === workerId);
-  };
-
-  const groupEntriesByDate = (entries: DetailedEntry[]) => {
-    const grouped: Record<string, DetailedEntry[]> = {};
-    entries.forEach((entry) => {
-      if (!grouped[entry.date]) {
-        grouped[entry.date] = [];
-      }
-      grouped[entry.date].push(entry);
-    });
-    return grouped;
   };
 
   // Utility functions for Xero export
@@ -478,6 +386,7 @@ export default function AdminReports() {
           workers (id, name, email, address),
           clock_entries!inner (
             id,
+            clock_in,
             jobs (id, name)
           )
         `,
@@ -488,7 +397,7 @@ export default function AdminReports() {
 
       if (costsError) throw costsError;
 
-      // Group by worker, then by job
+      // Group by worker, then by date, then by job site
       const workerMap = new Map<
         string,
         {
@@ -496,19 +405,18 @@ export default function AdminReports() {
           workerName: string;
           workerEmail: string;
           workerAddress: string;
-          jobs: Map<
-            string,
-            {
-              jobId: string;
-              jobName: string;
-              totalHours: number;
-              hourlyRate: number;
-              expenses: Array<{
-                amount: number;
-                description: string;
-              }>;
-            }
-          >;
+          dailyEntries: Array<{
+            date: string;
+            jobId: string;
+            jobName: string;
+            totalHours: number;
+            hourlyRate: number;
+            isOvertime: boolean;
+            expenses: Array<{
+              amount: number;
+              description: string;
+            }>;
+          }>;
           additionalCosts: Array<{
             amount: number;
             description: string;
@@ -517,10 +425,17 @@ export default function AdminReports() {
         }
       >();
 
-      // Process time entries
+      // Process time entries - group by worker, date, and job
       entriesData?.forEach((entry: any) => {
         const workerId = entry.workers.id;
         const jobId = entry.jobs.id;
+        const entryDate = format(new Date(entry.clock_in), "yyyy-MM-dd");
+        const isOvertime = entry.is_overtime || false;
+        
+        // Skip overtime entries that are not approved
+        if (isOvertime && entry.ot_status !== "approved") {
+          return;
+        }
 
         if (!workerMap.has(workerId)) {
           workerMap.set(workerId, {
@@ -528,43 +443,64 @@ export default function AdminReports() {
             workerName: entry.workers.name,
             workerEmail: entry.workers.email || "",
             workerAddress: entry.workers.address || "",
-            jobs: new Map(),
+            dailyEntries: [],
             additionalCosts: [],
           });
         }
 
         const worker = workerMap.get(workerId)!;
 
-        if (!worker.jobs.has(jobId)) {
-          worker.jobs.set(jobId, {
+        // Find existing entry for this date-job combination
+        const existingEntry = worker.dailyEntries.find(
+          (e) => e.date === entryDate && e.jobId === jobId && e.isOvertime === isOvertime
+        );
+
+        if (existingEntry) {
+          existingEntry.totalHours += parseFloat(entry.total_hours) || 0;
+        } else {
+          worker.dailyEntries.push({
+            date: entryDate,
             jobId,
             jobName: entry.jobs.name,
-            totalHours: 0,
+            totalHours: parseFloat(entry.total_hours) || 0,
             hourlyRate: entry.workers.hourly_rate,
+            isOvertime,
             expenses: [],
           });
         }
-
-        const job = worker.jobs.get(jobId)!;
-        job.totalHours += parseFloat(entry.total_hours) || 0;
       });
 
-      // Process additional costs and link them to specific jobs
+      // Process additional costs and link them to specific date-job entries
       costsData?.forEach((cost: any) => {
         const workerId = cost.workers.id;
         const jobId = cost.clock_entries?.jobs?.id;
         const jobName = cost.clock_entries?.jobs?.name;
+        const entryDate = cost.clock_entries?.clock_in 
+          ? format(new Date(cost.clock_entries.clock_in), "yyyy-MM-dd")
+          : null;
 
         if (workerMap.has(workerId)) {
           const worker = workerMap.get(workerId)!;
 
-          // If we have a job ID, link the expense to that specific job
-          if (jobId && worker.jobs.has(jobId)) {
-            const job = worker.jobs.get(jobId)!;
-            job.expenses.push({
-              amount: parseFloat(cost.amount) || 0,
-              description: cost.description || "Additional Cost",
-            });
+          // If we have a job ID and date, link the expense to that specific date-job entry
+          if (jobId && entryDate) {
+            const matchingEntry = worker.dailyEntries.find(
+              (e) => e.date === entryDate && e.jobId === jobId
+            );
+            
+            if (matchingEntry) {
+              matchingEntry.expenses.push({
+                amount: parseFloat(cost.amount) || 0,
+                description: cost.description || "Additional Cost",
+              });
+            } else {
+              // If no matching entry, add to general costs
+              worker.additionalCosts.push({
+                amount: parseFloat(cost.amount) || 0,
+                description: cost.description || "Additional Cost",
+                jobName: jobName || "General",
+              });
+            }
           } else {
             // Fallback: add to general additional costs
             worker.additionalCosts.push({
@@ -589,20 +525,18 @@ export default function AdminReports() {
   };
 
   const generateXeroCSV = async () => {
-    const startDate = new Date(selectedWeek);
-    const endDate = new Date(selectedWeek);
-    endDate.setDate(endDate.getDate() + 6); // End of week
-
-    const workerData = await fetchWorkerData();
-
-    if (workerData.length === 0) {
+    // Use editable line items as the single source of truth
+    if (lineItems.length === 0) {
       toast({
         title: "No Data",
-        description: "No timesheet data found for the selected week",
+        description: "No line items found for the selected week. Generate the report first.",
         variant: "destructive",
       });
       return;
     }
+
+    const startDate = new Date(selectedWeek);
+    const endDate = addDays(startDate, 6);
 
     const headers = [
       "*ContactName",
@@ -640,111 +574,45 @@ export default function AdminReports() {
     dueDate.setDate(dueDate.getDate() + xeroSettings.paymentTerms);
     const dueDateStr = `${dueDate.getDate().toString().padStart(2, "0")}/${(dueDate.getMonth() + 1).toString().padStart(2, "0")}/${dueDate.getFullYear()}`;
 
-    const weekNumber = getWeek(startDate);
     const year = getYear(startDate);
 
     let csvContent = headers.join(",") + "\n";
     let currentInvoiceNumber = getNextInvoiceNumber();
 
-    workerData.forEach((worker) => {
-      const addressInfo = parseWorkerAddress(worker.workerAddress);
+    // Group line items by worker for invoice number assignment
+    const itemsByWorker = groupItemsByWorker(lineItems);
+
+    Object.entries(itemsByWorker).forEach(([workerId, items]) => {
+      const firstItem = items[0];
+      const addressInfo = parseAddress(firstItem.worker_address || null);
       const invoiceNum = `${xeroSettings.prefix}-${year}-${currentInvoiceNumber.toString().padStart(4, "0")}`;
 
-      // Add line items for each job the worker worked on
-      worker.jobs.forEach((job) => {
-        if (job.totalHours > 0) {
-          // Add labour line item
-          const labourRow = [
-            `"${worker.workerName}"`,
-            `"${worker.workerEmail}"`,
-            `"${addressInfo.addressLine1}"`,
-            '""', // POAddressLine2
-            '""', // POAddressLine3
-            '""', // POAddressLine4
-            `"${addressInfo.city}"`,
-            `"${addressInfo.region}"`,
-            `"${addressInfo.postcode}"`,
-            '"United Kingdom"',
-            `"${invoiceNum}"`,
-            `"${invoiceDate}"`,
-            `"${dueDateStr}"`,
-            '""', // Total (Xero calculates)
-            '""', // InventoryItemCode
-            `"Construction Work - ${job.jobName} - Week ${weekNumber} ${year}"`,
-            job.totalHours.toFixed(2),
-            job.hourlyRate.toFixed(2),
-            `"${xeroSettings.accountCode}"`,
-            `"${xeroSettings.taxType}"`,
-            '""', // TaxAmount (Xero calculates)
-            '"Project"',
-            `"${job.jobName}"`,
-            '""', // TrackingName2
-            '""', // TrackingOption2
-            '"GBP"',
-          ];
-          csvContent += labourRow.join(",") + "\n";
-
-          // Add expenses for this specific job
-          job.expenses.forEach((expense) => {
-            const expenseRow = [
-              `"${worker.workerName}"`,
-              `"${worker.workerEmail}"`,
-              `"${addressInfo.addressLine1}"`,
-              '""', // POAddressLine2
-              '""', // POAddressLine3
-              '""', // POAddressLine4
-              `"${addressInfo.city}"`,
-              `"${addressInfo.region}"`,
-              `"${addressInfo.postcode}"`,
-              '"United Kingdom"',
-              `"${invoiceNum}"`,
-              `"${invoiceDate}"`,
-              `"${dueDateStr}"`,
-              '""', // Total (Xero calculates)
-              '""', // InventoryItemCode
-              `"${expense.description} - ${job.jobName} - Week ${weekNumber} ${year}"`,
-              "1",
-              expense.amount.toFixed(2),
-              `"${xeroSettings.accountCode}"`,
-              `"${xeroSettings.taxType}"`,
-              '""', // TaxAmount (Xero calculates)
-              '"Project"',
-              `"${job.jobName}"`, // Same job tracking as labour
-              '""', // TrackingName2
-              '""', // TrackingOption2
-              '"GBP"',
-            ];
-            csvContent += expenseRow.join(",") + "\n";
-          });
-        }
-      });
-
-      // Add any general additional costs (fallback for expenses not linked to specific clock entries)
-      worker.additionalCosts.forEach((cost) => {
+      // Add each line item as a row
+      items.forEach((item) => {
         const row = [
-          `"${worker.workerName}"`,
-          `"${worker.workerEmail}"`,
-          `"${addressInfo.addressLine1}"`,
+          `"${escapeCSV(item.worker_name || "")}"`,
+          `"${escapeCSV(item.worker_email || "")}"`,
+          `"${escapeCSV(addressInfo.addressLine1)}"`,
           '""', // POAddressLine2
           '""', // POAddressLine3
           '""', // POAddressLine4
-          `"${addressInfo.city}"`,
-          `"${addressInfo.region}"`,
-          `"${addressInfo.postcode}"`,
+          `"${escapeCSV(addressInfo.city)}"`,
+          `"${escapeCSV(addressInfo.region)}"`,
+          `"${escapeCSV(addressInfo.postcode)}"`,
           '"United Kingdom"',
           `"${invoiceNum}"`,
           `"${invoiceDate}"`,
           `"${dueDateStr}"`,
           '""', // Total (Xero calculates)
           '""', // InventoryItemCode
-          `"Additional Costs - ${cost.description}"`,
-          "1",
-          cost.amount.toFixed(2),
-          `"${xeroSettings.accountCode}"`,
-          `"${xeroSettings.taxType}"`,
+          `"${escapeCSV(item.description_generated)}"`,
+          item.quantity.toFixed(2),
+          item.unit_amount.toFixed(2),
+          `"${escapeCSV(item.account_code)}"`,
+          `"${escapeCSV(item.tax_type)}"`,
           '""', // TaxAmount (Xero calculates)
           '"Project"',
-          `"${cost.jobName || "General"}"`, // Use job name from cost or default to General
+          `"${escapeCSV(item.project_name || "General")}"`,
           '""', // TrackingName2
           '""', // TrackingOption2
           '"GBP"',
@@ -778,7 +646,17 @@ export default function AdminReports() {
     });
   };
 
-  const generateCSV = () => {
+  const generateCSV = async () => {
+    // Use editable line items as the single source of truth
+    if (lineItems.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No line items found for the selected week. Generate the report first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const weekStart = new Date(selectedWeek);
     const weekEnd = addDays(weekStart, 6);
     const invoiceDate = format(weekStart, "yyyy-MM-dd");
@@ -787,9 +665,6 @@ export default function AdminReports() {
     const csvHeaders = [
       "ContactName",
       "EmailAddress",
-      "Date",
-      "SiteName",
-      "SiteAddress",
       "InvoiceNumber",
       "InvoiceDate",
       "DueDate",
@@ -802,38 +677,25 @@ export default function AdminReports() {
       "TrackingOption1",
     ];
 
-    // Escape quotes in CSV fields
-    const escapeCSV = (field: string) => field.replace(/"/g, '""');
-
-    // Create one row per job per day for each worker
     const csvRows: string[][] = [];
-    
-    weeklyData
-      .filter((worker) => worker.total_hours > 0)
-      .forEach((worker) => {
-        if (worker.jobs && worker.jobs.length > 0) {
-          worker.jobs.forEach((job) => {
-            const row = [
-              escapeCSV(worker.worker_name),
-              escapeCSV(worker.worker_email || ""),
-              format(new Date(job.work_date), 'EEE dd/MM/yyyy'), // e.g., "Mon 04/11/2024"
-              escapeCSV(job.job_name),
-              escapeCSV(job.job_address),
-              `WE-${format(weekEnd, "yyyyMMdd")}-${worker.worker_id.slice(-4)}`,
-              invoiceDate,
-              dueDate,
-              escapeCSV(`${job.job_name} - ${format(new Date(job.work_date), 'EEE dd/MM/yyyy')}`),
-              job.hours.toFixed(2),
-              worker.hourly_rate.toFixed(2),
-              "200",
-              "No VAT",
-              "Job",
-              escapeCSV(job.job_name),
-            ];
-            csvRows.push(row);
-          });
-        }
-      });
+
+    // Transform each line item to a CSV row
+    lineItems.forEach((item) => {
+      csvRows.push([
+        escapeCSV(item.worker_name || ""),
+        escapeCSV(item.worker_email || ""),
+        `WE-${format(weekEnd, "yyyyMMdd")}-${item.worker_id.slice(-4)}`,
+        invoiceDate,
+        dueDate,
+        escapeCSV(item.description_generated),
+        item.quantity.toFixed(2),
+        item.unit_amount.toFixed(2),
+        item.account_code,
+        item.tax_type,
+        "Project",
+        escapeCSV(item.project_name || "General"),
+      ]);
+    });
 
     const csvContent = [csvHeaders, ...csvRows].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n");
 
@@ -890,7 +752,7 @@ export default function AdminReports() {
             <Button onClick={generateReport} disabled={loading} className="generate-report-button">
               {loading ? "Generating..." : "Generate Report"}
             </Button>
-            <Button onClick={generateCSV} disabled={weeklyData.length === 0} variant="outline" className="download-csv-button">
+            <Button onClick={() => setCsvModalOpen(true)} disabled={loading || lineItems.length === 0} variant="outline" className="download-csv-button">
               <Download className="h-4 w-4 mr-2" />
               Download CSV
             </Button>
@@ -912,8 +774,8 @@ export default function AdminReports() {
                     <XeroSettingsModal onSettingsChange={setXeroSettings} />
                     <Button 
                       id="export-xero-btn"
-                      onClick={generateXeroCSV} 
-                      disabled={weeklyData.length === 0 || loading} 
+                      onClick={() => setXeroModalOpen(true)} 
+                      disabled={lineItems.length === 0 || loading} 
                       variant="outline"
                     >
                       <Download className="h-4 w-4 mr-2" />
@@ -1007,120 +869,18 @@ export default function AdminReports() {
           <TabsContent value="detailed">
             <Card>
               <CardHeader>
-                <CardTitle>Detailed Timesheet</CardTitle>
+                <CardTitle>Editable Line Items</CardTitle>
               </CardHeader>
               <CardContent>
-                {detailedData.length === 0 ? (
-                  <div className="text-center py-6">No detailed data for selected week</div>
-                ) : (
-                  <div className="space-y-4">
-                    {Array.from(new Set(detailedData.map((entry) => entry.worker_id))).map((workerId) => {
-                      const workerEntries = getWorkerDetailedEntries(workerId);
-                      const workerName = workerEntries[0]?.worker_name;
-                      const totalHours = workerEntries.reduce((sum, entry) => sum + entry.hours, 0);
-                      const isExpanded = expandedWorkers.has(workerId);
-                      const groupedByDate = groupEntriesByDate(workerEntries);
-
-                      return (
-                        <Collapsible key={workerId}>
-                          <CollapsibleTrigger
-                            className="row-expand-btn flex items-center justify-between w-full p-4 bg-muted rounded-lg hover:bg-muted/80"
-                            onClick={() => toggleWorkerExpansion(workerId)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                {workerEntries[0]?.profile_photo ? (
-                                  <>
-                                    <AvatarImage src={workerEntries[0].profile_photo} alt={workerName} />
-                                    <AvatarFallback>
-                                      {workerName
-                                        ?.split(" ")
-                                        .map((n) => n[0])
-                                        .join("")
-                                        .slice(0, 2)
-                                        .toUpperCase()}
-                                    </AvatarFallback>
-                                  </>
-                                ) : (
-                                  <AvatarFallback>
-                                    {workerName
-                                      ?.split(" ")
-                                      .map((n) => n[0])
-                                      .join("")
-                                      .slice(0, 2)
-                                      .toUpperCase()}
-                                  </AvatarFallback>
-                                )}
-                              </Avatar>
-                              <span className="font-semibold">{workerName}</span>
-                              <span className="text-muted-foreground">| Total Hours: {totalHours.toFixed(1)}</span>
-                            </div>
-                            <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                          </CollapsibleTrigger>
-
-                          <CollapsibleContent className="space-y-2 mt-2">
-                            {Object.entries(groupedByDate).map(([date, dayEntries]) => (
-                              <div key={date} className="ml-4 space-y-1">
-                                <div className="font-medium text-sm">
-                                  {moment(date).format("dddd DD/MM")} | {dayEntries[0]?.job_name}
-                                </div>
-                                {dayEntries.map((entry) => (
-                                  <div key={entry.id} className="ml-4 text-sm space-y-2 py-2">
-                                    <div className="flex items-center gap-4">
-                                      <span>Clock In: {moment(entry.clock_in).format("HH:mm")}</span>
-                                      <span>| Clock Out: {moment(entry.clock_out).format("HH:mm")}</span>
-                                      <span>| Hours: {entry.hours.toFixed(1)}</span>
-                                    </div>
-
-                                    {(entry.clock_in_photo || entry.clock_out_photo) && (
-                                      <div className="flex items-center gap-4 mt-3">
-                                        {entry.clock_in_photo && (
-                                          <div className="flex flex-col items-center">
-                                            <p className="text-xs font-body text-muted-foreground mb-1">Clock In</p>
-                                            <div className="relative group">
-                                              <img
-                                                src={entry.clock_in_photo}
-                                                alt="Clock in"
-                                                className="w-16 h-16 rounded-full object-cover border-2 border-border cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg"
-                                                onClick={() => window.open(entry.clock_in_photo, "_blank")}
-                                              />
-                                              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/20 transition-all duration-200 pointer-events-none"></div>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground font-body mt-1">
-                                              {moment(entry.clock_in).format("h:mm A")}
-                                            </p>
-                                          </div>
-                                        )}
-
-                                        {entry.clock_out_photo && (
-                                          <div className="flex flex-col items-center">
-                                            <p className="text-xs font-body text-muted-foreground mb-1">Clock Out</p>
-                                            <div className="relative group">
-                                              <img
-                                                src={entry.clock_out_photo}
-                                                alt="Clock out"
-                                                className="w-16 h-16 rounded-full object-cover border-2 border-border cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-lg"
-                                                onClick={() => window.open(entry.clock_out_photo, "_blank")}
-                                              />
-                                              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/20 transition-all duration-200 pointer-events-none"></div>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground font-body mt-1">
-                                              {entry.clock_out ? moment(entry.clock_out).format("h:mm A") : "Active"}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </CollapsibleContent>
-                        </Collapsible>
-                      );
-                    })}
-                  </div>
-                )}
+                <EditableLineItemsTable
+                  lineItems={lineItems}
+                  loading={lineItemsLoading}
+                  saving={saving}
+                  onUpdate={updateLineItem}
+                  onDelete={deleteLineItem}
+                  onRegenerate={regenerateFromSource}
+                  totals={getTotals()}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1133,6 +893,34 @@ export default function AdminReports() {
           workerName={photoModal.workerName}
           timestamp={photoModal.timestamp}
           jobName={photoModal.jobName}
+        />
+
+        {/* CSV Preview Modal */}
+        <CSVPreviewModal
+          open={csvModalOpen}
+          onClose={() => setCsvModalOpen(false)}
+          lineItems={lineItems}
+          loading={lineItemsLoading}
+          saving={saving}
+          onUpdate={updateLineItem}
+          onExport={generateCSV}
+          onExportComplete={generateReport}
+          exportType="csv"
+          weekStart={selectedWeek}
+        />
+
+        {/* Xero Preview Modal */}
+        <CSVPreviewModal
+          open={xeroModalOpen}
+          onClose={() => setXeroModalOpen(false)}
+          lineItems={lineItems}
+          loading={lineItemsLoading}
+          saving={saving}
+          onUpdate={updateLineItem}
+          onExport={generateXeroCSV}
+          onExportComplete={generateReport}
+          exportType="xero"
+          weekStart={selectedWeek}
         />
       </div>
 

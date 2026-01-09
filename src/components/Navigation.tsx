@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building } from 'lucide-react';
+import { Menu, LogOut, LayoutDashboard, Users, Briefcase, Clock, FileText, User, Settings, Building, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkerNotifications } from '@/components/WorkerNotifications';
 
@@ -58,7 +58,7 @@ export const Navigation: React.FC = () => {
   if (!user) return null;
 
   return (
-    <nav className="bg-black shadow-lg sticky top-0 z-50">
+    <nav className="bg-primary shadow-lg sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Organization */}
@@ -79,7 +79,7 @@ export const Navigation: React.FC = () => {
             ) : null}
             
             <span className="font-bold text-xl text-white hover:text-gray-200">
-              AutoTime
+              TimeTrack
             </span>
           </div>
 
@@ -140,7 +140,7 @@ export const Navigation: React.FC = () => {
                 className={location.pathname === '/admin/amendments' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:text-white hover:bg-gray-800'}
               >
                 <Clock className="mr-2 h-4 w-4" />
-                Amendments
+                Additions
               </Button>
               <Button
                 id="nav-reports-button"
@@ -150,6 +150,15 @@ export const Navigation: React.FC = () => {
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Reports
+              </Button>
+              <Button
+                id="nav-resources-button"
+                variant={location.pathname === '/resources' ? 'secondary' : 'ghost'}
+                onClick={() => navigate('/resources')}
+                className={location.pathname === '/resources' ? 'text-black hover:text-white hover:bg-gray-700' : 'text-white hover:text-white hover:bg-gray-800'}
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Resources
               </Button>
               <Button
                 variant="ghost"
@@ -257,7 +266,7 @@ export const Navigation: React.FC = () => {
                       className="justify-start"
                     >
                       <Clock className="mr-2 h-4 w-4" />
-                      Amendments
+                      Additions
                     </Button>
                     <Button 
                       variant="ghost" 
@@ -266,6 +275,14 @@ export const Navigation: React.FC = () => {
                     >
                       <FileText className="mr-2 h-4 w-4" />
                       Reports
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => { navigate('/resources'); setIsOpen(false); }}
+                      className="justify-start"
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Resources
                     </Button>
                   </>
                 )}

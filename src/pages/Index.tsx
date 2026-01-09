@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PioneerLogo } from '@/components/PioneerLogo';
+import { AutoTimeLogo } from '@/components/AutoTimeLogo';
 import { DemoRequestModal } from '@/components/DemoRequestModal';
 import { Clock, MapPin, Users, BarChart3, Shield, Smartphone, Mail } from 'lucide-react';
 
@@ -49,10 +49,10 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
-              <PioneerLogo className="h-10 w-10" />
+              <AutoTimeLogo className="h-10 w-10" />
               <div>
-                <h1 className="text-xl font-bold text-primary">Pioneer</h1>
-                <p className="text-sm text-muted-foreground">Auto Timesheets</p>
+                <h1 className="text-xl font-bold text-primary">TimeTrack</h1>
+                <p className="text-sm text-muted-foreground">Workforce Management</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -96,7 +96,7 @@ const Index = () => {
             </DemoRequestModal>
           </div>
           <p className="text-sm text-muted-foreground mt-4">
-            Professional time tracking starts here • Pay monthly • Cancel anytime
+            Professional time tracking starts here | Pay monthly | Cancel anytime
           </p>
         </div>
       </section>
@@ -109,7 +109,7 @@ const Index = () => {
               Everything You Need for Time Tracking
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              From GPS verification to detailed reports, Pioneer has all the tools 
+              From GPS verification to detailed reports, TimeTrack has all the tools 
               to streamline your workforce management.
             </p>
           </div>
@@ -162,10 +162,10 @@ const Index = () => {
               </div>
               <hr />
               <div className="text-sm text-muted-foreground">
-                <p>• No setup fees</p>
-                <p>• Cancel anytime</p>
-                <p>• Only pay for active users</p>
-                <p>• Professional support included</p>
+                <p>No setup fees</p>
+                <p>Cancel anytime</p>
+                <p>Only pay for active users</p>
+                <p>Professional support included</p>
               </div>
               <Button className="w-full" onClick={() => navigate('/onboarding')}>
                 Get Started Today
@@ -179,8 +179,8 @@ const Index = () => {
       <footer className="border-t py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <PioneerLogo className="h-8 w-8" />
-            <span className="text-lg font-semibold">Pioneer Auto Timesheets</span>
+            <AutoTimeLogo className="h-8 w-8" />
+            <span className="text-lg font-semibold">TimeTrack</span>
           </div>
           <p className="text-muted-foreground">
             Professional time tracking for construction teams
@@ -192,3 +192,7 @@ const Index = () => {
 };
 
 export default Index;
+
+
+
+

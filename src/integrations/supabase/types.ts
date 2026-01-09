@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -65,6 +65,86 @@ export type Database = {
           },
           {
             foreignKeyName: "additional_costs_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      amendment_requests: {
+        Row: {
+          clock_entry_id: string
+          created_at: string | null
+          created_clock_entry_id: string | null
+          group_id: string
+          id: string
+          manager_id: string | null
+          manager_notes: string | null
+          payload: Json
+          processed_at: string | null
+          reason: string | null
+          status: string
+          type: string
+          updated_at: string | null
+          worker_id: string
+        }
+        Insert: {
+          clock_entry_id: string
+          created_at?: string | null
+          created_clock_entry_id?: string | null
+          group_id: string
+          id?: string
+          manager_id?: string | null
+          manager_notes?: string | null
+          payload: Json
+          processed_at?: string | null
+          reason?: string | null
+          status?: string
+          type: string
+          updated_at?: string | null
+          worker_id: string
+        }
+        Update: {
+          clock_entry_id?: string
+          created_at?: string | null
+          created_clock_entry_id?: string | null
+          group_id?: string
+          id?: string
+          manager_id?: string | null
+          manager_notes?: string | null
+          payload?: Json
+          processed_at?: string | null
+          reason?: string | null
+          status?: string
+          type?: string
+          updated_at?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amendment_requests_clock_entry_id_fkey"
+            columns: ["clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amendment_requests_created_clock_entry_id_fkey"
+            columns: ["created_clock_entry_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amendment_requests_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "amendment_requests_worker_id_fkey"
             columns: ["worker_id"]
             isOneToOne: false
             referencedRelation: "workers"
@@ -191,7 +271,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_reason: string | null
           auto_clocked_out: boolean | null
+          auto_clockout_reason: string | null
           auto_clockout_type: string | null
           clock_in: string
           clock_in_lat: number | null
@@ -206,12 +288,13 @@ export type Database = {
           id: string
           is_overtime: boolean | null
           job_id: string
+          linked_shift_id: string | null
           manual_entry: boolean | null
           needs_approval: boolean | null
           notes: string | null
           ot_approved_at: string | null
           ot_approved_by: string | null
-          ot_approved_reason: string | null
+          ot_rejection_reason: string | null
           ot_requested_at: string | null
           ot_status: string | null
           photo_required: boolean | null
@@ -222,7 +305,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_reason?: string | null
           auto_clocked_out?: boolean | null
+          auto_clockout_reason?: string | null
           auto_clockout_type?: string | null
           clock_in: string
           clock_in_lat?: number | null
@@ -237,12 +322,13 @@ export type Database = {
           id?: string
           is_overtime?: boolean | null
           job_id: string
+          linked_shift_id?: string | null
           manual_entry?: boolean | null
           needs_approval?: boolean | null
           notes?: string | null
           ot_approved_at?: string | null
           ot_approved_by?: string | null
-          ot_approved_reason?: string | null
+          ot_rejection_reason?: string | null
           ot_requested_at?: string | null
           ot_status?: string | null
           photo_required?: boolean | null
@@ -253,7 +339,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_reason?: string | null
           auto_clocked_out?: boolean | null
+          auto_clockout_reason?: string | null
           auto_clockout_type?: string | null
           clock_in?: string
           clock_in_lat?: number | null
@@ -268,12 +356,13 @@ export type Database = {
           id?: string
           is_overtime?: boolean | null
           job_id?: string
+          linked_shift_id?: string | null
           manual_entry?: boolean | null
           needs_approval?: boolean | null
           notes?: string | null
           ot_approved_at?: string | null
           ot_approved_by?: string | null
-          ot_approved_reason?: string | null
+          ot_rejection_reason?: string | null
           ot_requested_at?: string | null
           ot_status?: string | null
           photo_required?: boolean | null
@@ -294,6 +383,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_entries_linked_shift_id_fkey"
+            columns: ["linked_shift_id"]
+            isOneToOne: false
+            referencedRelation: "clock_entries"
             referencedColumns: ["id"]
           },
           {
@@ -429,6 +525,7 @@ export type Database = {
       expense_types: {
         Row: {
           amount: number
+          calculation_type: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -439,6 +536,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          calculation_type?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -449,6 +547,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          calculation_type?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -466,11 +565,13 @@ export type Database = {
           created_at: string | null
           distance_from_center: number
           event_type: string
+          grace_expires_at: string | null
           id: string
           job_radius: number
           latitude: number
           longitude: number
           metadata: Json | null
+          resolved_at: string | null
           safe_out_threshold: number
           shift_date: string
           timestamp: string
@@ -482,11 +583,13 @@ export type Database = {
           created_at?: string | null
           distance_from_center: number
           event_type: string
+          grace_expires_at?: string | null
           id?: string
           job_radius: number
           latitude: number
           longitude: number
           metadata?: Json | null
+          resolved_at?: string | null
           safe_out_threshold: number
           shift_date: string
           timestamp: string
@@ -498,11 +601,13 @@ export type Database = {
           created_at?: string | null
           distance_from_center?: number
           event_type?: string
+          grace_expires_at?: string | null
           id?: string
           job_radius?: number
           latitude?: number
           longitude?: number
           metadata?: Json | null
+          resolved_at?: string | null
           safe_out_threshold?: number
           shift_date?: string
           timestamp?: string
@@ -534,6 +639,7 @@ export type Database = {
           code: string
           county: string | null
           created_at: string | null
+          geofence_enabled: boolean | null
           geofence_radius: number | null
           id: string
           is_active: boolean | null
@@ -545,6 +651,9 @@ export type Database = {
           shift_days: number[] | null
           shift_end: string | null
           shift_start: string | null
+          show_rams_and_site_info: boolean | null
+          terms_and_conditions_url: string | null
+          waiver_url: string | null
         }
         Insert: {
           address: string
@@ -554,6 +663,7 @@ export type Database = {
           code: string
           county?: string | null
           created_at?: string | null
+          geofence_enabled?: boolean | null
           geofence_radius?: number | null
           id?: string
           is_active?: boolean | null
@@ -565,6 +675,9 @@ export type Database = {
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
+          show_rams_and_site_info?: boolean | null
+          terms_and_conditions_url?: string | null
+          waiver_url?: string | null
         }
         Update: {
           address?: string
@@ -574,6 +687,7 @@ export type Database = {
           code?: string
           county?: string | null
           created_at?: string | null
+          geofence_enabled?: boolean | null
           geofence_radius?: number | null
           id?: string
           is_active?: boolean | null
@@ -585,6 +699,9 @@ export type Database = {
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
+          show_rams_and_site_info?: boolean | null
+          terms_and_conditions_url?: string | null
+          waiver_url?: string | null
         }
         Relationships: [
           {
@@ -870,6 +987,51 @@ export type Database = {
         }
         Relationships: []
       }
+      rams_acceptances: {
+        Row: {
+          accepted_at: string
+          created_at: string
+          id: string
+          job_id: string
+          terms_and_conditions_url: string | null
+          waiver_url: string | null
+          worker_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          created_at?: string
+          id?: string
+          job_id: string
+          terms_and_conditions_url?: string | null
+          waiver_url?: string | null
+          worker_id: string
+        }
+        Update: {
+          accepted_at?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          terms_and_conditions_url?: string | null
+          waiver_url?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rams_acceptances_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rams_acceptances_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_audit_log: {
         Row: {
           action: string
@@ -1106,6 +1268,8 @@ export type Database = {
           shift_days: number[] | null
           shift_end: string | null
           shift_start: string | null
+          terms_accepted: boolean | null
+          terms_accepted_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1128,6 +1292,8 @@ export type Database = {
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1150,6 +1316,8 @@ export type Database = {
           shift_days?: number[] | null
           shift_end?: string | null
           shift_start?: string | null
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1236,22 +1404,6 @@ export type Database = {
           is_manager: boolean
           is_super_admin: boolean
           organization_id: string
-        }[]
-      }
-      get_overtime_requests: {
-        Args: never
-        Returns: {
-          clock_in: string
-          clock_out: string
-          hours: number
-          id: string
-          job_name: string
-          ot_approved_by: string
-          ot_approved_reason: string
-          ot_requested_at: string
-          ot_status: string
-          worker_id: string
-          worker_name: string
         }[]
       }
       get_recent_activity: {

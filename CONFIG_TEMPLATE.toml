@@ -1,0 +1,176 @@
+# Supabase Configuration Template
+# Copy this file's settings to your new Supabase project
+# Update project_id with your new project's ID
+
+# ============================================================================
+# PROJECT CONFIGURATION
+# ============================================================================
+# Replace YOUR_NEW_PROJECT_ID with the actual project ID from your new Supabase project
+# Find this at: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/general
+project_id = "YOUR_NEW_PROJECT_ID"
+
+# ============================================================================
+# API CONFIGURATION
+# ============================================================================
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+# ============================================================================
+# DATABASE CONFIGURATION
+# ============================================================================
+[db]
+port = 54322
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+# ============================================================================
+# REALTIME CONFIGURATION
+# ============================================================================
+[realtime]
+enabled = true
+ip_version = "dual"
+
+# ============================================================================
+# STUDIO CONFIGURATION
+# ============================================================================
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1:54321"
+
+# ============================================================================
+# INBUCKET (EMAIL TESTING) CONFIGURATION
+# ============================================================================
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+# ============================================================================
+# STORAGE CONFIGURATION
+# ============================================================================
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+# ============================================================================
+# AUTH CONFIGURATION
+# ============================================================================
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+security_update_password_require_reauthentication = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+# ============================================================================
+# EDGE FUNCTIONS CONFIGURATION
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Subscription Management Functions (JWT Required)
+# ----------------------------------------------------------------------------
+[functions.create-subscription]
+verify_jwt = true
+
+[functions.update-subscription]
+verify_jwt = true
+
+[functions.upgrade-subscription-plan]
+verify_jwt = true
+
+[functions.reconcile-subscription]
+verify_jwt = true
+
+# ----------------------------------------------------------------------------
+# Organization Management Functions
+# ----------------------------------------------------------------------------
+# Public function - allows organization creation during signup
+[functions.setup-organization]
+verify_jwt = false
+
+# Protected function - requires super admin authentication
+[functions.delete-organization]
+verify_jwt = true
+
+# ----------------------------------------------------------------------------
+# User Management Functions (JWT Required)
+# ----------------------------------------------------------------------------
+[functions.delete-user]
+verify_jwt = true
+
+[functions.manager-change-password]
+verify_jwt = true
+
+[functions.reset-manager-password]
+verify_jwt = true
+
+[functions.secure-profile-operations]
+verify_jwt = true
+
+# ----------------------------------------------------------------------------
+# Data Import Functions (JWT Required)
+# ----------------------------------------------------------------------------
+[functions.import-uk-postcodes]
+verify_jwt = true
+
+# ----------------------------------------------------------------------------
+# Public API Functions (No JWT Required)
+# ----------------------------------------------------------------------------
+# Geocoding - called during job creation
+[functions.geocode-postcode]
+verify_jwt = false
+
+# Demo requests - called from landing page
+[functions.send-demo-request]
+verify_jwt = false
+
+# Notifications - called by database triggers
+[functions.send-amendment-notification]
+verify_jwt = false
+
+# Payment processing - called from frontend
+[functions.create-payment-intent]
+verify_jwt = false
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# 
+# After updating project_id:
+# 1. Save this file as supabase/config.toml in your project
+# 2. Edge functions will be automatically deployed by your deployment pipeline
+# 3. Verify deployment in Supabase Dashboard > Edge Functions
+# 4. Test each function to ensure it's working correctly
+# 
+# Security Notes:
+# - Functions with verify_jwt = true require authentication
+# - Functions with verify_jwt = false are public (use with caution)
+# - Public functions should implement their own security measures
+# - All public functions should validate and sanitize input
+# 
+# Required Secrets (configure in Supabase Dashboard):
+# - GOOGLE_GEOCODING_API_KEY (for geocode-postcode)
+# - RESEND_API_KEY (for send-demo-request, send-amendment-notification)
+# - FROM_EMAIL (for email sending)
+# - TO_EMAIL (for demo requests)
+# - ALLOWED_ORIGINS (optional, for CORS)
+# - SITE_URL (optional, for email links)
+# 
+# ============================================================================
+

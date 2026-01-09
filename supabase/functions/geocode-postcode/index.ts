@@ -8,6 +8,8 @@ const googleApiKey = Deno.env.get('GOOGLE_GEOCODING_API_KEY')!
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+const UK_POSTCODE_REGEX = /^([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})$/i;
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -84,8 +86,6 @@ serve(async (req: Request) => {
     } catch (error) {
       console.log('✗ Google API failed:', error instanceof Error ? error.message : 'Unknown error');
     }
-    
-    const UK_POSTCODE_REGEX = /^([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})$/i;
 
     // Tier 2: Try local postcode database (UK postcodes only)
     if (postcode) {

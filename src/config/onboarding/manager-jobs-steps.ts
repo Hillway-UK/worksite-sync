@@ -8,8 +8,13 @@ export const jobsSteps: Step[] = [
     disableBeacon: true,
   },
   {
+    target: '#rams-global-toggle',
+    content: '📋 Global RAMS & Site Info Toggle: Control whether RAMS and Site Information documents are visible to workers across all jobs at once.',
+    placement: 'bottom',
+  },
+  {
     target: '.btn-add-job',
-    content: '➕ Click here to add a new job site with geofence tracking.',
+    content: '➕ Click here to add a new job site with geofence tracking and upload job documents.',
     placement: 'bottom',
   },
   {
@@ -49,7 +54,7 @@ export const jobsSteps: Step[] = [
   },
   {
     target: '#nav-amendments-button',
-    content: '📝 Ready to manage time and expense amendments? Click here to review and approve worker submissions!',
+    content: '📝 Ready to manage time and expense additions? Click here to review and approve worker submissions!',
     placement: 'bottom',
   },
 ];

@@ -10,6 +10,18 @@ import { JobDialog } from '@/components/JobDialog';
 import { AddressDisplay } from '@/components/AddressDisplay';
 import { toast } from '@/hooks/use-toast';
 import { Briefcase, Search, MapPin, ToggleLeft, ToggleRight, Plus, HelpCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ManagerTourGate } from '@/components/onboarding/ManagerTourGate';
 import { jobsSteps } from '@/config/onboarding';
@@ -34,6 +46,7 @@ interface Job {
   longitude: number;
   geofence_radius: number;
   is_active: boolean;
+  show_rams_and_site_info?: boolean;
   created_at: string;
 }
 
@@ -41,7 +54,12 @@ export default function AdminJobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [workerCounts, setWorkerCounts] = useState<Record<string, number>>({});
   const [showJobsTour, setShowJobsTour] = useState(false);
+  const [showRamsGlobal, setShowRamsGlobal] = useState<boolean>(true);
+  const [updatingGlobal, setUpdatingGlobal] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingToggleValue, setPendingToggleValue] = useState<boolean>(true);
 
   useEffect(() => {
     fetchJobs();
@@ -58,6 +76,14 @@ export default function AdminJobs() {
     checkAutoRun();
   }, []);
 
+  useEffect(() => {
+    if (jobs.length > 0) {
+      // Set global toggle based on majority of jobs
+      const enabledCount = jobs.filter(j => j.show_rams_and_site_info !== false).length;
+      setShowRamsGlobal(enabledCount > jobs.length / 2);
+    }
+  }, [jobs]);
+
   const handleJobsTourEnd = async () => {
     setShowJobsTour(false);
     await markPageTutorialComplete('jobs');
@@ -70,8 +96,62 @@ export default function AdminJobs() {
     }
   };
 
+  const handleGlobalToggleChange = (newValue: boolean) => {
+    setPendingToggleValue(newValue);
+    setShowConfirmDialog(true);
+  };
+
+  const confirmGlobalToggle = async () => {
+    try {
+      setUpdatingGlobal(true);
+      
+      // Get manager's organization
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return;
+
+      const { data: manager } = await supabase
+        .from('managers')
+        .select('organization_id')
+        .eq('email', user.email)
+        .maybeSingle();
+      
+      if (!manager?.organization_id) return;
+
+      // Batch update all jobs in this organization
+      const { error } = await supabase
+        .from('jobs')
+        .update({ show_rams_and_site_info: pendingToggleValue } as any)
+        .eq('organization_id', manager.organization_id);
+
+      if (error) throw error;
+
+      // Update local state
+      setShowRamsGlobal(pendingToggleValue);
+      
+      toast({
+        title: "Success",
+        description: `RAMS & Site Info ${pendingToggleValue ? 'enabled' : 'disabled'} for all jobs`,
+      });
+
+      // Refresh jobs list
+      fetchJobs();
+    } catch (error: any) {
+      console.error('Error updating global toggle:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update settings",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingGlobal(false);
+      setShowConfirmDialog(false);
+    }
+  };
+
   const fetchJobs = async () => {
     try {
+      setLoading(true);
+
       // Get manager's organization
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) {
@@ -83,7 +163,7 @@ export default function AdminJobs() {
         .from('managers')
         .select('organization_id')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
       
       if (managerError || !manager?.organization_id) {
         toast({
@@ -95,15 +175,45 @@ export default function AdminJobs() {
         return;
       }
 
-      // Fetch only jobs from this organization
-      const { data, error } = await supabase
+      // Fetch jobs from this organization
+      const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
         .eq('organization_id', manager.organization_id)
         .order('name');
 
-      if (error) throw error;
-      setJobs(data || []);
+      if (jobsError) throw jobsError;
+      
+      setJobs(jobsData || []);
+
+      // Fetch ALL active clock entries for this organization's jobs in ONE query
+      if (jobsData && jobsData.length > 0) {
+        const jobIds = jobsData.map(job => job.id);
+        
+        const { data: activeClockEntries, error: clockError } = await supabase
+          .from('clock_entries')
+          .select('job_id')
+          .in('job_id', jobIds)
+          .is('clock_out', null);
+
+        if (!clockError && activeClockEntries) {
+          // Aggregate counts by job_id
+          const counts: Record<string, number> = {};
+          activeClockEntries.forEach(entry => {
+            counts[entry.job_id] = (counts[entry.job_id] || 0) + 1;
+          });
+          setWorkerCounts(counts);
+        } else {
+          // If error or no data, set all counts to 0
+          const counts: Record<string, number> = {};
+          jobsData.forEach(job => {
+            counts[job.id] = 0;
+          });
+          setWorkerCounts(counts);
+        }
+      } else {
+        setWorkerCounts({});
+      }
 
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -147,29 +257,21 @@ export default function AdminJobs() {
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('⚠️ Are you sure you want to delete this job?\n\nThis will also permanently delete:\n• All clock entries (time records)\n• All time amendments\n• All additional costs/expenses\n• All clock entry history\n\nThis action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this job? This will also delete all associated time entries, job assignments, and related data. This action cannot be undone.')) {
       return;
     }
     
     try {
-      console.log('Starting job deletion cascade for job:', jobId);
-      
       // Step 1: Get all clock entries for this job
-      const { data: clockEntries, error: fetchError } = await supabase
+      const { data: clockEntries } = await supabase
         .from('clock_entries')
         .select('id')
         .eq('job_id', jobId);
       
-      if (fetchError) {
-        console.error('Error fetching clock entries:', fetchError);
-        throw new Error('Failed to fetch clock entries');
-      }
-      
       if (clockEntries && clockEntries.length > 0) {
         const clockEntryIds = clockEntries.map(ce => ce.id);
-        console.log(`Found ${clockEntryIds.length} clock entries to cascade delete`);
         
-        // Step 2: Delete time amendments
+        // Delete time amendments (references clock_entries)
         const { error: amendmentsError } = await supabase
           .from('time_amendments')
           .delete()
@@ -177,11 +279,9 @@ export default function AdminJobs() {
         
         if (amendmentsError) {
           console.error('Error deleting time amendments:', amendmentsError);
-          throw new Error('Failed to delete time amendments');
         }
-        console.log('✓ Time amendments deleted');
         
-        // Step 3: Delete additional costs (expenses)
+        // Delete additional costs (references clock_entries)
         const { error: costsError } = await supabase
           .from('additional_costs')
           .delete()
@@ -189,11 +289,9 @@ export default function AdminJobs() {
         
         if (costsError) {
           console.error('Error deleting additional costs:', costsError);
-          throw new Error('Failed to delete additional costs');
         }
-        console.log('✓ Additional costs deleted');
         
-        // Step 4: Delete clock entry history
+        // Delete clock entry history (references clock_entries)
         const { error: historyError } = await supabase
           .from('clock_entry_history')
           .delete()
@@ -201,37 +299,27 @@ export default function AdminJobs() {
         
         if (historyError) {
           console.error('Error deleting clock entry history:', historyError);
-          throw new Error('Failed to delete clock entry history');
         }
-        console.log('✓ Clock entry history deleted');
-        
-        // Step 5: Delete all clock entries (this will cascade delete geofence_events via DB)
-        const { error: clockEntriesError } = await supabase
-          .from('clock_entries')
-          .delete()
-          .eq('job_id', jobId);
-        
-        if (clockEntriesError) {
-          console.error('Error deleting clock entries:', clockEntriesError);
-          throw new Error('Failed to delete clock entries');
-        }
-        console.log('✓ Clock entries deleted');
-      } else {
-        console.log('No clock entries found for this job');
       }
       
-      // Step 6: Finally, delete the job itself
+      // Step 2: Delete all clock entries for this job
+      const { error: clockEntriesError } = await supabase
+        .from('clock_entries')
+        .delete()
+        .eq('job_id', jobId);
+      
+      if (clockEntriesError) {
+        console.error('Error deleting clock entries:', clockEntriesError);
+        throw new Error('Failed to delete clock entries: ' + clockEntriesError.message);
+      }
+      
+      // Step 3: Delete the job (cascades to job_assignments automatically)
       const { error: jobError } = await supabase
         .from('jobs')
         .delete()
         .eq('id', jobId);
       
-      if (jobError) {
-        console.error('Error deleting job:', jobError);
-        throw jobError;
-      }
-      
-      console.log('✓ Job deleted successfully');
+      if (jobError) throw jobError;
       
       toast({
         title: "Success",
@@ -240,10 +328,10 @@ export default function AdminJobs() {
       
       fetchJobs(); // Refresh the list
     } catch (error: any) {
-      console.error('Error during job deletion cascade:', error);
+      console.error('Error deleting job:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete job. Please check the console for details.",
+        description: error.message || "Failed to delete job",
         variant: "destructive",
       });
     }
@@ -289,6 +377,7 @@ export default function AdminJobs() {
                       <TableHead>Name</TableHead>
                       <TableHead>Address</TableHead>
                       <TableHead>Geofence</TableHead>
+                      <TableHead>Workers On Site</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -300,6 +389,7 @@ export default function AdminJobs() {
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-8 rounded-full" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-2">
@@ -333,9 +423,25 @@ export default function AdminJobs() {
         </div>
 
         <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Jobs ({jobs.length})</CardTitle>
-            <div className="flex gap-4">
+          <CardHeader className="flex flex-col space-y-4">
+            <div className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-4">
+                <CardTitle>Jobs ({jobs.length})</CardTitle>
+                
+                {/* Global RAMS Toggle */}
+                <div id="rams-global-toggle" className="flex items-center gap-2 border-l pl-4">
+                  <Switch
+                    checked={showRamsGlobal}
+                    onCheckedChange={handleGlobalToggleChange}
+                    disabled={updatingGlobal || jobs.length === 0}
+                  />
+                  <Label className="text-sm font-normal cursor-pointer">
+                    Show RAMS & Site Info
+                  </Label>
+                </div>
+              </div>
+              
+              <div className="flex gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -357,6 +463,7 @@ export default function AdminJobs() {
               </Button>
               <JobDialog onSave={fetchJobs} triggerClassName="btn-add-job" />
             </div>
+          </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="rounded-md border">
@@ -375,7 +482,7 @@ export default function AdminJobs() {
                 <TableBody>
                   {filteredJobs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
+                      <TableCell colSpan={7} className="text-center py-12">
                         {searchTerm ? (
                           <div>
                             <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -430,6 +537,14 @@ export default function AdminJobs() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          <Badge 
+                            variant={workerCounts[job.id] > 0 ? "default" : "secondary"}
+                            className="workers-on-site-badge"
+                          >
+                            {workerCounts[job.id] || 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={job.is_active ? "default" : "secondary"}>
                             {job.is_active ? 'Active' : 'Inactive'}
                           </Badge>
@@ -482,6 +597,29 @@ export default function AdminJobs() {
           completionDescription="You now know how to manage jobs! If you want a refresher later, just click the 'Tutorial' button on this page."
           exploreButtonText="Explore Jobs"
         />
+
+        {/* Confirmation Dialog for Global Toggle */}
+        <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Apply to All Jobs?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will {pendingToggleValue ? 'show' : 'hide'} RAMS & Site Information 
+                documents for all {jobs.length} job(s) in your organization. 
+                {!pendingToggleValue && ' Workers will not be able to view or accept these documents.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={updatingGlobal}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmGlobalToggle}
+                disabled={updatingGlobal}
+              >
+                {updatingGlobal ? 'Updating...' : 'Confirm'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Layout>
     );
   }

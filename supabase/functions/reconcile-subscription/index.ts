@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Reconciliation error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error.message }),

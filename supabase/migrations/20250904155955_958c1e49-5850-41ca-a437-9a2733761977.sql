@@ -6,7 +6,7 @@ SET organization_id = (
   WHERE name ILIKE '%hillway%' 
   LIMIT 1
 )
-WHERE email = 'manager@pioneer.com' AND organization_id IS NULL;
+WHERE email = 'manager@hillwayco.uk' AND organization_id IS NULL;
 
 -- Step 2: Identify and consolidate duplicate Hillway organizations
 -- Get the organization with most workers (or first one if tied)

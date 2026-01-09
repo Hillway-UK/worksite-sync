@@ -39,7 +39,6 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://lovable.dev"]
 jwt_expiry = 3600
 refresh_token_rotation_enabled = true
 security_update_password_require_reauthentication = true
@@ -83,4 +82,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.send-amendment-notification]
+verify_jwt = false
+
+[functions.get-jobs-with-worker-counts]
+verify_jwt = true
+
+[functions.send-invitation-email]
 verify_jwt = false

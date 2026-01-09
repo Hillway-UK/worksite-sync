@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { Separator } from '@/components/ui/separator';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
-const stripePromise = loadStripe('pk_test_51Jv4K2LXpjQqS8kXFKkN0YV9X4mKRhGwY5Y8KZGxHvR4VvQZJ6NnPX9RY5FqK4x5RqN8M0xKqY5Z8Y5Z8Y5Z00Y5Z8Y5Z8');
+const stripePromise = loadStripe(
+  "pk_test_51Jv4K2LXpjQqS8kXFKkN0YV9X4mKRhGwY5Y8KZGxHvR4VvQZJ6NnPX9RY5FqK4x5RqN8M0xKqY5Z8Y5Z8Y5Z00Y5Z8Y5Z8",
+);
 
 function PaymentStep({ orgData, organizationId }: any) {
   const stripe = useStripe();
@@ -23,64 +25,61 @@ function PaymentStep({ orgData, organizationId }: any) {
     if (!stripe || !elements) return;
 
     setProcessing(true);
-    
+
     // For testing - just complete the payment
     try {
-      await supabase
-        .from('organizations')
-        .update({ subscription_status: 'active' })
-        .eq('id', organizationId);
-      
-      toast.success('Account activated successfully!');
-      navigate('/admin');
+      await supabase.from("organizations").update({ subscription_status: "active" }).eq("id", organizationId);
+
+      toast.success("Account activated successfully!");
+      navigate("/admin");
     } catch (error) {
-      toast.error('Payment failed');
+      toast.error("Payment failed");
     } finally {
       setProcessing(false);
     }
   };
 
-  const monthlyTotal = (orgData.managerCount * 25) + (orgData.workerCount * 1.5);
+  const monthlyTotal = orgData.managerCount * 25 + orgData.workerCount * 1.5;
 
   return (
     <form onSubmit={handlePayment}>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: "20px" }}>
         <PaymentElement />
       </div>
-      
+
       <button
         type="submit"
         disabled={!stripe || processing}
         style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: '#702D30',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '16px',
-          cursor: processing ? 'not-allowed' : 'pointer',
-          opacity: processing ? 0.7 : 1
+          width: "100%",
+          padding: "12px",
+          backgroundColor: "#000000",
+          color: "white",
+          border: "none",
+          borderRadius: "6px",
+          fontSize: "16px",
+          cursor: processing ? "not-allowed" : "pointer",
+          opacity: processing ? 0.7 : 1,
         }}
       >
-        {processing ? 'Processing...' : `Pay £${monthlyTotal.toFixed(2)}/month`}
+        {processing ? "Processing..." : `Pay £${monthlyTotal.toFixed(2)}/month`}
       </button>
-      
+
       <button
         type="button"
         onClick={() => {
-          navigate('/admin');
+          navigate("/admin");
         }}
         style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: 'transparent',
-          color: '#702D30',
-          border: '1px solid #702D30',
-          borderRadius: '6px',
-          fontSize: '14px',
-          marginTop: '10px',
-          cursor: 'pointer'
+          width: "100%",
+          padding: "12px",
+          backgroundColor: "transparent",
+          color: "#000000",
+          border: "1px solid #000000",
+          borderRadius: "6px",
+          fontSize: "14px",
+          marginTop: "10px",
+          cursor: "pointer",
         }}
       >
         Skip Payment (Test Mode)
@@ -91,34 +90,34 @@ function PaymentStep({ orgData, organizationId }: any) {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<'organization' | 'payment' | 'complete'>('organization');
+  const [currentStep, setCurrentStep] = useState<"organization" | "payment" | "complete">("organization");
   const [loading, setLoading] = useState(false);
-  const [organizationId, setOrganizationId] = useState<string>('');
-  const [clientSecret, setClientSecret] = useState<string>('');
-  
+  const [organizationId, setOrganizationId] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>("");
+
   const [orgData, setOrgData] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    admin_name: '',
-    admin_email: '',
-    admin_password: '',
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
     managerCount: 1,
-    workerCount: 5
+    workerCount: 5,
   });
 
   const handleCreateOrganization = async () => {
     try {
       setLoading(true);
-      
+
       if (!orgData.name || !orgData.admin_email || !orgData.admin_password) {
-        toast.error('Please fill in all required fields');
+        toast.error("Please fill in all required fields");
         return;
       }
 
       if (orgData.admin_password.length < 8) {
-        toast.error('Password must be at least 8 characters');
+        toast.error("Password must be at least 8 characters");
         return;
       }
 
@@ -129,22 +128,22 @@ export default function Onboarding() {
         options: {
           emailRedirectTo: "https://autotime.hillwayco.uk/login",
           data: {
-            role: 'super_admin'
-          }
-        }
+            role: "super_admin",
+          },
+        },
       });
 
       if (authError) throw authError;
 
       // Create organization (without max_workers/max_managers)
       const { data: org, error: orgError } = await supabase
-        .from('organizations')
+        .from("organizations")
         .insert({
           name: orgData.name,
           address: orgData.address || null,
           phone: orgData.phone || null,
           email: orgData.admin_email,
-          subscription_status: 'pending_payment'
+          subscription_status: "pending_payment",
         })
         .select()
         .single();
@@ -154,29 +153,26 @@ export default function Onboarding() {
       setOrganizationId(org.id);
 
       // Create manager
-      const { error: managerError } = await supabase
-        .from('managers')
-        .insert({
-          email: orgData.admin_email,
-          name: orgData.admin_name,
-          organization_id: org.id
-        });
+      const { error: managerError } = await supabase.from("managers").insert({
+        email: orgData.admin_email,
+        name: orgData.admin_name,
+        organization_id: org.id,
+      });
 
       if (managerError) throw managerError;
 
       // For testing - use a dummy client secret
-      setClientSecret('pi_test_secret_key');
-      setCurrentStep('payment');
-      toast.success('Account created! Complete payment to activate.');
-      
+      setClientSecret("pi_test_secret_key");
+      setCurrentStep("payment");
+      toast.success("Account created! Complete payment to activate.");
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create organization');
+      toast.error(error.message || "Failed to create organization");
     } finally {
       setLoading(false);
     }
   };
 
-  if (currentStep === 'complete') {
+  if (currentStep === "complete") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -192,13 +188,13 @@ export default function Onboarding() {
     );
   }
 
-  if (currentStep === 'payment' && clientSecret) {
+  if (currentStep === "payment" && clientSecret) {
     const options = {
       clientSecret,
       appearance: {
-        theme: 'stripe' as const,
+        theme: "stripe" as const,
         variables: {
-          colorPrimary: '#702D30',
+          colorPrimary: "#000000",
         },
       },
     };
@@ -210,7 +206,7 @@ export default function Onboarding() {
             <CardHeader>
               <CardTitle>Complete Payment</CardTitle>
               <CardDescription>
-                Monthly subscription: £{((orgData.managerCount * 25) + (orgData.workerCount * 1.5)).toFixed(2)}
+                Monthly subscription: £{(orgData.managerCount * 25 + orgData.workerCount * 1.5).toFixed(2)}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -233,31 +229,30 @@ export default function Onboarding() {
             <CardDescription>Enter your company details and choose your subscription</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            
             <div className="space-y-4">
               <div>
                 <Label>Company Name *</Label>
                 <Input
                   value={orgData.name}
-                  onChange={(e) => setOrgData({...orgData, name: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
                   placeholder="Your Company Name"
                 />
               </div>
-              
+
               <div>
                 <Label>Address</Label>
                 <Input
                   value={orgData.address}
-                  onChange={(e) => setOrgData({...orgData, address: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, address: e.target.value })}
                   placeholder="123 Main Street"
                 />
               </div>
-              
+
               <div>
                 <Label>Phone</Label>
                 <Input
                   value={orgData.phone}
-                  onChange={(e) => setOrgData({...orgData, phone: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, phone: e.target.value })}
                   placeholder="01234 567890"
                 />
               </div>
@@ -267,65 +262,65 @@ export default function Onboarding() {
 
             <div className="space-y-4">
               <h3 className="font-semibold">Choose Your Subscription</h3>
-              
+
               {/* WORKING MANAGER BUTTONS */}
               <div>
                 <Label>Managers</Label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                   <div
                     onClick={() => {
                       if (orgData.managerCount > 1) {
-                        setOrgData({...orgData, managerCount: orgData.managerCount - 1});
+                        setOrgData({ ...orgData, managerCount: orgData.managerCount - 1 });
                       }
                     }}
                     style={{
-                      width: '36px',
-                      height: '36px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: orgData.managerCount > 1 ? 'pointer' : 'not-allowed',
-                      backgroundColor: orgData.managerCount > 1 ? 'white' : '#f5f5f5',
-                      userSelect: 'none'
+                      width: "36px",
+                      height: "36px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: orgData.managerCount > 1 ? "pointer" : "not-allowed",
+                      backgroundColor: orgData.managerCount > 1 ? "white" : "#f5f5f5",
+                      userSelect: "none",
                     }}
                   >
                     -
                   </div>
-                  
+
                   <input
                     type="number"
                     value={orgData.managerCount}
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 1;
-                      if (val >= 1) setOrgData({...orgData, managerCount: val});
+                      if (val >= 1) setOrgData({ ...orgData, managerCount: val });
                     }}
                     style={{
-                      width: '60px',
-                      textAlign: 'center',
-                      padding: '4px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px'
+                      width: "60px",
+                      textAlign: "center",
+                      padding: "4px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
                     }}
                     min="1"
                   />
-                  
+
                   <div
                     onClick={() => {
-                      setOrgData({...orgData, managerCount: orgData.managerCount + 1});
+                      setOrgData({ ...orgData, managerCount: orgData.managerCount + 1 });
                     }}
                     style={{
-                      width: '36px',
-                      height: '36px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: 'white',
-                      userSelect: 'none'
+                      width: "36px",
+                      height: "36px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      backgroundColor: "white",
+                      userSelect: "none",
                     }}
                   >
                     +
@@ -333,65 +328,65 @@ export default function Onboarding() {
                 </div>
                 <p className="text-xs text-gray-600 mt-1">£25/month each</p>
               </div>
-              
+
               {/* WORKING WORKER BUTTONS */}
               <div>
                 <Label>Workers</Label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                   <div
                     onClick={() => {
                       if (orgData.workerCount > 0) {
-                        setOrgData({...orgData, workerCount: orgData.workerCount - 1});
+                        setOrgData({ ...orgData, workerCount: orgData.workerCount - 1 });
                       }
                     }}
                     style={{
-                      width: '36px',
-                      height: '36px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: orgData.workerCount > 0 ? 'pointer' : 'not-allowed',
-                      backgroundColor: orgData.workerCount > 0 ? 'white' : '#f5f5f5',
-                      userSelect: 'none'
+                      width: "36px",
+                      height: "36px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: orgData.workerCount > 0 ? "pointer" : "not-allowed",
+                      backgroundColor: orgData.workerCount > 0 ? "white" : "#f5f5f5",
+                      userSelect: "none",
                     }}
                   >
                     -
                   </div>
-                  
+
                   <input
                     type="number"
                     value={orgData.workerCount}
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 0;
-                      if (val >= 0) setOrgData({...orgData, workerCount: val});
+                      if (val >= 0) setOrgData({ ...orgData, workerCount: val });
                     }}
                     style={{
-                      width: '60px',
-                      textAlign: 'center',
-                      padding: '4px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px'
+                      width: "60px",
+                      textAlign: "center",
+                      padding: "4px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
                     }}
                     min="0"
                   />
-                  
+
                   <div
                     onClick={() => {
-                      setOrgData({...orgData, workerCount: orgData.workerCount + 1});
+                      setOrgData({ ...orgData, workerCount: orgData.workerCount + 1 });
                     }}
                     style={{
-                      width: '36px',
-                      height: '36px',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: 'white',
-                      userSelect: 'none'
+                      width: "36px",
+                      height: "36px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      backgroundColor: "white",
+                      userSelect: "none",
                     }}
                   >
                     +
@@ -399,12 +394,12 @@ export default function Onboarding() {
                 </div>
                 <p className="text-xs text-gray-600 mt-1">£1.50/month each</p>
               </div>
-              
+
               <div className="bg-gray-100 p-4 rounded-lg">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Monthly Total:</span>
                   <span className="text-2xl font-bold text-black">
-                    £{((orgData.managerCount * 25) + (orgData.workerCount * 1.5)).toFixed(2)}
+                    £{(orgData.managerCount * 25 + orgData.workerCount * 1.5).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -414,32 +409,32 @@ export default function Onboarding() {
 
             <div className="space-y-4">
               <h3 className="font-semibold">Admin Account</h3>
-              
+
               <div>
                 <Label>Your Name *</Label>
                 <Input
                   value={orgData.admin_name}
-                  onChange={(e) => setOrgData({...orgData, admin_name: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, admin_name: e.target.value })}
                   placeholder="John Smith"
                 />
               </div>
-              
+
               <div>
                 <Label>Your Email *</Label>
                 <Input
                   type="email"
                   value={orgData.admin_email}
-                  onChange={(e) => setOrgData({...orgData, admin_email: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, admin_email: e.target.value })}
                   placeholder="admin@company.com"
                 />
               </div>
-              
+
               <div>
                 <Label>Password * (min 8 characters)</Label>
                 <Input
                   type="password"
                   value={orgData.admin_password}
-                  onChange={(e) => setOrgData({...orgData, admin_password: e.target.value})}
+                  onChange={(e) => setOrgData({ ...orgData, admin_password: e.target.value })}
                   placeholder="********"
                   minLength={8}
                 />
@@ -450,17 +445,17 @@ export default function Onboarding() {
               onClick={handleCreateOrganization}
               disabled={loading}
               style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: loading ? '#ccc' : '#702D30',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: loading ? 'not-allowed' : 'pointer'
+                width: "100%",
+                padding: "12px",
+                backgroundColor: loading ? "#ccc" : "#000000",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "16px",
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? 'Creating Account...' : 'Continue to Payment'}
+              {loading ? "Creating Account..." : "Continue to Payment"}
             </button>
           </CardContent>
         </Card>
@@ -468,3 +463,5 @@ export default function Onboarding() {
     </div>
   );
 }
+
+
