@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -228,19 +229,14 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const apiKey = Deno.env.get("MAILCHANNELS_API_KEY");
-    const fromEmail = Deno.env.get("MAILCHANNELS_FROM_EMAIL");
-    const fromName = Deno.env.get("MAILCHANNELS_FROM_NAME") || "TimeTrack";
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
-    if (!apiKey) {
-      console.error("MAILCHANNELS_API_KEY not configured");
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY not configured");
       throw new Error("Email service not configured: missing API key");
     }
 
-    if (!fromEmail) {
-      console.error("MAILCHANNELS_FROM_EMAIL not configured");
-      throw new Error("Email service not configured: missing from email");
-    }
+    const resend = new Resend(resendApiKey);
 
     const payload: InvitationPayload = await req.json();
     console.log("Sending invitation email to:", payload.recipientEmail, "Type:", payload.type);
@@ -253,7 +249,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const orgName = organizationName || "Your Organization";
-    
+
     // Generate HTML based on type
     const htmlContent = type === "manager"
       ? generateManagerEmailHTML(recipientName, recipientEmail, password, orgName, loginUrl)
@@ -263,45 +259,23 @@ const handler = async (req: Request): Promise<Response> => {
       ? `Welcome to TimeTrack - Manager Account Created`
       : `Welcome to TimeTrack - Your Account is Ready`;
 
-    // Send email via MailChannels API
-    const emailResponse = await fetch("https://api.mailchannels.net/tx/v1/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": apiKey,
-      },
-      body: JSON.stringify({
-        personalizations: [
-          {
-            to: [{ email: recipientEmail, name: recipientName }],
-          },
-        ],
-        from: {
-          email: fromEmail,
-          name: fromName,
-        },
-        subject: subject,
-        content: [
-          {
-            type: "text/html",
-            value: htmlContent,
-          },
-        ],
-      }),
+    // Send email via Resend API
+    const { data, error } = await resend.emails.send({
+      from: "TimeTrack <no-reply@hillwayco.uk>",
+      to: [recipientEmail],
+      subject: subject,
+      html: htmlContent,
     });
 
-    console.log("MailChannels response status:", emailResponse.status);
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error("MailChannels error response:", errorText);
-      throw new Error(`MailChannels API error: ${emailResponse.status} - ${errorText}`);
+    if (error) {
+      console.error("Resend error:", error);
+      throw new Error(`Resend API error: ${error.message}`);
     }
 
-    console.log("Invitation email sent successfully to:", recipientEmail);
+    console.log("Invitation email sent successfully to:", recipientEmail, "ID:", data?.id);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Invitation email sent successfully" }),
+      JSON.stringify({ success: true, message: "Invitation email sent successfully", id: data?.id }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -320,5 +294,3 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 serve(handler);
-
-
