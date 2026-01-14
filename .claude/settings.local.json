@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Skill(deploy)"
+      "Skill(deploy)",
+      "mcp__ide__getDiagnostics",
+      "Bash(vercel:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(dir \"C:\\\\Users\\\\marcosm\\\\OneDrive - delaware\\\\Desktop\\\\Krista\\\\OLJ\\\\Hillway\\\\Codebase\\\\worksite-sync\\\\src\\\\routes\")"
     ]
   }
 }
