@@ -35,3 +35,12 @@ export type {
   UpdateOrganizationInput,
   OrganizationWithManagers,
 } from './organizations/OrganizationService';
+
+// Report Service
+export { ReportService, reportService } from './reports/ReportService';
+export type {
+  ClockEntryWithRelations,
+  AdditionalCostWithRelations,
+  ReportTotals,
+  GenerateLineItemsOptions,
+} from './reports/ReportService';
